@@ -244,13 +244,15 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     const invDate = new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     // Row 1 — invoice number is replaced by the customer-care WhatsApp QR.
-    const row1H = 100;
-    const qrSize = 64;
-    const qrGap = 3;
-    const captionSize = 6.5;
-    const captionBlockH = captionSize * 2 + 2;
-    const qrGroupH = qrSize + qrGap + captionBlockH;
-    const qrGroupTop = y + (row1H - qrGroupH) / 2;
+    // Caption lines are drawn separately so a wrapped text box cannot spill
+    // into the Order Date row underneath.
+    const row1H = 96;
+    const qrSize = 52;
+    const captionSize = 7;
+    doc.font('Helvetica-Bold').fontSize(captionSize);
+    const captionLineH = doc.currentLineHeight();
+    const qrGroupH = qrSize + 8 + captionLineH * 2;
+    const qrGroupTop = y + Math.max(8, (row1H - qrGroupH) / 2);
     const qrX = LEFT + (colW - qrSize) / 2;
 
     doc.save();
@@ -259,11 +261,15 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, y, colW, row1H).stroke();
     doc.image(careQr, qrX, qrGroupTop, { width: qrSize, height: qrSize });
     doc.font('Helvetica-Bold').fontSize(captionSize).fillColor('#6B1D2E');
-    doc.text('Scan to reach\nCustomer Care', LEFT + 4, qrGroupTop + qrSize + qrGap, {
-      width: colW - 8,
+    doc.text('Scan to reach', LEFT + 6, qrGroupTop + qrSize + 6, {
+      width: colW - 12,
       align: 'center',
-      lineGap: 0.5,
-      height: captionBlockH + 2,
+      lineBreak: false,
+    });
+    doc.text('Customer Care', LEFT + 6, qrGroupTop + qrSize + 6 + captionLineH, {
+      width: colW - 12,
+      align: 'center',
+      lineBreak: false,
     });
     doc.link(LEFT, y, colW, row1H, CUSTOMER_CARE_WHATSAPP_URL);
     cell(LEFT + colW,     y, colW, row1H, 'Order No.',          order.orderNumber, { bold: true, vAlign: 'middle' });
@@ -287,21 +293,25 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     y += cellH + 4;
 
     // ── Bill From / Shipped From boxes ──────────────────────────────────────
-    const partyH = 64;
+    doc.font('Helvetica').fontSize(8.5);
+    const partyAddrH = doc.heightOfString(vendorAddrText, { width: PAGE_W - 115 });
+    const partyH = Math.max(58, 20 + partyAddrH + 16);
     const drawParty = (yStart: number, label: string) => {
       doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, yStart, PAGE_W, partyH).stroke();
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
-      doc.text(`${label} :`, LEFT + 5, yStart + 5);
+      doc.text(`${label} :`, LEFT + 5, yStart + 6, { lineBreak: false });
       doc.font('Helvetica').fontSize(9);
-      doc.text(order.vendor.businessName, LEFT + 100, yStart + 5, { width: PAGE_W - 110 });
+      doc.text(order.vendor.businessName, LEFT + 100, yStart + 6, { width: PAGE_W - 110, lineBreak: false });
+      const addrY = yStart + 22;
       doc.font('Helvetica-Bold').fontSize(9);
-      doc.text('Address  :', LEFT + 5, yStart + 22);
+      doc.text('Address  :', LEFT + 5, addrY, { lineBreak: false });
       doc.font('Helvetica').fontSize(8.5);
-      doc.text(vendorAddrText, LEFT + 100, yStart + 22, { width: PAGE_W - 110 });
+      doc.text(vendorAddrText, LEFT + 100, addrY, { width: PAGE_W - 115 });
+      const gstinY = addrY + partyAddrH + 6;
       doc.font('Helvetica-Bold').fontSize(9);
-      doc.text('GSTIN  :', LEFT + 5, yStart + 48);
+      doc.text('GSTIN  :', LEFT + 5, gstinY, { lineBreak: false });
       doc.font('Helvetica').fontSize(9);
-      doc.text(vendorGstin, LEFT + 100, yStart + 48, { width: PAGE_W - 110 });
+      doc.text(vendorGstin, LEFT + 100, gstinY, { width: PAGE_W - 110, lineBreak: false });
     };
 
     drawParty(y, 'Bill From');
@@ -310,24 +320,43 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     y += partyH + 4;
 
     // ── Bill To / Ship To (2-col) ───────────────────────────────────────────
+    // Box height follows the wrapped address so GSTIN stays inside the box
+    // and cannot run into the items table.
     const halfW = PAGE_W / 2;
-    const buyerH = 110;
+    doc.font('Helvetica-Bold').fontSize(8.5);
+    const buyerLabelW = doc.widthOfString('Place of Supply :') + 10;
+    const buyerValueW = halfW - buyerLabelW - 14;
+    doc.font('Helvetica').fontSize(8.5);
+    const buyerLineH = (value: string) =>
+      Math.max(11, doc.heightOfString(value || '—', { width: buyerValueW }));
+    const buyerH =
+      8 +
+      12 +
+      buyerLineH(buyerOutletName) + 3 +
+      buyerLineH(buyerAddressText) + 3 +
+      buyerLineH(buyerPincode) + 3 +
+      buyerLineH(buyerStateForSupply) + 3 +
+      buyerLineH(buyerGstin) + 8;
 
     const drawBuyer = (xStart: number, label: string) => {
       doc.lineWidth(0.6).strokeColor('#000').rect(xStart, y, halfW, buyerH).stroke();
-      const lx = xStart + 5;
-      const vx = xStart + 70;
-      let by = y + 5;
+      const lx = xStart + 6;
+      const vx = xStart + 6 + buyerLabelW;
+      let by = y + 6;
 
       const line = (k: string, v: string) => {
-        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000').text(k, lx, by);
-        doc.font('Helvetica').fontSize(8.5).text(v, vx, by, { width: halfW - 75 });
-        const lines = Math.max(1, Math.ceil(v.length / 38));
-        by += 4 + Math.max(11, lines * 10);
+        const shown = v || '—';
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000');
+        doc.text(k, lx, by, { lineBreak: false });
+        doc.font('Helvetica').fontSize(8.5);
+        const h = buyerLineH(shown);
+        doc.text(shown, vx, by, { width: buyerValueW });
+        by += h + 3;
       };
 
-      doc.font('Helvetica-Bold').fontSize(9).text(`${label} :`, lx, by);
-      by += 14;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
+      doc.text(`${label} :`, lx, by, { lineBreak: false });
+      by += 12;
       line('Outlet :', buyerOutletName);
       line('Address :', buyerAddressText);
       line('Pincode :', buyerPincode);
@@ -342,20 +371,26 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     // ── Items table ─────────────────────────────────────────────────────────
     // Keep headers to 1–2 short lines so they never spill into the next column.
     // PAGE_W ≈ 535; widths must sum exactly to PAGE_W.
-    const COL = {
-      sl:      { x: LEFT,       w: 18 },
-      desc:    { x: LEFT + 18,  w: 108 },
-      hsn:     { x: LEFT + 126, w: 36 },
-      qty:     { x: LEFT + 162, w: 28 },
-      unit:    { x: LEFT + 190, w: 42 },
-      uom:     { x: LEFT + 232, w: 30 },
-      preTax:  { x: LEFT + 262, w: 42 },
-      disc:    { x: LEFT + 304, w: 36 },
-      taxable: { x: LEFT + 340, w: 44 },
-      taxRate: { x: LEFT + 384, w: 36 },
-      taxAmt:  { x: LEFT + 420, w: 44 },
-      total:   { x: LEFT + 464, w: PAGE_W - 464 },
-    };
+    const colSpec = [
+      ['sl', 22],
+      ['desc', 86],
+      ['hsn', 48],
+      ['qty', 28],
+      ['unit', 40],
+      ['uom', 32],
+      ['preTax', 42],
+      ['disc', 32],
+      ['taxable', 44],
+      ['taxRate', 58],
+      ['taxAmt', 40],
+    ] as const;
+    const COL: Record<string, { x: number; w: number }> = {};
+    let colX = LEFT;
+    for (const [key, w] of colSpec) {
+      COL[key] = { x: colX, w };
+      colX += w;
+    }
+    COL.total = { x: colX, w: LEFT + PAGE_W - colX };
 
     const headerH = 28;
 
@@ -403,8 +438,14 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       doc.font('Helvetica').fontSize(8);
 
       for (const item of list) {
-        const lines = Math.max(1, Math.ceil(item.productName.length / 28));
-        const rowH = Math.max(20, lines * 10 + 8);
+        const taxLabel = formatLineTaxRate(item.taxPercent, supplyType);
+        doc.font('Helvetica').fontSize(8);
+        const nameH = doc.heightOfString(item.productName, { width: COL.desc.w - 6 });
+        doc.font('Helvetica').fontSize(7);
+        const hsnH = doc.heightOfString(item.hsn ?? '-', { width: COL.hsn.w - 4 });
+        doc.font('Helvetica').fontSize(6.5);
+        const taxH = doc.heightOfString(taxLabel, { width: COL.taxRate.w - 4 });
+        const rowH = Math.max(20, nameH, hsnH, taxH) + 8;
 
         doc.lineWidth(0.4).strokeColor('#000').rect(LEFT, y, PAGE_W, rowH).stroke();
         Object.values(COL).forEach((c, idx) => {
@@ -412,18 +453,22 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
         });
 
         doc.fillColor('#000').font('Helvetica').fontSize(8);
-        doc.text(String(serial++), COL.sl.x + 1, y + 4, { width: COL.sl.w - 2, align: 'center' });
-        doc.text(item.productName,  COL.desc.x + 2, y + 4, { width: COL.desc.w - 4 });
-        doc.text(item.hsn ?? '-',   COL.hsn.x + 1, y + 4, { width: COL.hsn.w - 2, align: 'center' });
-        doc.text(String(item.quantity), COL.qty.x, y + 4, { width: COL.qty.w, align: 'center' });
-        doc.text(fmtNum(item.unitPrice), COL.unit.x, y + 4, { width: COL.unit.w - 2, align: 'right' });
-        doc.text(item.unit,         COL.uom.x, y + 4, { width: COL.uom.w, align: 'center' });
-        doc.text(fmtNum(item.preTax), COL.preTax.x, y + 4, { width: COL.preTax.w - 2, align: 'right' });
-        doc.text(fmtNum(item.discount), COL.disc.x, y + 4, { width: COL.disc.w - 2, align: 'right' });
-        doc.text(fmtNum(item.taxableAmount), COL.taxable.x, y + 4, { width: COL.taxable.w - 2, align: 'right' });
-        doc.text(formatLineTaxRate(item.taxPercent, supplyType), COL.taxRate.x, y + 4, { width: COL.taxRate.w, align: 'center' });
-        doc.text(fmtNum(item.taxAmount), COL.taxAmt.x, y + 4, { width: COL.taxAmt.w - 2, align: 'right' });
-        doc.text(fmtNum(item.total), COL.total.x, y + 4, { width: COL.total.w - 2, align: 'right' });
+        doc.text(String(serial++), COL.sl.x + 1, y + 4, { width: COL.sl.w - 2, align: 'center', lineBreak: false });
+        doc.text(item.productName,  COL.desc.x + 2, y + 4, { width: COL.desc.w - 6 });
+        doc.fontSize(7);
+        doc.text(item.hsn ?? '-',   COL.hsn.x + 1, y + 4, { width: COL.hsn.w - 4, align: 'center' });
+        doc.fontSize(8);
+        doc.text(String(item.quantity), COL.qty.x, y + 4, { width: COL.qty.w - 2, align: 'center', lineBreak: false });
+        doc.text(fmtNum(item.unitPrice), COL.unit.x, y + 4, { width: COL.unit.w - 3, align: 'right', lineBreak: false });
+        doc.text(item.unit,         COL.uom.x, y + 4, { width: COL.uom.w - 2, align: 'center', lineBreak: false });
+        doc.text(fmtNum(item.preTax), COL.preTax.x, y + 4, { width: COL.preTax.w - 3, align: 'right', lineBreak: false });
+        doc.text(fmtNum(item.discount), COL.disc.x, y + 4, { width: COL.disc.w - 3, align: 'right', lineBreak: false });
+        doc.text(fmtNum(item.taxableAmount), COL.taxable.x, y + 4, { width: COL.taxable.w - 3, align: 'right', lineBreak: false });
+        doc.fontSize(6.5);
+        doc.text(taxLabel, COL.taxRate.x + 1, y + 5, { width: COL.taxRate.w - 4, align: 'center' });
+        doc.fontSize(8);
+        doc.text(fmtNum(item.taxAmount), COL.taxAmt.x, y + 4, { width: COL.taxAmt.w - 3, align: 'right', lineBreak: false });
+        doc.text(fmtNum(item.total), COL.total.x, y + 4, { width: COL.total.w - 4, align: 'right', lineBreak: false });
 
         y += rowH;
       }
@@ -502,12 +547,6 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     // ── Payment / Remittance Box (for Pending / Offline / Credit payments) ──
     const hasBankDetails = Boolean(order.vendor.bankAccountNumber && order.vendor.bankIfsc);
     if (!isPaid) {
-      const remitH = hasBankDetails ? 30 : 22;
-      doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, y, PAGE_W, remitH).stroke();
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c0392b');
-      doc.text('PAYMENT PENDING / REMITTANCE INSTRUCTIONS:', LEFT + 5, y + 3);
-      doc.font('Helvetica').fontSize(7.5).fillColor('#000');
-      
       let remitText = `Please remit payment against Order No. ${order.orderNumber} via ${payMethodDisplay}.`;
       if (hasBankDetails) {
         remitText += ` Bank: ${order.vendor.bankName || 'Vendor Bank'} | A/C Name: ${order.vendor.bankAccountName || order.vendor.businessName} | A/C No: ${order.vendor.bankAccountNumber} | IFSC: ${order.vendor.bankIfsc}`;
@@ -515,7 +554,14 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       if (order.customerPoNumber) {
         remitText += ` | PO Ref: ${order.customerPoNumber}`;
       }
-      doc.text(remitText, LEFT + 5, y + 13, { width: PAGE_W - 10, lineGap: 1 });
+      doc.font('Helvetica').fontSize(7.5);
+      const remitTextH = doc.heightOfString(remitText, { width: PAGE_W - 12 });
+      const remitH = 14 + remitTextH + 4;
+      doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, y, PAGE_W, remitH).stroke();
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c0392b');
+      doc.text('PAYMENT PENDING / REMITTANCE INSTRUCTIONS:', LEFT + 5, y + 4, { lineBreak: false });
+      doc.font('Helvetica').fontSize(7.5).fillColor('#000');
+      doc.text(remitText, LEFT + 5, y + 16, { width: PAGE_W - 12, lineGap: 1 });
       y += remitH + 4;
     }
 
@@ -533,6 +579,12 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     // Underline (red-ish)
     doc.lineWidth(1).strokeColor('#c0392b').moveTo(LEFT, y).lineTo(LEFT + PAGE_W, y).stroke();
     y += 12;
+
+    // Keep the company line and the phone line on the same page.
+    if (y > doc.page.height - 56) {
+      doc.addPage();
+      y = 40;
+    }
 
     // ── Footer: registered company info ─────────────────────────────────────
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
