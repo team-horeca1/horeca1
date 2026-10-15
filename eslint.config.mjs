@@ -15,8 +15,14 @@ const eslintConfig = defineConfig([
     // Local tunnel helpers (not app source)
     "tmp-tun*.js",
     "studio-horeca1/**",
+    // Local agent tooling (.cjs) is not app source. ESLint's React plugin
+    // is only registered for js/ts, so linting these crashes the config.
+    ".agent/**",
+    ".agents/**",
+    ".codex/**",
   ]),
   {
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "react/no-unescaped-entities": "warn",
