@@ -3,13 +3,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Search, Loader2, Eye, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, Download, X, ChevronDown, ArrowUpRight } from 'lucide-react';
+import { Search, Loader2, Eye, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, Download, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { personFirstCustomerLabel } from '@/lib/customerLabel';
 import { isAbandonedCart } from '@/lib/abandonedOrder';
 import { toast } from 'sonner';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import OrderWorkspace from '@/components/features/vendor/OrderWorkspace';
+import { OrderListFilters } from '@/components/features/orders/OrderListFilters';
+import { OrderPaymentBadge } from '@/components/features/orders/OrderPaymentBadge';
+import { OrderStatusBadge, OrderStatusSelect } from '@/components/features/orders/OrderStatusSelect';
+import { orderStatusLabel } from '@/components/features/orders/orderStatus';
 
 interface VendorOrder {
     id: string;
@@ -42,80 +46,6 @@ function orderFulfillmentChip(order: VendorOrder) {
     );
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const STATUS_STYLE: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-700 border-gray-200',
-    delivered: 'bg-primary-light text-primary border-[#D1FAE5]',
-    confirmed: 'bg-blue-50 text-blue-700 border-blue-100',
-    processing: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-    pending: 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]',
-    ready_for_dispatch: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-    shipped: 'bg-purple-50 text-purple-700 border-purple-100',
-    partially_delivered: 'bg-orange-50 text-orange-700 border-orange-100',
-    returned: 'bg-rose-50 text-rose-700 border-rose-100',
-    cancelled: 'bg-[#FDF2F2] text-[#EF4444] border-[#FEE2E2]',
-    abandoned: 'bg-amber-50 text-amber-800 border-amber-200',
-};
-
-const PAYMENT_STYLE: Record<string, string> = {
-    paid: 'bg-primary-light text-primary',
-    unpaid: 'bg-[#FFF4E5] text-[#976538]',
-    partial: 'bg-blue-50 text-blue-600',
-    refunded: 'bg-[#F3F4F6] text-[#6B7280]',
-};
-
-/** Row / dropdown labels for native order statuses (+ legacy aliases). */
-const STATUS_LABELS: Record<string, string> = {
-    draft: 'Draft',
-    pending: 'Pending',
-    accepted: 'Accepted',
-    confirmed: 'Accepted',
-    partially_accepted: 'Partially Accepted',
-    packed: 'Packed',
-    processing: 'Packed',
-    ready_for_dispatch: 'Ready for Dispatch',
-    dispatched: 'Dispatched',
-    shipped: 'Dispatched',
-    partially_delivered: 'Partially Fulfilled',
-    delivered: 'Delivered',
-    returned: 'Returned',
-    cancelled: 'Cancelled',
-    abandoned: 'Abandoned',
-};
-
-/** Tab chip labels — separate so Processing bucket ≠ DB processing → Packed. */
-const TAB_LABELS: Record<string, string> = {
-    all: 'All',
-    new: 'New',
-    processing: 'Processing',
-    partially_accepted: 'Partially Accepted',
-    packed: 'Packed',
-    ready_for_dispatch: 'Ready for Dispatch',
-    dispatched: 'Dispatched',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
-    abandoned: 'Abandoned',
-};
-
-const STATUS_OPTIONS = [
-    'pending', 'confirmed', 'processing', 'ready_for_dispatch',
-    'shipped', 'partially_delivered', 'delivered', 'returned', 'cancelled',
-];
-
-/** Filter tabs: New = Accepted; Processing = middle phases; single Delivered end-state. */
-const STATUS_TABS = [
-    'all',
-    'new',
-    'processing',
-    'partially_accepted',
-    'packed',
-    'ready_for_dispatch',
-    'dispatched',
-    'delivered',
-    'cancelled',
-    'abandoned',
-] as const;
 const PAGE_SIZE = 20;
 
 function isOverSLA(dateStr: string): boolean {
@@ -307,7 +237,7 @@ export default function VendorOrdersPage() {
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to update status');
-            toast.success(`Order set to ${STATUS_LABELS[newStatus] || newStatus.replace(/_/g, ' ')}`);
+            toast.success(`Order set to ${orderStatusLabel(newStatus)}`);
         } catch (err: unknown) {
             setOrders(os => os.map(o => o.id === orderId ? { ...o, status: prev } : o));
             toast.error(err instanceof Error ? err.message : 'Failed to update status');
@@ -487,76 +417,21 @@ export default function VendorOrdersPage() {
                 </div>
             </div>
 
-            {/* Status Tabs */}
-            <div className="flex items-center gap-2 flex-wrap">
-                        {STATUS_TABS.map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => handleTabChange(tab)}
-                        className={cn(
-                            'px-4 py-2 rounded-[10px] text-[13px] font-bold transition-all',
-                            activeTab === tab
-                                ? 'bg-primary text-white shadow-sm shadow-primary/30'
-                                : 'bg-white text-[#7C7C7C] border border-[#EEEEEE] hover:border-primary/30'
-                        )}
-                    >
-                        {TAB_LABELS[tab] || tab.replace(/_/g, ' ')}
-                    </button>
-                ))}
-            </div>
-
-            {/* Filter controls */}
-            <div className="flex items-center gap-3 flex-wrap">
-                <input
-                    type="date"
-                    value={dateFrom}
-                    max={today}
-                    onChange={e => setDateFrom(e.target.value)}
-                    title="From date"
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#181725] outline-none focus:border-primary/40 bg-white shadow-sm"
-                />
-                <input
-                    type="date"
-                    value={dateTo}
-                    min={dateFrom || undefined}
-                    max={today}
-                    onChange={e => setDateTo(e.target.value)}
-                    title="To date"
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#181725] outline-none focus:border-primary/40 bg-white shadow-sm"
-                />
-                <select
-                    value={paymentStatusFilter}
-                    onChange={e => setPaymentStatusFilter(e.target.value)}
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-primary/40 bg-white shadow-sm"
-                >
-                    <option value="">All Payment Status</option>
-                    <option value="paid">Paid</option>
-                    <option value="unpaid">Unpaid</option>
-                    <option value="partial">Partial</option>
-                    <option value="refunded">Refunded</option>
-                </select>
-                <select
-                    value={paymentMethodFilter}
-                    onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                    data-testid="payment-method-filter"
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-primary/40 bg-white shadow-sm"
-                >
-                    <option value="">All Methods</option>
-                    <option value="cod">Cash / COD</option>
-                    <option value="online">Online</option>
-                    <option value="credit">Credit</option>
-                    <option value="vendor_credit">Vendor Credit</option>
-                </select>
-                {hasActiveFilters && (
-                    <button
-                        onClick={clearFilters}
-                        className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] bg-white text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 transition-all"
-                    >
-                        <X size={12} />
-                        Clear
-                    </button>
-                )}
-            </div>
+            <OrderListFilters
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateFromChange={setDateFrom}
+                onDateToChange={setDateTo}
+                paymentStatus={paymentStatusFilter}
+                onPaymentStatusChange={setPaymentStatusFilter}
+                paymentMethod={paymentMethodFilter}
+                onPaymentMethodChange={setPaymentMethodFilter}
+                hasActiveFilters={Boolean(hasActiveFilters)}
+                onClear={clearFilters}
+                today={today}
+            />
 
             {selectedIds.length > 0 && (
                 <div
@@ -625,13 +500,11 @@ export default function VendorOrdersPage() {
                             >
                                 <div className="flex justify-between items-start gap-2">
                                     <p className="text-[14px] font-bold text-[#181725]">{order.orderNumber}</p>
-                                    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', isAbandonedCart(order) ? STATUS_STYLE.abandoned : (STATUS_STYLE[order.status] || 'bg-gray-100'))}>
-                                        {isAbandonedCart(order)
-                                            ? 'Abandoned'
-                                            : order.isPartial && order.status !== 'cancelled'
-                                            ? 'Partially Accepted'
-                                            : (STATUS_LABELS[order.status] ?? order.status)}
-                                    </span>
+                                    <OrderStatusBadge
+                                        status={order.status}
+                                        abandoned={isAbandonedCart(order)}
+                                        isPartial={Boolean(order.isPartial)}
+                                    />
                                 </div>
                                 <div>
                                     <p className="text-[12px] font-semibold text-[#181725]">
@@ -736,46 +609,16 @@ export default function VendorOrdersPage() {
                                                 {new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                                             </td>
                                             <td className="px-5 py-4 text-center">
-                                                <span className={cn(
-                                                    'text-[11px] font-bold px-2.5 py-1 rounded-[6px] uppercase',
-                                                    PAYMENT_STYLE[order.paymentStatus] || 'bg-gray-100 text-gray-500'
-                                                )}>
-                                                    {order.paymentStatus}
-                                                </span>
+                                                <OrderPaymentBadge paymentStatus={order.paymentStatus} />
                                             </td>
                                             <td className="px-5 py-4 text-center">
-                                                <div className="flex justify-center items-center">
-                                                    <div className="relative inline-block">
-                                                        <select
-                                                            value={abandoned ? 'abandoned' : order.status}
-                                                            disabled={busyId === order.id || abandoned}
-                                                            title={abandoned ? 'Abandoned cart. The customer can pay to make this a normal order.' : undefined}
-                                                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                                                            className={cn(
-                                                                "cursor-pointer rounded-[8px] text-[11px] font-black uppercase tracking-wider pl-3.5 pr-8 py-2 outline-none border border-transparent appearance-none disabled:opacity-50 transition-all shadow-sm",
-                                                                (abandoned ? STATUS_STYLE.abandoned : STATUS_STYLE[order.status]) || 'bg-gray-100 text-gray-700 border-gray-200'
-                                                            )}
-                                                        >
-                                                            {abandoned && (
-                                                                <option value="abandoned">Abandoned</option>
-                                                            )}
-                                                            {!STATUS_OPTIONS.includes(order.status) && (
-                                                                <option value={order.status} disabled className="bg-white text-gray-800 capitalize">
-                                                                    {STATUS_LABELS[order.status] || order.status.replace(/_/g, ' ')}
-                                                                </option>
-                                                            )}
-                                                            {STATUS_OPTIONS.map((s) => (
-                                                                <option key={s} value={s} className="bg-white text-gray-800 capitalize">
-                                                                    {STATUS_LABELS[s] || s.replace(/_/g, ' ')}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-                                                    </div>
-                                                    {busyId === order.id && (
-                                                        <Loader2 size={13} className="animate-spin text-primary ml-1.5 shrink-0" />
-                                                    )}
-                                                </div>
+                                                <OrderStatusSelect
+                                                    status={order.status}
+                                                    abandoned={abandoned}
+                                                    busy={busyId === order.id}
+                                                    title={abandoned ? 'Abandoned cart. The customer can pay to make this a normal order.' : undefined}
+                                                    onChange={(next) => updateOrderStatus(order.id, next)}
+                                                />
                                             </td>
                                             <td className="px-5 py-4 text-center">
                                                 <div className="flex justify-center">

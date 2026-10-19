@@ -98,7 +98,10 @@ export async function GET(
       });
       vendorIdFilter = Array.from(new Set(areas.map((a) => a.vendorId)));
       if (vendorIdFilter.length === 0) {
-        return NextResponse.json({ success: true, data: { items: [] } });
+        return NextResponse.json({
+          success: true,
+          data: { items: [], noVendorsForPincode: true },
+        });
       }
     }
 
@@ -184,7 +187,10 @@ export async function GET(
       })
       .slice(0, limit);
 
-    return NextResponse.json({ success: true, data: { items } });
+    return NextResponse.json({
+      success: true,
+      data: { items, noVendorsForPincode: false },
+    });
   } catch (error) {
     return errorResponse(error);
   }

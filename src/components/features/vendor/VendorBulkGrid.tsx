@@ -275,18 +275,19 @@ export default function VendorBulkGrid({
     { key: 'substituteMapping', label: 'Substitute Mapping', width: 'w-[150px]', type: 'text' },
   ], [brandNames, categoryNames, subCategoryNames, readOnlyCommission]);
 
-  const hideIdentity = isAdmin;
-  const supplierStock = isAdmin && Boolean(vendorId);
+  // Always hide Vendor ID / Item ID in the grid (both portals).
+  const hideIdentity = true;
+  const supplierStock = !isAdmin || Boolean(vendorId);
   const visibleColumns = useMemo(
     () => {
-      const base = hideIdentity ? COLUMNS.filter((c) => c.key !== 'vendorId' && c.key !== 'itemId') : COLUMNS;
+      const base = COLUMNS.filter((c) => c.key !== 'vendorId' && c.key !== 'itemId');
       return base.flatMap((col) => {
         if (col.key === 'qtyReserved' || col.key === 'stockNet') return supplierStock ? [col] : [];
         if (col.key === 'stockOnHand' && supplierStock) return [{ ...col, label: 'Available' }];
         return [col];
       });
     },
-    [COLUMNS, hideIdentity, supplierStock],
+    [COLUMNS, supplierStock],
   );
 
   const subCategoriesForParent = (parentName: string) => {

@@ -474,9 +474,11 @@ export const dal = {
           defaultOffer: Record<string, unknown>;
           offers: Record<string, unknown>[];
         }>;
+        noVendorsForPincode?: boolean;
       }>(`/api/v1/categories/${categoryId}/products${qs}`);
 
       return {
+        noVendorsForPincode: Boolean(data.noVendorsForPincode),
         items: (data.items ?? []).map((item) => {
           const defaultOffer = toVendorProduct(item.defaultOffer);
           // Prefer master identity on the card when available
