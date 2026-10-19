@@ -270,7 +270,10 @@ function HeaderChip(props: { label: string; isPortrait: boolean }) {
   );
 }
 
-/** Brand share card — mirrors BrandStoreCard: cover + scrim + name/check/categories/items pill. */
+/**
+ * Brand share card — full-bleed like BrandStoreCard.
+ * No white chrome, no Horeca1 logo header — only the cover + overlay.
+ */
 export function BrandShareCard(props: {
   format: 'portrait' | 'square';
   name: string;
@@ -278,150 +281,133 @@ export function BrandShareCard(props: {
   productCount?: number;
   imageUrl?: string | null;
   bgColor?: string | null;
-  logoUrl?: string | null;
 }) {
   const isPortrait = props.format === 'portrait';
-  const topPad = isPortrait ? 48 : 36;
-  const sidePad = isPortrait ? 52 : 40;
-  const bottomPad = isPortrait ? 44 : 36;
-  const coverH = isPortrait ? 980 : 780;
   const bg = props.bgColor?.trim() || PRIMARY;
   const count = props.productCount ?? 0;
   const initial = (props.name.trim()[0] || 'B').toUpperCase();
 
   return (
-    <div style={{ ...shell, padding: `${topPad}px ${sidePad}px ${bottomPad}px` }}>
-      <div style={{ ...flexRow, width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
-        <BrandLockup logoUrl={props.logoUrl} isPortrait={isPortrait} />
-        <HeaderChip label="BRAND STORE" isPortrait={isPortrait} />
-      </div>
+    <div
+      style={{
+        ...shell,
+        padding: 0,
+        backgroundColor: bg,
+        justifyContent: 'flex-end',
+      }}
+    >
+      {props.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={props.imageUrl}
+          alt=""
+          width={1080}
+          height={isPortrait ? 1350 : 1080}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            ...flexCol,
+            position: 'absolute',
+            inset: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 120,
+            fontWeight: 700,
+            color: 'rgba(255,255,255,0.35)',
+          }}
+        >
+          {initial}
+        </div>
+      )}
+
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: '58%',
+          backgroundImage:
+            'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)',
+        }}
+      />
 
       <div
         style={{
           ...flexCol,
-          width: '100%',
-          height: coverH,
-          marginTop: isPortrait ? 28 : 20,
-          borderRadius: 28,
-          overflow: 'hidden',
           position: 'relative',
-          backgroundColor: bg,
-          justifyContent: 'flex-end',
+          padding: isPortrait ? '48px 52px 56px' : '36px 40px 44px',
+          color: '#FFFFFF',
         }}
       >
-        {props.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={props.imageUrl}
-            alt=""
-            width={1080}
-            height={coverH}
+        <div style={{ ...flexRow, alignItems: 'center' }}>
+          <span
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              ...flexCol,
-              position: 'absolute',
-              inset: 0,
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 120,
+              fontSize: isPortrait ? 56 : 44,
               fontWeight: 700,
-              color: 'rgba(255,255,255,0.35)',
+              lineHeight: 1.15,
+              letterSpacing: -0.6,
+              color: '#FFFFFF',
+              maxWidth: isPortrait ? 900 : 780,
+              overflow: 'hidden',
             }}
           >
-            {initial}
+            {clampTitle(props.name, isPortrait ? 48 : 40)}
+          </span>
+          <div style={{ marginLeft: 12, display: 'flex' }}>
+            <BadgeCheckGlyph size={isPortrait ? 36 : 30} />
           </div>
-        )}
-
-        {/* Bottom scrim */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: '58%',
-            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)',
-          }}
-        />
-
-        <div
-          style={{
-            ...flexCol,
-            position: 'relative',
-            padding: isPortrait ? '36px 40px 40px' : '28px 32px 32px',
-            color: '#FFFFFF',
-          }}
-        >
-          <div style={{ ...flexRow, alignItems: 'center' }}>
-            <span
-              style={{
-                fontSize: isPortrait ? 52 : 40,
-                fontWeight: 700,
-                lineHeight: 1.15,
-                letterSpacing: -0.6,
-                color: '#FFFFFF',
-                maxWidth: isPortrait ? 820 : 700,
-                overflow: 'hidden',
-              }}
-            >
-              {clampTitle(props.name, isPortrait ? 48 : 40)}
-            </span>
-            <div style={{ marginLeft: 12, display: 'flex' }}>
-              <BadgeCheckGlyph size={isPortrait ? 34 : 28} />
-            </div>
-          </div>
-
-          {props.categoryLine ? (
-            <span
-              style={{
-                fontSize: isPortrait ? 26 : 20,
-                fontWeight: 500,
-                color: 'rgba(255,255,255,0.82)',
-                marginTop: 10,
-              }}
-            >
-              {clampTitle(props.categoryLine, 56)}
-            </span>
-          ) : null}
-
-          {count > 0 ? (
-            <div
-              style={{
-                ...flexRow,
-                alignItems: 'center',
-                alignSelf: 'flex-start',
-                marginTop: isPortrait ? 22 : 16,
-                backgroundColor: 'rgba(255,255,255,0.20)',
-                border: '1.5px solid rgba(255,255,255,0.30)',
-                borderRadius: 999,
-                padding: isPortrait ? '10px 18px' : '8px 14px',
-              }}
-            >
-              <ShoppingBagGlyph size={isPortrait ? 18 : 15} />
-              <span
-                style={{
-                  marginLeft: 8,
-                  fontSize: isPortrait ? 22 : 17,
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  letterSpacing: 0.2,
-                }}
-              >
-                {count} {count === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-          ) : null}
         </div>
+
+        {props.categoryLine ? (
+          <span
+            style={{
+              fontSize: isPortrait ? 28 : 22,
+              fontWeight: 500,
+              color: 'rgba(255,255,255,0.82)',
+              marginTop: 12,
+            }}
+          >
+            {clampTitle(props.categoryLine, 56)}
+          </span>
+        ) : null}
+
+        {count > 0 ? (
+          <div
+            style={{
+              ...flexRow,
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              marginTop: isPortrait ? 24 : 18,
+              backgroundColor: 'rgba(255,255,255,0.20)',
+              border: '1.5px solid rgba(255,255,255,0.30)',
+              borderRadius: 999,
+              padding: isPortrait ? '10px 18px' : '8px 14px',
+            }}
+          >
+            <ShoppingBagGlyph size={isPortrait ? 18 : 15} />
+            <span
+              style={{
+                marginLeft: 8,
+                fontSize: isPortrait ? 22 : 17,
+                fontWeight: 600,
+                color: '#FFFFFF',
+                letterSpacing: 0.2,
+              }}
+            >
+              {count} {count === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

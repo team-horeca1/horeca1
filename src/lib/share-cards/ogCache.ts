@@ -54,7 +54,7 @@ const STALE_AFTER_MS = 15 * 60 * 1000;
 const REDIS_TTL_SEC = 7 * 24 * 60 * 60;
 const REDIS_TIMEOUT_MS = 200;
 const MAX_REDIS_CARDS = 500;
-const REDIS_KEY_PREFIX = 'og:card:v7:';
+const REDIS_KEY_PREFIX = 'og:card:v8:';
 const REDIS_INDEX = 'og:card:index';
 
 function redisKey(cacheKey: string): string {

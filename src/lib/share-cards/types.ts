@@ -1,6 +1,6 @@
 import { brandPublicPath, productPublicPath, vendorPublicPath } from '@/lib/publicSlug';
 
-const OG_CARD_VERSION = '6';
+const OG_CARD_VERSION = '7';
 
 export type ShareKind =
   | 'product'

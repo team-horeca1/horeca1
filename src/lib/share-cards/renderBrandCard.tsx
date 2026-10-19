@@ -1,7 +1,7 @@
 import 'server-only';
 import { ImageResponse } from 'next/og';
 import { BrandShareCard } from '@/lib/share-cards/templates';
-import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
 import { loadShareFonts } from '@/lib/share-cards/fonts';
 import { prisma } from '@/lib/prisma';
 import {
@@ -49,9 +49,8 @@ export async function renderBrandShareImage(
   const categoryLine = brand.categories?.slice(0, 2).join(' · ') || undefined;
   const productCount = brand._count.masterProducts;
 
-  const [imageUrl, logoUrl, fonts] = await Promise.all([
+  const [imageUrl, fonts] = await Promise.all([
     resolveOgImage(origin, cover, { maxPx: 1000 }),
-    loadHorecaLogoDataUrl(),
     loadShareFonts(),
   ]);
 
@@ -64,7 +63,6 @@ export async function renderBrandShareImage(
         productCount={productCount}
         imageUrl={imageUrl}
         bgColor={brand.bgColor}
-        logoUrl={logoUrl}
       />
     ),
     {
