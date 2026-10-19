@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { attachCustomerPricing, filterExcludedProducts } from '@/modules/pricing/catalog-pricing';
 import { attachActivePromotions } from '@/modules/promotion/promotion-catalog';
 import {
   fetchLivePromotionsForVendors,
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
       .filter((p) => isPriceDeal(p) || promoByProduct.has(p.id))
       .slice(0, limit);
 
-    let withPricing = await attachCustomerPricing(products);
+    let withPricing = filterExcludedProducts(await attachCustomerPricing(products));
     withPricing = await attachActivePromotions(withPricing);
     return NextResponse.json({ success: true, data: { products: withPricing } });
   } catch (error) {

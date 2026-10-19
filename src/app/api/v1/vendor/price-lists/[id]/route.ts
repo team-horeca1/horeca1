@@ -12,6 +12,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { logPriceHistory, type PriceHistoryEntry } from '@/lib/priceHistory';
+import { saveAssignments } from '@/modules/pricing/pricelist-assignment.service';
 
 function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
@@ -55,7 +56,7 @@ const itemSchema = z.object({
 // Server validates that the right targeting column is populated for the
 // given `type` (DB CHECK enforces this too — defence in depth).
 const assignmentSchema = z.object({
-  type: z.enum(['customer', 'outlet', 'pincode', 'area', 'segment', 'brand', 'group']),
+  type: z.enum(['customer', 'outlet', 'pincode', 'area', 'segment', 'brand', 'group', 'credit_status']),
   userId: z.string().uuid().optional(),
   businessAccountId: z.string().uuid().optional(),
   outletId: z.string().uuid().optional(),
@@ -65,17 +66,24 @@ const assignmentSchema = z.object({
   area: z.string().max(100).optional(),
   segment: z.string().max(100).optional(),
   brandName: z.string().max(150).optional(),
+  creditStatus: z.string().max(32).optional(),
+  moveFrom: z.string().uuid().optional(),
 });
 
 const patchSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   discountPercent: z.number().min(0).max(100).optional(),
+  floorPercentOfBase: z.number().min(0).max(100).nullable().optional(),
   isActive: z.boolean().optional(),
   // Optional list-level validity window (ISO datetime strings or null).
   validFrom: z.string().nullable().optional(),
   validTo: z.string().nullable().optional(),
   items: z.array(itemSchema).optional(),
   assignments: z.array(assignmentSchema).optional(),
+  resolutions: z.array(z.object({
+    userId: z.string().uuid(),
+    action: z.enum(['skip', 'replace']),
+  })).optional(),
 });
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
@@ -161,7 +169,8 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         (a.type === 'area'     && a.area) ||
         (a.type === 'segment'  && a.segment) ||
         (a.type === 'brand'    && (a.brandId || a.brandName)) ||
-        (a.type === 'group'    && a.groupId)
+        (a.type === 'group'    && a.groupId) ||
+        (a.type === 'credit_status' && a.creditStatus)
       );
       if (!ok) throw Errors.badRequest(`Assignment of type '${a.type}' is missing its targeting field`);
     }
@@ -194,6 +203,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         data: {
           ...(body.name !== undefined && { name: body.name }),
           ...(body.discountPercent !== undefined && { discountPercent: body.discountPercent }),
+          ...(body.floorPercentOfBase !== undefined && { floorPercentOfBase: body.floorPercentOfBase }),
           ...(body.isActive !== undefined && { isActive: body.isActive }),
           ...(body.validFrom !== undefined && { validFrom: body.validFrom ? new Date(body.validFrom) : null }),
           ...(body.validTo !== undefined && { validTo: body.validTo ? new Date(body.validTo) : null }),
@@ -329,37 +339,26 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         }
       }
 
-      if (body.assignments !== undefined) {
-        // Same replace pattern — the DB CHECK on price_list_assignments
-        // catches any inconsistent target-column shape before commit.
-        await tx.priceListAssignment.deleteMany({ where: { priceListId: id } });
-        if (body.assignments.length > 0) {
-          const assignedAt = new Date();
-          await tx.priceListAssignment.createMany({
-            data: body.assignments.map((a) => ({
-              priceListId: id,
-              type: a.type,
-              userId:            a.type === 'customer' ? a.userId            ?? null : null,
-              businessAccountId: a.type === 'customer' ? a.businessAccountId ?? null : null,
-              outletId:          a.type === 'outlet'   ? a.outletId          ?? null : null,
-              brandId:           a.type === 'brand'    ? a.brandId           ?? null : null,
-              groupId:           a.type === 'group'    ? a.groupId           ?? null : null,
-              pincode:           a.type === 'pincode'  ? a.pincode           ?? null : null,
-              area:              a.type === 'area'     ? a.area              ?? null : null,
-              segment:           a.type === 'segment'  ? a.segment           ?? null : null,
-              brandName:         a.type === 'brand'    ? a.brandName         ?? null : null,
-              // Audit who wired the assignment (shown on the customer profile).
-              assignedById: ctx.userId,
-              assignedAt,
-            })),
-          });
-        }
-      }
-
+      // Assignments are saved outside this tx via saveAssignments (atomic,
+      // Skip/Replace, one-list-per-target). Keep meta/items here.
       return pl;
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    let assignmentResult: { saved: number; skipped: number; replaced: number } | undefined;
+    if (body.assignments !== undefined) {
+      assignmentResult = await saveAssignments({
+        vendorId,
+        actorId: ctx.userId,
+        priceListId: id,
+        assignments: body.assignments,
+        resolutions: body.resolutions,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { ...updated, assignmentResult },
+    });
   } catch (error) {
     return errorResponse(error);
   }

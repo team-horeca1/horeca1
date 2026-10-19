@@ -333,10 +333,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         buyerImpersonating || (isLoggedIn && purchaseAccess.allowed),
     );
 
-    const applyApiCart = useCallback((apiData: { vendorGroups: unknown[]; total: number }) => {
+    const applyApiCart = useCallback((apiData: {
+        vendorGroups: unknown[];
+        total: number;
+        priceChanges?: Array<{ productId: string; from: number; to: number }>;
+        removedItems?: Array<{ productId: string; reason: string }>;
+    }) => {
         const { items, groupMeta } = parseApiCart(apiData);
         setCart(items);
         setApiGroupMeta(groupMeta);
+        const changes = apiData.priceChanges?.length ?? 0;
+        const removed = apiData.removedItems?.length ?? 0;
+        if (changes > 0) {
+            toast.message(`Prices updated for ${changes} item${changes === 1 ? '' : 's'}`);
+        }
+        if (removed > 0) {
+            toast.message(`${removed} item${removed === 1 ? '' : 's'} no longer available for your account`);
+        }
     }, []);
 
     // Admin View: JWT stays admin while cookies switch the API to the customer.

@@ -178,8 +178,13 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
   // per-customer override) attached by the catalog APIs for logged-in
   // buyers. It outranks slabs and promos, so it becomes THE price and the
   // slab tiers are hidden (the resolver ignores them when a list matches).
-  const customerPricing = p.customerPricing as { unitPrice: number } | undefined;
-  const customerPriceApplied = customerPricing != null && Number.isFinite(Number(customerPricing.unitPrice));
+  const unavailableForAccount = !!(p as { unavailableForAccount?: boolean }).unavailableForAccount;
+  const customerPricing = p.customerPricing as { unitPrice: number; excluded?: boolean } | undefined;
+  const customerPriceApplied =
+    !unavailableForAccount &&
+    customerPricing != null &&
+    !customerPricing.excluded &&
+    Number.isFinite(Number(customerPricing.unitPrice));
   if (customerPriceApplied) {
     const rawCustPrice = Number(customerPricing.unitPrice);
     effectivePrice = rawCustPrice;
@@ -339,6 +344,7 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
       (strikePriceGross !== undefined && strikePriceGross > effectivePriceGross) ||
       !!(p.storePromotion && (p.storePromotion as { type?: string }).type === 'bxgy'),
     customerPriceApplied: customerPriceApplied || undefined,
+    unavailableForAccount: unavailableForAccount || undefined,
     taxPercent,
     taxableRate: effectivePrice,
     sku: typeof p.sku === 'string' ? p.sku : undefined,

@@ -18,7 +18,7 @@ import { resolveVendorId } from '@/lib/resolveVendorId';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'products.edit');
+    requirePermission(ctx, 'priceLists.view');
     const vendorId = await resolveVendorId(ctx, req);
 
     const [orderBuyers, crmCustomers, creditAccounts] = await Promise.all([

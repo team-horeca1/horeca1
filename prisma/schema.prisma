@@ -129,6 +129,7 @@ model User {
 
   productAuditLogs       ProductAuditLog[]       @relation("ProductAuditActor")
   priceHistoryChanges    PriceHistory[]          @relation("PriceHistoryActor")
+  priceListPublishes     PriceListPublish[]      @relation("PriceListPublishActor")
   orderEvents            OrderEvent[]            @relation("OrderEventActor")
   orderShipments         OrderShipment[]         @relation("OrderShipmentActor")
   fulfilmentEvents       FulfilmentEvent[]       @relation("FulfilmentEventActor")
@@ -256,6 +257,7 @@ model Vendor {
   vendorCustomers         VendorCustomer[]             @relation("VendorCustomerMapping")
   priceLists              PriceList[]
   priceHistory            PriceHistory[]
+  priceListPublishes      PriceListPublish[]
   settlements             VendorSettlement[]
   promotions              Promotion[]
   customerTasks           VendorCustomerTask[]
@@ -1054,6 +1056,10 @@ model OrderItem {
   cancelledQty Int      @default(0) @map("cancelled_qty")
   unitPrice    Decimal  @map("unit_price") @db.Decimal(10, 2)
   totalPrice   Decimal  @map("total_price") @db.Decimal(12, 2)
+  // Pricing workspace V2 — snapshotted resolution (no FK: list may be deleted later).
+  priceListId     String? @map("price_list_id") @db.Uuid
+  priceListItemId String? @map("price_list_item_id") @db.Uuid
+  priceSource     String? @map("price_source") @db.VarChar(64)
 
   order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product         Product             @relation(fields: [productId], references: [id])
@@ -2531,6 +2537,9 @@ model PriceList {
   // given product. Items override this per-product via customPrice or
   // their own discountPercent.
   discountPercent Decimal   @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  // Optional floor: prices below (base × floorPercentOfBase / 100) are blocked on publish.
+  // There is no product cost field — this is a supplier-set floor, not margin validation.
+  floorPercentOfBase Decimal? @map("floor_percent_of_base") @db.Decimal(5, 2)
   isActive        Boolean   @default(true) @map("is_active")
   // List-level validity window. When set, the resolver ignores this list
   // outside [validFrom, validTo] and the customer falls back to base/other.
@@ -2568,6 +2577,8 @@ model PriceListItem {
 
   // V2.2 Phase 5 — pricing cell attributes
   isLocked       Boolean   @default(false) @map("is_locked")
+  // Pricing workspace V2 — product is not offered to this list's audience (Hidden wins).
+  isExcluded     Boolean   @default(false) @map("is_excluded")
   validFrom      DateTime? @map("valid_from") @db.Timestamptz
   validTo        DateTime? @map("valid_to") @db.Timestamptz
   note           String?   @db.Text
@@ -2613,8 +2624,16 @@ enum PriceListAssignmentType {
   segment
   brand
   group
+  credit_status
 
   @@map("price_list_assignment_type")
+}
+
+enum PriceListPublishKind {
+  publish
+  rollback
+
+  @@map("price_list_publish_kind")
 }
 
 model PriceListAssignment {
@@ -2624,8 +2643,8 @@ model PriceListAssignment {
   // Targeting columns — service layer picks the right one based on `type`.
   // Cascade on the FK columns so when a User / Outlet / Brand / BA is
   // deleted, the orphaned assignments disappear too. Free-text columns
-  // (pincode / area / segment / brandName) don't have a referential
-  // target so they can't dangle.
+  // (pincode / area / segment / brandName / creditStatus) don't have a
+  // referential target so they can't dangle.
   userId            String?                 @map("user_id") @db.Uuid
   businessAccountId String?                 @map("business_account_id") @db.Uuid
   outletId          String?                 @map("outlet_id") @db.Uuid
@@ -2635,6 +2654,8 @@ model PriceListAssignment {
   area              String?                 @db.VarChar(100)
   segment           String?                 @db.VarChar(100)
   brandName         String?                 @map("brand_name") @db.VarChar(150)
+  // First-class credit-status targeting (pending|active|suspended|closed|blocked|blacklisted).
+  creditStatus      String?                 @map("credit_status") @db.VarChar(32)
   // Audit: who wired this assignment and when (shown on the customer profile).
   assignedById      String?                 @map("assigned_by_id") @db.Uuid
   assignedAt        DateTime?               @map("assigned_at") @db.Timestamptz
@@ -2654,7 +2675,32 @@ model PriceListAssignment {
   @@index([pincode])
   @@index([brandId])
   @@index([groupId])
+  @@index([creditStatus])
   @@map("price_list_assignments")
+}
+
+// Append-only publish / rollback versions for the Pricing workspace.
+// Drafts live client-side; each Review & publish creates one of these rows.
+model PriceListPublish {
+  id            String               @id @default(uuid()) @db.Uuid
+  vendorId      String               @map("vendor_id") @db.Uuid
+  actorId       String?              @map("actor_id") @db.Uuid
+  kind          PriceListPublishKind @default(publish)
+  // Optimistic concurrency: draft was based on this publish id (null = first publish).
+  baseVersionId String?              @map("base_version_id") @db.Uuid
+  // When kind=rollback, points at the publish being undone (never mutates that row).
+  rollbackOfId  String?              @map("rollback_of_id") @db.Uuid
+  summary       Json                 @default("{}")
+  // [{ priceListId, productId, before: CellState|null, after: CellState|null }]
+  changes       Json                 @default("[]")
+  cellCount     Int                  @default(0) @map("cell_count")
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  actor  User?  @relation("PriceListPublishActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([vendorId, createdAt(sort: Desc)])
+  @@map("price_list_publishes")
 }
 
 // Named groups of customers a vendor can target with a price list (spec:

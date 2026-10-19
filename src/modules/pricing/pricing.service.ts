@@ -1,5 +1,5 @@
 /**
- * Pricing resolver — V2.2 Phase 4.
+ * Pricing resolver — V2.2 Phase 4 + Pricing workspace V2.
  *
  * Single source of truth for "what unit price should this customer see/pay
  * for this product?". Called from cart.addItem / cart.updateQuantity /
@@ -13,15 +13,20 @@
  *   1. PriceListAssignment.type='outlet'   matching customer.outletId
  *   2. PriceListAssignment.type='customer' matching customer.userId
  *                                      OR customer.businessAccountId
- *   3. PriceListAssignment.type='segment'  matching customer.tags
- *   4. PriceListAssignment.type='pincode'  matching customer.outletPincode
- *   5. PriceListAssignment.type='area'     matching outlet city/state
- *   6. PriceListAssignment.type='brand'    matching product.brand (id or name)
- *   7. Legacy VendorCustomer.priceListId   (the per-customer mapping
- *                                      that predates assignments)
- *   8. VendorCustomerPrice (per-product per-customer override)
- *   9. PriceSlab matching the quantity tier
- *  10. Product.basePrice (final fallback)
+ *   3. PriceListAssignment.type='group'    matching CustomerGroup membership
+ *   4. PriceListAssignment.type='credit_status' matching CreditWallet status
+ *   5. PriceListAssignment.type='segment'  matching customer.tags
+ *   6. PriceListAssignment.type='pincode'  matching customer.outletPincode
+ *   7. PriceListAssignment.type='area'     matching outlet city/state
+ *   8. PriceListAssignment.type='brand'    matching product.brand (id or name)
+ *   9. Legacy VendorCustomer.priceListId
+ *  10. VendorCustomerPrice (per-product per-customer override)
+ *  11. PriceSlab matching the quantity tier
+ *  12. Product.basePrice (final fallback)
+ *
+ * Hidden wins: if ANY eligible assigned list of this vendor has
+ * PriceListItem.isExcluded for the product, the product is unavailable
+ * for that customer (excluded: true) — even if another list prices it.
  *
  * Within whichever PriceList wins, the chosen PriceListItem decides
  * the math:
@@ -67,6 +72,7 @@ export type ResolutionSource =
   | 'pricelist:outlet'
   | 'pricelist:customer'
   | 'pricelist:group'
+  | 'pricelist:credit_status'
   | 'pricelist:segment'
   | 'pricelist:pincode'
   | 'pricelist:area'
@@ -74,17 +80,38 @@ export type ResolutionSource =
   | 'pricelist:legacy-customer-mapping'
   | 'customer-product-override'
   | 'price-slab'
-  | 'base-price';
+  | 'base-price'
+  | 'excluded';
 
 export interface ResolutionResult {
   unitPrice: Prisma.Decimal;
   source: ResolutionSource;
   priceListId?: string;
   priceListItemId?: string;
+  /** Product is hidden from this customer for this vendor (Hidden wins). */
+  excluded?: boolean;
   // B-5: present only when a 'scheme' pricelist item matched. The caller
   // (order.create) uses these to grant free goods ("buy X get Y free").
   schemeMinQty?: number | null;
   schemeFreeQty?: number | null;
+}
+
+/** Map CreditWallet status (+ workflow) to assignment creditStatus values. */
+export function normalizeCreditStatus(
+  status: string | null | undefined,
+  workflowStatus?: string | null,
+): string | null {
+  if (!status) return null;
+  const s = status.toUpperCase();
+  if (s === 'BLACKLISTED') return 'blacklisted';
+  if (s === 'BLOCKED' || s === 'FROZEN') return 'blocked';
+  if (s === 'SUSPENDED') return 'suspended';
+  if (s === 'CANCELLED' || s === 'EXPIRED') return 'closed';
+  if (s === 'ACTIVE') return 'active';
+  // Fallback: workflow for pending-ish states
+  const w = (workflowStatus ?? '').toUpperCase();
+  if (w === 'IN_PROGRESS' || w === 'SANCTIONED') return 'pending';
+  return s.toLowerCase();
 }
 
 // ── Shared chain internals ───────────────────────────────────────────
@@ -94,18 +121,19 @@ export interface ResolutionResult {
 type ItemShape = Pick<
   PriceListItem,
   | 'id' | 'productId' | 'customPrice' | 'pricingType' | 'discountPercent' | 'schemeMinQty' | 'schemeFreeQty'
-  | 'validFrom' | 'validTo' | 'scheduledPrice' | 'scheduledFrom' | 'scheduledTo'
->;
+  | 'validFrom' | 'validTo' | 'scheduledPrice' | 'scheduledFrom' | 'scheduledTo' | 'isExcluded'
+> & { isLocked?: boolean; note?: string | null; history?: unknown };
 
 interface ListShape {
   id: string;
+  name?: string;
   discountPercent: Prisma.Decimal | number;
   items: ItemShape[];
 }
 
 type AssignmentShape = Pick<
   PriceListAssignment,
-  'type' | 'userId' | 'businessAccountId' | 'outletId' | 'brandId' | 'groupId' | 'pincode' | 'area' | 'segment' | 'brandName'
+  'type' | 'userId' | 'businessAccountId' | 'outletId' | 'brandId' | 'groupId' | 'pincode' | 'area' | 'segment' | 'brandName' | 'creditStatus'
 > & { priceList: ListShape };
 
 interface ProductPricingInput {
@@ -123,6 +151,7 @@ function assignmentEligible(
   product: ProductPricingInput,
   customerTags: ReadonlySet<string>,
   customerGroups: ReadonlySet<string>,
+  creditStatus: string | null = null,
 ): boolean {
   switch (a.type) {
     case 'outlet':
@@ -134,6 +163,8 @@ function assignmentEligible(
       );
     case 'group':
       return !!a.groupId && customerGroups.has(a.groupId);
+    case 'credit_status':
+      return !!a.creditStatus && !!creditStatus && a.creditStatus.toLowerCase() === creditStatus.toLowerCase();
     case 'segment':
       return !!a.segment && customerTags.has(a.segment.toLowerCase());
     case 'pincode':
@@ -157,6 +188,26 @@ function assignmentEligible(
   }
 }
 
+/** Collect eligible assignments; if any excludes the product → Hidden wins. */
+function findExclusion(
+  assignments: AssignmentShape[],
+  customer: CustomerContext,
+  product: ProductPricingInput,
+  customerTags: ReadonlySet<string>,
+  customerGroups: ReadonlySet<string>,
+  creditStatus: string | null,
+  now: Date,
+): { priceListId: string; priceListItemId: string } | null {
+  for (const a of assignments) {
+    if (!assignmentEligible(a, customer, product, customerTags, customerGroups, creditStatus)) continue;
+    const item = a.priceList.items.find(
+      (i) => i.productId === product.id && i.isExcluded && itemIsLive(i, now),
+    );
+    if (item) return { priceListId: a.priceList.id, priceListItemId: item.id };
+  }
+  return null;
+}
+
 // Try to resolve via a single PriceList — picks this product's item,
 // applies pricingType math, and returns a result. Null means this list
 // doesn't yield a usable price (e.g. scheme miss) and the chain falls
@@ -169,7 +220,8 @@ function applyListForProduct(
   sourceKey: ResolutionSource,
   now: Date = new Date(),
 ): ResolutionResult | null {
-  const item = list.items.find((i) => i.productId === productId && itemIsLive(i, now));
+  // Excluded items are handled by findExclusion (Hidden wins); never price them here.
+  const item = list.items.find((i) => i.productId === productId && !i.isExcluded && itemIsLive(i, now));
   if (item) {
     const result = applyPricingType(item, basePrice, quantity, now);
     if (result !== null) {
@@ -200,16 +252,17 @@ function applyListForProduct(
 }
 
 const ORDERED_TYPES: Array<{ type: PriceListAssignment['type']; key: ResolutionSource }> = [
-  { type: 'outlet',   key: 'pricelist:outlet' },
-  { type: 'customer', key: 'pricelist:customer' },
-  { type: 'group',    key: 'pricelist:group' },
-  { type: 'segment',  key: 'pricelist:segment' },
-  { type: 'pincode',  key: 'pricelist:pincode' },
-  { type: 'area',     key: 'pricelist:area' },
-  { type: 'brand',    key: 'pricelist:brand' },
+  { type: 'outlet',         key: 'pricelist:outlet' },
+  { type: 'customer',       key: 'pricelist:customer' },
+  { type: 'group',          key: 'pricelist:group' },
+  { type: 'credit_status',  key: 'pricelist:credit_status' },
+  { type: 'segment',        key: 'pricelist:segment' },
+  { type: 'pincode',        key: 'pricelist:pincode' },
+  { type: 'area',           key: 'pricelist:area' },
+  { type: 'brand',          key: 'pricelist:brand' },
 ];
 
-// Levels 1–7 of the chain: assignment-driven price lists.
+// Assignment-driven price lists (after Hidden-wins exclusion check).
 function evaluateAssignmentChain(
   assignments: AssignmentShape[],
   customer: CustomerContext,
@@ -217,11 +270,12 @@ function evaluateAssignmentChain(
   quantity: number,
   customerTags: ReadonlySet<string>,
   customerGroups: ReadonlySet<string>,
+  creditStatus: string | null = null,
   now: Date = new Date(),
 ): ResolutionResult | null {
   for (const { type, key } of ORDERED_TYPES) {
     for (const a of assignments) {
-      if (a.type !== type || !assignmentEligible(a, customer, product, customerTags, customerGroups)) continue;
+      if (a.type !== type || !assignmentEligible(a, customer, product, customerTags, customerGroups, creditStatus)) continue;
       const r = applyListForProduct(a.priceList, product.id, product.basePrice, quantity, key, now);
       if (r) return r;
     }
@@ -245,6 +299,7 @@ const ITEM_SELECT = {
   discountPercent: true, schemeMinQty: true, schemeFreeQty: true,
   validFrom: true, validTo: true,
   scheduledPrice: true, scheduledFrom: true, scheduledTo: true,
+  isExcluded: true, isLocked: true, note: true, history: true,
 } as const;
 
 function itemIsLive(
@@ -271,7 +326,7 @@ export async function resolveUnitPrice(
   // sources in parallel. We over-fetch (everything the priority chain
   // might consult) so we don't pay a second roundtrip per fallthrough.
   const now = new Date();
-  const [product, vendorCustomer, customerProductOverride, slabs, assignments, groupMemberships] =
+  const [product, vendorCustomer, customerProductOverride, slabs, assignments, groupMemberships, creditWallet] =
     await Promise.all([
       db.product.findFirst({
         where: { id: input.productId, vendorId: input.vendorId },
@@ -316,26 +371,27 @@ export async function resolveUnitPrice(
             ...(input.customer.businessAccountId
               ? [{ type: 'customer' as const, businessAccountId: input.customer.businessAccountId }]
               : []),
-            { type: 'group' },    // groups matched in memory against memberships
-            { type: 'segment' },  // segments matched in memory against tags
+            { type: 'group' },
+            { type: 'credit_status' },
+            { type: 'segment' },
             ...(input.customer.outletPincode
               ? [{ type: 'pincode' as const, pincode: input.customer.outletPincode }]
               : []),
-            { type: 'area' },     // area matched in memory against city/state
-            { type: 'brand' },    // brand matched in memory against product.brand
+            { type: 'area' },
+            { type: 'brand' },
           ],
         },
         include: {
           priceList: {
             select: {
               id: true,
+              name: true,
               discountPercent: true,
               items: { where: { productId: input.productId }, select: ITEM_SELECT },
             },
           },
         },
       }),
-      // Which of this vendor's customer-groups the buyer belongs to.
       db.customerGroupMember.findMany({
         where: {
           group: { vendorId: input.vendorId },
@@ -345,6 +401,10 @@ export async function resolveUnitPrice(
           ],
         },
         select: { groupId: true },
+      }),
+      db.creditWallet.findFirst({
+        where: { vendorId: input.vendorId, userId: input.customer.userId },
+        select: { status: true, workflowStatus: true },
       }),
     ]);
 
@@ -363,9 +423,25 @@ export async function resolveUnitPrice(
     [...(input.customer.tags ?? []), ...(vendorCustomer?.tags ?? [])].map((t) => t.toLowerCase()),
   );
   const customerGroups = new Set(groupMemberships.map((m) => m.groupId));
+  const creditStatus = normalizeCreditStatus(creditWallet?.status, creditWallet?.workflowStatus);
 
-  // ── 1–7. Assignment-driven price lists ─────────────────────────────
-  const chained = evaluateAssignmentChain(assignments, input.customer, productInput, input.quantity, customerTags, customerGroups, now);
+  // Hidden wins — any eligible list that excludes this product hides it.
+  const exclusion = findExclusion(assignments, input.customer, productInput, customerTags, customerGroups, creditStatus, now);
+  if (exclusion) {
+    return {
+      unitPrice: round2(basePrice),
+      source: 'excluded',
+      excluded: true,
+      priceListId: exclusion.priceListId,
+      priceListItemId: exclusion.priceListItemId,
+    };
+  }
+
+  // ── Assignment-driven price lists ──────────────────────────────────
+  const chained = evaluateAssignmentChain(
+    assignments, input.customer, productInput, input.quantity,
+    customerTags, customerGroups, creditStatus, now,
+  );
   if (chained) return chained;
 
   // 8. Legacy VendorCustomer.priceListId
@@ -413,6 +489,8 @@ export interface CatalogPrice {
   unitPrice: number;
   source: ResolutionSource;
   priceListId?: string;
+  priceListItemId?: string;
+  excluded?: boolean;
 }
 
 /**
@@ -437,7 +515,7 @@ export async function resolveCatalogPrices(
   const vendorIds = [...new Set(products.map((p) => p.vendorId))];
 
   const now = new Date();
-  const [assignments, vendorCustomers, overrides, brandMappings, groupMemberships] = await Promise.all([
+  const [assignments, vendorCustomers, overrides, brandMappings, groupMemberships, creditWallets] = await Promise.all([
     db.priceListAssignment.findMany({
       where: {
         priceList: { vendorId: { in: vendorIds }, isActive: true, ...priceListLiveWhere(now) },
@@ -448,6 +526,7 @@ export async function resolveCatalogPrices(
             ? [{ type: 'customer' as const, businessAccountId: customer.businessAccountId }]
             : []),
           { type: 'group' },
+          { type: 'credit_status' },
           { type: 'segment' },
           ...(customer.outletPincode
             ? [{ type: 'pincode' as const, pincode: customer.outletPincode }]
@@ -460,6 +539,7 @@ export async function resolveCatalogPrices(
         priceList: {
           select: {
             id: true,
+            name: true,
             vendorId: true,
             discountPercent: true,
             items: { where: { productId: { in: productIds } }, select: ITEM_SELECT },
@@ -489,8 +569,15 @@ export async function resolveCatalogPrices(
       },
       select: { groupId: true },
     }),
+    db.creditWallet.findMany({
+      where: { vendorId: { in: vendorIds }, userId: customer.userId },
+      select: { vendorId: true, status: true, workflowStatus: true },
+    }),
   ]);
   const customerGroups = new Set(groupMemberships.map((m) => m.groupId));
+  const creditByVendor = new Map(
+    creditWallets.map((w) => [w.vendorId!, normalizeCreditStatus(w.status, w.workflowStatus)]),
+  );
 
   const vcByVendor = new Map(vendorCustomers.map((vc) => [vc.vendorId, vc]));
 
@@ -538,19 +625,34 @@ export async function resolveCatalogPrices(
       brandLower: p.brand?.toLowerCase() ?? null,
       mappedBrandIds: brandIdsByProduct.get(p.id) ?? new Set(),
     };
+    const creditStatus = creditByVendor.get(p.vendorId) ?? null;
+    const vendorAssignments = assignmentsByVendor.get(p.vendorId) ?? [];
 
-    // 1–7. Assignment chain (scoped to this product's vendor)
+    const exclusion = findExclusion(
+      vendorAssignments, customer, productInput, customerTags, customerGroups, creditStatus, now,
+    );
+    if (exclusion) {
+      out.set(p.id, {
+        unitPrice: Number(productInput.basePrice),
+        source: 'excluded',
+        excluded: true,
+        priceListId: exclusion.priceListId,
+        priceListItemId: exclusion.priceListItemId,
+      });
+      continue;
+    }
+
     let result = evaluateAssignmentChain(
-      assignmentsByVendor.get(p.vendorId) ?? [],
+      vendorAssignments,
       customer,
       productInput,
       quantity,
       customerTags,
       customerGroups,
+      creditStatus,
       now,
     );
 
-    // 7. Legacy mapping
     if (!result && vc?.priceListId) {
       const list = legacyById.get(vc.priceListId);
       if (list && list.vendorId === p.vendorId) {
@@ -563,11 +665,11 @@ export async function resolveCatalogPrices(
         unitPrice: Number(result.unitPrice),
         source: result.source,
         priceListId: result.priceListId,
+        priceListItemId: result.priceListItemId,
       });
       continue;
     }
 
-    // 8. Per-product customer override
     const override = overrideByKey.get(`${p.vendorId}:${p.id}`);
     if (override != null) {
       out.set(p.id, {
@@ -575,7 +677,6 @@ export async function resolveCatalogPrices(
         source: 'customer-product-override',
       });
     }
-    // 9–10 (slabs/base) intentionally omitted — catalog renders those already.
   }
 
   return out;
@@ -641,4 +742,220 @@ export function computeSchemeBilledQty(
   schemeFreeQty?: number | null,
 ): number {
   return Math.max(0, quantity - computeSchemeFreeQty(quantity, schemeMinQty, schemeFreeQty));
+}
+
+// ── Why this price? ──────────────────────────────────────────────────
+
+export interface ExplainLadderStep {
+  level: string;
+  matched: boolean;
+  detail?: string;
+  priceListId?: string;
+  priceListName?: string;
+}
+
+export interface ExplainPriceResult {
+  unitPrice: number;
+  source: ResolutionSource;
+  excluded: boolean;
+  priceListId?: string;
+  priceListItemId?: string;
+  priceListName?: string;
+  ladder: ExplainLadderStep[];
+  cell?: {
+    customPrice: number | null;
+    pricingType: string;
+    isLocked: boolean;
+    note: string | null;
+    lastHistory?: { date?: string; action?: string; user?: string; oldPrice?: number | null; newPrice?: number | null };
+  };
+}
+
+/**
+ * Full ladder for support / "Why this price?" — reuses the same chain as resolveUnitPrice.
+ */
+export async function explainPrice(
+  input: ResolveInput,
+  db: Db = defaultPrisma,
+): Promise<ExplainPriceResult> {
+  const resolved = await resolveUnitPrice(input, db);
+  const now = new Date();
+
+  const [assignments, creditWallet, groupMemberships, vendorCustomer, product] = await Promise.all([
+    db.priceListAssignment.findMany({
+      where: {
+        priceList: { vendorId: input.vendorId, isActive: true, ...priceListLiveWhere(now) },
+      },
+      include: {
+        priceList: {
+          select: {
+            id: true,
+            name: true,
+            discountPercent: true,
+            items: { where: { productId: input.productId }, select: ITEM_SELECT },
+          },
+        },
+      },
+    }),
+    db.creditWallet.findFirst({
+      where: { vendorId: input.vendorId, userId: input.customer.userId },
+      select: { status: true, workflowStatus: true },
+    }),
+    db.customerGroupMember.findMany({
+      where: {
+        group: { vendorId: input.vendorId },
+        OR: [
+          { userId: input.customer.userId },
+          ...(input.customer.businessAccountId ? [{ businessAccountId: input.customer.businessAccountId }] : []),
+        ],
+      },
+      select: { groupId: true },
+    }),
+    db.vendorCustomer.findUnique({
+      where: { vendorId_userId: { vendorId: input.vendorId, userId: input.customer.userId } },
+      select: { tags: true },
+    }),
+    db.product.findFirst({
+      where: { id: input.productId, vendorId: input.vendorId },
+      select: {
+        id: true, basePrice: true, brand: true,
+        brandMappings: {
+          where: { status: { in: ['verified', 'auto_mapped'] } },
+          select: { brandId: true },
+        },
+      },
+    }),
+  ]);
+
+  const ladder: ExplainLadderStep[] = [];
+  if (!product) {
+    return {
+      unitPrice: Number(resolved.unitPrice),
+      source: resolved.source,
+      excluded: !!resolved.excluded,
+      ladder: [{ level: 'error', matched: false, detail: 'Product not found' }],
+    };
+  }
+
+  const productInput: ProductPricingInput = {
+    id: product.id,
+    basePrice: product.basePrice,
+    brandLower: product.brand?.toLowerCase() ?? null,
+    mappedBrandIds: new Set((product.brandMappings ?? []).map((m) => m.brandId)),
+  };
+  const customerTags = new Set(
+    [...(input.customer.tags ?? []), ...(vendorCustomer?.tags ?? [])].map((t) => t.toLowerCase()),
+  );
+  const customerGroups = new Set(groupMemberships.map((m) => m.groupId));
+  const creditStatus = normalizeCreditStatus(creditWallet?.status, creditWallet?.workflowStatus);
+
+  for (const { type, key } of ORDERED_TYPES) {
+    const matches = assignments.filter(
+      (a) => a.type === type && assignmentEligible(a, input.customer, productInput, customerTags, customerGroups, creditStatus),
+    );
+    if (matches.length === 0) {
+      ladder.push({ level: key, matched: false });
+      continue;
+    }
+    for (const a of matches) {
+      const item = a.priceList.items.find((i) => i.productId === product.id && itemIsLive(i, now));
+      ladder.push({
+        level: key,
+        matched: true,
+        detail: item?.isExcluded
+          ? 'Excluded (Hidden wins)'
+          : item
+            ? `Item ${item.pricingType}`
+            : Number(a.priceList.discountPercent) > 0
+              ? `List discount ${a.priceList.discountPercent}%`
+              : 'No item for this SKU (falls through)',
+        priceListId: a.priceList.id,
+        priceListName: a.priceList.name,
+      });
+    }
+  }
+
+  let cell: ExplainPriceResult['cell'];
+  if (resolved.priceListItemId) {
+    const item = assignments
+      .flatMap((a) => a.priceList.items.map((i) => ({ i, name: a.priceList.name })))
+      .find((x) => x.i.id === resolved.priceListItemId);
+    if (item) {
+      const hist = Array.isArray(item.i.history) ? item.i.history[0] as Record<string, unknown> | undefined : undefined;
+      cell = {
+        customPrice: item.i.customPrice != null ? Number(item.i.customPrice) : null,
+        pricingType: item.i.pricingType,
+        isLocked: !!item.i.isLocked,
+        note: item.i.note ?? null,
+        lastHistory: hist
+          ? {
+              date: typeof hist.date === 'string' ? hist.date : undefined,
+              action: typeof hist.action === 'string' ? hist.action : undefined,
+              user: typeof hist.user === 'string' ? hist.user : undefined,
+              oldPrice: typeof hist.oldPrice === 'number' ? hist.oldPrice : null,
+              newPrice: typeof hist.newPrice === 'number' ? hist.newPrice : null,
+            }
+          : undefined,
+      };
+    }
+  }
+
+  const winningName = assignments.find((a) => a.priceList.id === resolved.priceListId)?.priceList.name;
+
+  return {
+    unitPrice: Number(resolved.unitPrice),
+    source: resolved.source,
+    excluded: !!resolved.excluded,
+    priceListId: resolved.priceListId,
+    priceListItemId: resolved.priceListItemId,
+    priceListName: winningName,
+    ladder,
+    cell,
+  };
+}
+
+/**
+ * Pure chain evaluator for unit tests — no DB. Cross-vendor independence is
+ * the caller's responsibility (pass only one vendor's assignments).
+ */
+export function resolveFromPreloaded(args: {
+  productId: string;
+  basePrice: number;
+  quantity: number;
+  customer: CustomerContext;
+  assignments: AssignmentShape[];
+  customerTags?: string[];
+  customerGroups?: string[];
+  creditStatus?: string | null;
+  brandLower?: string | null;
+  mappedBrandIds?: string[];
+  now?: Date;
+}): ResolutionResult {
+  const now = args.now ?? new Date();
+  const productInput: ProductPricingInput = {
+    id: args.productId,
+    basePrice: new Prisma.Decimal(args.basePrice),
+    brandLower: args.brandLower ?? null,
+    mappedBrandIds: new Set(args.mappedBrandIds ?? []),
+  };
+  const tags = new Set((args.customerTags ?? args.customer.tags).map((t) => t.toLowerCase()));
+  const groups = new Set(args.customerGroups ?? []);
+  const credit = args.creditStatus ?? null;
+
+  const exclusion = findExclusion(args.assignments, args.customer, productInput, tags, groups, credit, now);
+  if (exclusion) {
+    return {
+      unitPrice: round2(productInput.basePrice),
+      source: 'excluded',
+      excluded: true,
+      priceListId: exclusion.priceListId,
+      priceListItemId: exclusion.priceListItemId,
+    };
+  }
+
+  const chained = evaluateAssignmentChain(
+    args.assignments, args.customer, productInput, args.quantity, tags, groups, credit, now,
+  );
+  if (chained) return chained;
+  return { unitPrice: round2(productInput.basePrice), source: 'base-price' };
 }

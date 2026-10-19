@@ -450,6 +450,11 @@ export class OrderService {
             { productId: item.productId, vendorId: vo.vendorId, quantity: item.quantity, customer: customerCtx },
             tx,
           );
+          if (resolved.excluded) {
+            throw Errors.badRequest(
+              `${product.name} is not available for your account from this supplier`,
+            );
+          }
           const taxableUnitPrice = Number(resolved.unitPrice);
           const taxPercent = Number(product.taxPercent) || 0;
           const grossUnitPrice = Math.round(taxableUnitPrice * (1 + taxPercent / 100) * 100) / 100;
@@ -470,6 +475,9 @@ export class OrderService {
             fulfilledQty: 0,
             unitPrice: grossUnitPrice,
             totalPrice,
+            priceListId: resolved.priceListId ?? null,
+            priceListItemId: resolved.priceListItemId ?? null,
+            priceSource: resolved.source,
           });
           draftItems.push({
             productId: item.productId,
@@ -1053,9 +1061,20 @@ export class OrderService {
     productId: string,
     quantity: number,
     customer: CustomerContext,
-  ): Promise<{ grossUnitPrice: number; totalPrice: number }> {
-    const product = await tx.product.findUnique({ where: { id: productId }, select: { taxPercent: true } });
+  ): Promise<{
+    grossUnitPrice: number;
+    totalPrice: number;
+    priceListId?: string | null;
+    priceListItemId?: string | null;
+    priceSource?: string;
+  }> {
+    const product = await tx.product.findUnique({ where: { id: productId }, select: { taxPercent: true, name: true } });
     const resolved = await resolveUnitPrice({ productId, vendorId, quantity, customer }, tx);
+    if (resolved.excluded) {
+      throw Errors.badRequest(
+        `${product?.name ?? 'Product'} is not available for your account from this supplier`,
+      );
+    }
     const taxableUnitPrice = Number(resolved.unitPrice);
     const taxPercent = Number(product?.taxPercent) || 0;
     const grossUnitPrice = Math.round(taxableUnitPrice * (1 + taxPercent / 100) * 100) / 100;
@@ -1064,7 +1083,13 @@ export class OrderService {
       resolved.schemeMinQty,
       resolved.schemeFreeQty,
     );
-    return { grossUnitPrice, totalPrice: Math.round(grossUnitPrice * billedQty * 100) / 100 };
+    return {
+      grossUnitPrice,
+      totalPrice: Math.round(grossUnitPrice * billedQty * 100) / 100,
+      priceListId: resolved.priceListId ?? null,
+      priceListItemId: resolved.priceListItemId ?? null,
+      priceSource: resolved.source,
+    };
   }
 
   /** Submit a draft PO: draft → pending. Re-validates stock/MOV/credit, reserves, notifies. */
@@ -1210,7 +1235,17 @@ export class OrderService {
         else if (delta < 0) releaseDeltas.push({ productId: item.productId, quantity: -delta });
         if (q === 0) { await tx.orderItem.delete({ where: { id: item.id } }); continue; }
         const priced = await this.priceLine(tx, vendorId, item.productId, q, customer);
-        await tx.orderItem.update({ where: { id: item.id }, data: { quantity: q, unitPrice: priced.grossUnitPrice, totalPrice: priced.totalPrice } });
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: {
+            quantity: q,
+            unitPrice: priced.grossUnitPrice,
+            totalPrice: priced.totalPrice,
+            priceListId: priced.priceListId ?? null,
+            priceListItemId: priced.priceListItemId ?? null,
+            priceSource: priced.priceSource ?? null,
+          },
+        });
         subtotal += priced.totalPrice;
       }
 
@@ -1413,6 +1448,9 @@ export class OrderService {
             ...snapshotFromProduct(newProduct),
             unitPrice: priced.grossUnitPrice,
             totalPrice: priced.totalPrice,
+            priceListId: priced.priceListId ?? null,
+            priceListItemId: priced.priceListItemId ?? null,
+            priceSource: priced.priceSource ?? null,
           },
         });
         subtotal += priced.totalPrice;
@@ -1679,6 +1717,11 @@ export class OrderService {
         { productId: substituteProductId, vendorId, quantity: qty, customer },
         tx,
       );
+      if (resolved.excluded) {
+        throw Errors.badRequest(
+          `${subProduct.name} is not available for this customer from this supplier`,
+        );
+      }
       const taxPercent = Number(subProduct.taxPercent) || 0;
       const grossUnit = Math.round(Number(resolved.unitPrice) * (1 + taxPercent / 100) * 100) / 100;
       const totalPrice = Math.round(grossUnit * qty * 100) / 100;
@@ -1711,6 +1754,9 @@ export class OrderService {
           fulfilledQty: qty,
           unitPrice: grossUnit,
           totalPrice,
+          priceListId: resolved.priceListId ?? null,
+          priceListItemId: resolved.priceListItemId ?? null,
+          priceSource: resolved.source,
         },
       });
 

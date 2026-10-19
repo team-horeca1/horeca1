@@ -299,7 +299,7 @@ export class CartService {
       },
     });
 
-    if (!cart) return { vendorGroups: [], total: 0 };
+    if (!cart) return { vendorGroups: [], total: 0, priceChanges: [], removedItems: [] };
 
     // V2.2 Phase 4 — re-resolve every line through the PricingService so
     // assignment / pricelist changes show up on cart load WITHOUT requiring
@@ -311,6 +311,8 @@ export class CartService {
     });
     const ctxCache = new Map<string, CustomerContext>();
     const refreshes: Array<{ id: string; unitPrice: number }> = [];
+    const priceChanges: Array<{ productId: string; from: number; to: number }> = [];
+    const removedItems: Array<{ productId: string; cartItemId: string; reason: 'excluded' }> = [];
     const schemeByItemId = new Map<string, number>();
     for (const item of cart.items) {
       if (Number(item.unitPrice) === 0) continue;
@@ -326,9 +328,15 @@ export class CartService {
           quantity: item.quantity,
           customer,
         });
+        if (resolved.excluded) {
+          removedItems.push({ productId: item.productId, cartItemId: item.id, reason: 'excluded' });
+          continue;
+        }
         const next = Number(resolved.unitPrice);
-        if (next !== Number(item.unitPrice)) {
+        const prev = Number(item.unitPrice);
+        if (next !== prev) {
           refreshes.push({ id: item.id, unitPrice: next });
+          priceChanges.push({ productId: item.productId, from: prev, to: next });
           item.unitPrice = resolved.unitPrice as unknown as typeof item.unitPrice;
         }
         schemeByItemId.set(
@@ -340,6 +348,12 @@ export class CartService {
         // unitPrice as-is so the row still renders. The pre-checkout
         // validation will catch dangling items.
       }
+    }
+    if (removedItems.length > 0) {
+      await prisma.cartItem.deleteMany({
+        where: { id: { in: removedItems.map((r) => r.cartItemId) } },
+      });
+      cart.items = cart.items.filter((i) => !removedItems.some((r) => r.cartItemId === i.id));
     }
     if (refreshes.length > 0) {
       await prisma.$transaction(
@@ -423,7 +437,7 @@ export class CartService {
 
     const total = vendorGroups.reduce((sum, g) => sum + g.subtotal, 0);
 
-    return { vendorGroups, total };
+    return { vendorGroups, total, priceChanges, removedItems };
   }
 
   async addItem(ctx: CartContext, productId: string, vendorId: string, quantity: number) {
@@ -462,8 +476,11 @@ export class CartService {
       throw Errors.outOfStock(productName, sellable);
     }
 
-    const { unitPrice: resolved } = await resolveUnitPrice({ productId, vendorId, quantity, customer });
-    const unitPrice = Number(resolved);
+    const resolved = await resolveUnitPrice({ productId, vendorId, quantity, customer });
+    if (resolved.excluded) {
+      throw Errors.badRequest('This product is not available for your account from this supplier');
+    }
+    const unitPrice = Number(resolved.unitPrice);
 
     const result = await prisma.cartItem.upsert({
       where: { cartId_productId: { cartId: cart.id, productId } },
@@ -504,13 +521,16 @@ export class CartService {
       throw Errors.outOfStock(productName, sellable);
     }
 
-    const { unitPrice: resolved } = await resolveUnitPrice({
+    const resolved = await resolveUnitPrice({
       productId: item.productId,
       vendorId: item.vendorId,
       quantity,
       customer,
     });
-    const unitPrice = Number(resolved);
+    if (resolved.excluded) {
+      throw Errors.badRequest('This product is not available for your account from this supplier');
+    }
+    const unitPrice = Number(resolved.unitPrice);
 
     const result = await prisma.cartItem.update({
       where: { id: itemId },

@@ -13,7 +13,7 @@ import { searchProductsSchema } from '@/modules/catalog/catalog.validator';
 import { errorResponse } from '@/middleware/errorHandler';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/utils';
-import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { attachCustomerPricing, filterExcludedProducts } from '@/modules/pricing/catalog-pricing';
 import { attachActivePromotions } from '@/modules/promotion/promotion-catalog';
 
 const searchService = new SearchService();
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
     const result = await searchService.search(q, pincode, cursor, limit);
     // Logged-in buyers see THEIR price (price lists / overrides) in results.
     let products = await attachCustomerPricing(result.products);
+    products = filterExcludedProducts(products);
     products = await attachActivePromotions(products);
     return NextResponse.json({ success: true, data: { ...result, products } });
   } catch (error) {

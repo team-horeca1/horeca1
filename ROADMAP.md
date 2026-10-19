@@ -229,6 +229,14 @@ Findings from a 3-agent code audit on the deployed `64.227.187.210` build. Each 
 - Profile completeness banner — real flag toggle
 - Product `tags` indexed in search (exact-match)
 
+### Vendor Pricing Workspace — Phase 2 (deferred)
+
+- **Show both** ex-GST and inc-GST preview in grid cells (today: ex-GST only; GST at checkout).
+- **Per-list GST flag** on `PriceList` for mixed tax treatment (schema + resolver).
+- **Maker-checker**: second approver on publish when guardrails warn or change count exceeds threshold.
+- **Scheduled publish** queue (draft → publish at `validFrom`).
+- **Assignment matrix**: outlet + brand rows, bulk assign CSV, effective-list simulation before save.
+
 ### 📅 ROADMAP claims to correct
 
 | Old claim | Reality after audit |

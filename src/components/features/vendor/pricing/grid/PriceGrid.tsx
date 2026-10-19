@@ -1,0 +1,663 @@
+'use client';
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+  FunctionSquare,
+  Lock,
+  MoreVertical,
+  Loader2,
+  Pencil,
+  Copy,
+  PowerOff,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { applyFormula, normalizeListKey, parseFormula } from '@/modules/pricing/formula';
+import type { DraftCell, PriceListCol, ProductRow } from '../types';
+import {
+  cellKey,
+  effective,
+  fallbackPrice,
+  inr,
+  isDirty,
+  isExcluded,
+} from '../types';
+
+interface Props {
+  rows: ProductRow[];
+  cols: PriceListCol[];
+  dirty: Record<string, DraftCell>;
+  setCell: (key: string, value: DraftCell) => void;
+  loading?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  onListsChanged?: () => void;
+  selectedProductIds?: Set<string>;
+  onSelectedProductIdsChange?: (ids: Set<string>) => void;
+}
+
+function cellLocked(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
+  const key = cellKey(row.id, col.id);
+  if (key in dirty) {
+    const d = dirty[key];
+    if (d === null) return false;
+    if (d.isLocked !== undefined) return d.isLocked;
+  }
+  return !!row.cells[col.id]?.isLocked;
+}
+
+function usesBaseFallback(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
+  const key = cellKey(row.id, col.id);
+  if (key in dirty) {
+    const d = dirty[key];
+    if (d === null) return true;
+    if (d.isExcluded) return true;
+    if (d.price === null) return true;
+    if (d.price !== undefined && d.price !== null) return false;
+  }
+  const cell = row.cells[col.id];
+  if (!cell || cell.isExcluded) return true;
+  return cell.price == null;
+}
+
+export function PriceGrid({
+  rows,
+  cols,
+  dirty,
+  setCell,
+  loading,
+  loadingMore,
+  hasMore,
+  onLoadMore,
+  onListsChanged,
+  selectedProductIds,
+  onSelectedProductIdsChange,
+}: Props) {
+  const [active, setActive] = useState<{ r: number; c: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ r: number; c: number } | null>(null);
+  const [editing, setEditing] = useState<{ r: number; c: number } | null>(null);
+  const [editVal, setEditVal] = useState('');
+  const editRef = useRef<HTMLInputElement>(null);
+  const [colMenu, setColMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [rename, setRename] = useState<{ id: string; name: string } | null>(null);
+  const [renameVal, setRenameVal] = useState('');
+  const [colBusy, setColBusy] = useState<string | null>(null);
+  const [formulaCol, setFormulaCol] = useState<string | null>(null);
+  const [formulaText, setFormulaText] = useState('');
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editing) setTimeout(() => editRef.current?.select(), 0);
+  }, [editing]);
+
+  const selection = useMemo(() => {
+    if (!active || !anchor) return new Set<string>();
+    const r0 = Math.min(active.r, anchor.r);
+    const r1 = Math.max(active.r, anchor.r);
+    const c0 = Math.min(active.c, anchor.c);
+    const c1 = Math.max(active.c, anchor.c);
+    const keys = new Set<string>();
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        keys.add(`${r}:${c}`);
+      }
+    }
+    return keys;
+  }, [active, anchor]);
+
+  const setCellFields = useCallback(
+    (rowId: string, listId: string, fields: DraftCell) => {
+      const key = cellKey(rowId, listId);
+      if (fields === null) {
+        setCell(key, null);
+        return;
+      }
+      setCell(key, fields);
+    },
+    [setCell],
+  );
+
+  const mergeCellFields = useCallback(
+    (rowId: string, listId: string, fields: Partial<NonNullable<DraftCell>>) => {
+      const key = cellKey(rowId, listId);
+      const existing = dirty[key];
+      setCell(key, {
+        ...(existing !== null && existing !== undefined ? existing : {}),
+        ...fields,
+      });
+    },
+    [dirty, setCell],
+  );
+
+  const commitEdit = (r: number, c: number) => {
+    const row = rows[r];
+    const col = cols[c];
+    if (!row || !col) {
+      setEditing(null);
+      return;
+    }
+    const trimmed = editVal.trim();
+    if (trimmed === '') {
+      setCellFields(row.id, col.id, null);
+    } else {
+      const num = parseFloat(trimmed);
+      if (!Number.isNaN(num) && num >= 0) {
+        mergeCellFields(row.id, col.id, { price: Math.round(num * 100) / 100, isExcluded: false });
+      }
+    }
+    setEditing(null);
+  };
+
+  const startEdit = (r: number, c: number) => {
+    const row = rows[r];
+    const col = cols[c];
+    if (!row || !col) return;
+    if (cellLocked(row, col, dirty)) {
+      toast.warning('Cell is locked');
+      return;
+    }
+    const val = effective(row, col, dirty);
+    setEditVal(String(val));
+    setEditing({ r, c });
+  };
+
+  const applyToSelection = (fn: (row: ProductRow, col: PriceListCol) => void) => {
+    selection.forEach((key) => {
+      const [rs, cs] = key.split(':').map(Number);
+      const row = rows[rs];
+      const col = cols[cs];
+      if (row && col) fn(row, col);
+    });
+  };
+
+  const applyFormulaToColumn = () => {
+    const colId = formulaCol;
+    if (!colId) return;
+    const targetCol = cols.find((c) => c.id === colId);
+    if (!targetCol) return;
+    const parsed = parseFormula(formulaText);
+    if (!parsed) {
+      toast.error('Invalid formula. Try =BASE-3%');
+      return;
+    }
+
+    const listByKey = new Map(cols.map((c) => [normalizeListKey(c.name), c]));
+    let updated = 0;
+    let skipped = 0;
+
+    const targetRows =
+      selectedProductIds && selectedProductIds.size > 0
+        ? rows.filter((r) => selectedProductIds.has(r.id))
+        : rows;
+
+    for (const row of targetRows) {
+      if (cellLocked(row, targetCol, dirty)) {
+        skipped++;
+        continue;
+      }
+      let sourcePrice = row.basePrice;
+      if (parsed.source !== 'BASE') {
+        const srcCol = listByKey.get(parsed.source);
+        if (!srcCol) {
+          toast.error(`Unknown list in formula: ${parsed.source}`);
+          return;
+        }
+        sourcePrice = effective(row, srcCol, dirty);
+      }
+      try {
+        const out = applyFormula(sourcePrice, parsed);
+        if (out > 0) {
+          mergeCellFields(row.id, targetCol.id, { price: out, isExcluded: false });
+          updated++;
+        }
+      } catch {
+        skipped++;
+      }
+    }
+
+    setFormulaCol(null);
+    setFormulaText('');
+    toast.success(`Formula applied to ${updated} cells${skipped ? ` (${skipped} skipped)` : ''}`);
+  };
+
+  const renameList = async () => {
+    if (!rename) return;
+    const name = renameVal.trim();
+    if (!name) return;
+    setColBusy(rename.id);
+    try {
+      const res = await fetch(`/api/v1/vendor/price-lists/${rename.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Rename failed');
+      toast.success('List renamed');
+      setRename(null);
+      onListsChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Rename failed');
+    } finally {
+      setColBusy(null);
+    }
+  };
+
+  const cloneList = async (sourceId: string) => {
+    const source = cols.find((c) => c.id === sourceId);
+    if (!source) return;
+    setColBusy(sourceId);
+    setColMenu(null);
+    try {
+      const res = await fetch(`/api/v1/vendor/price-lists/${sourceId}/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `${source.name} (copy)` }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Clone failed');
+      toast.success('List cloned');
+      onListsChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Clone failed');
+    } finally {
+      setColBusy(null);
+    }
+  };
+
+  const deactivateList = async (id: string) => {
+    if (!confirm('Deactivate this price list? It will hide from the workspace.')) return;
+    setColBusy(id);
+    setColMenu(null);
+    try {
+      const res = await fetch(`/api/v1/vendor/price-lists/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: false }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed');
+      toast.success('List deactivated');
+      onListsChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setColBusy(null);
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!active || editing) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
+      const row = rows[active.r];
+      const col = cols[active.c];
+      if (!row || !col) return;
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        startEdit(active.r, active.c);
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (!cellLocked(row, col, dirty)) setCellFields(row.id, col.id, null);
+        return;
+      }
+      if (e.key === 'x' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        applyToSelection((r, c) => {
+          if (!cellLocked(r, c, dirty)) mergeCellFields(r.id, c.id, { isExcluded: true });
+        });
+        return;
+      }
+      if (e.key === 'Enter' && editing) {
+        e.preventDefault();
+        commitEdit(active.r, active.c);
+        setActive({ r: Math.min(active.r + 1, rows.length - 1), c: active.c });
+        setAnchor({ r: Math.min(active.r + 1, rows.length - 1), c: active.c });
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const nextC = e.shiftKey ? active.c - 1 : active.c + 1;
+        if (nextC >= 0 && nextC < cols.length) {
+          setActive({ r: active.r, c: nextC });
+          setAnchor({ r: active.r, c: nextC });
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        setEditing(null);
+        return;
+      }
+      if (e.key.length === 1 && /[\d.]/.test(e.key)) {
+        startEdit(active.r, active.c);
+        setEditVal(e.key);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active, anchor, cols, dirty, editing, rows, applyToSelection, mergeCellFields, setCellFields]);
+
+  const selectionCount = selection.size;
+
+  return (
+    <div className="space-y-2">
+      {selectionCount > 1 && (
+        <div className="flex flex-wrap items-center gap-2 p-2 rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] text-[12px]">
+          <span className="font-semibold text-[#181725] tabular-nums">{selectionCount} cells</span>
+          <button
+            type="button"
+            className="h-8 px-3 rounded-lg border border-[#E9E3DD] bg-white font-medium"
+            onClick={() =>
+              applyToSelection((r, c) => {
+                if (!cellLocked(r, c, dirty)) setCellFields(r.id, c.id, null);
+              })
+            }
+          >
+            Use Base
+          </button>
+          <button
+            type="button"
+            className="h-8 px-3 rounded-lg border border-[#E9E3DD] bg-white font-medium"
+            onClick={() =>
+              applyToSelection((r, c) => {
+                if (!cellLocked(r, c, dirty)) {
+                  const ex = isExcluded(r, c, dirty);
+                  mergeCellFields(r.id, c.id, { isExcluded: !ex });
+                }
+              })
+            }
+          >
+            Remove / Put back
+          </button>
+          <button
+            type="button"
+            className="h-8 px-3 rounded-lg border border-[#E9E3DD] bg-white font-medium"
+            onClick={() =>
+              applyToSelection((r, c) => {
+                const locked = cellLocked(r, c, dirty);
+                mergeCellFields(r.id, c.id, { isLocked: !locked });
+              })
+            }
+          >
+            Lock toggle
+          </button>
+        </div>
+      )}
+
+      <div ref={gridRef} className="rounded-[12px] border border-[#E9E3DD] bg-white overflow-auto max-h-[calc(100vh-280px)]">
+        <table className="border-collapse text-[12px] min-w-full">
+          <thead className="sticky top-0 z-30 bg-[#FAF7F2]">
+            <tr>
+              <th className="sticky left-0 z-40 bg-[#FAF7F2] p-2 border-b border-[#E9E3DD] text-left min-w-[180px]">
+                Product
+              </th>
+              <th className="sticky left-[180px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[88px]">
+                SKU
+              </th>
+              <th className="sticky left-[268px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[72px] text-right tabular-nums">
+                Base
+              </th>
+              {cols.map((col) => (
+                <th
+                  key={col.id}
+                  className="p-2 border-b border-l border-[#E9E3DD] min-w-[108px] align-top"
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0">
+                      <div className="font-bold text-[#181725] truncate" title={col.name}>
+                        {col.name}
+                      </div>
+                      <div className="text-[10px] text-[#7C7C7C] tabular-nums">
+                        {col.counts?.priced ?? 0} priced · {col.counts?.excluded ?? 0} removed
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="p-1 rounded hover:bg-white shrink-0"
+                      onClick={(e) => {
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        setColMenu({ id: col.id, x: rect.left, y: rect.bottom + 4 });
+                      }}
+                    >
+                      {colBusy === col.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <MoreVertical size={14} />
+                      )}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-1 text-[10px] text-primary font-semibold flex items-center gap-0.5"
+                    onClick={() => {
+                      setFormulaCol(col.id);
+                      setFormulaText('=BASE-3%');
+                    }}
+                  >
+                    <FunctionSquare size={11} /> Formula
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading && rows.length === 0 ? (
+              <tr>
+                <td colSpan={3 + cols.length} className="p-12 text-center text-[#7C7C7C]">
+                  <Loader2 className="inline animate-spin mr-2" size={18} /> Loading products…
+                </td>
+              </tr>
+            ) : (
+              rows.map((row, ri) => (
+                <tr key={row.id} className="hover:bg-[#FAF7F2]/50">
+                  <td className="sticky left-0 z-20 bg-white p-2 border-b border-[#E9E3DD] font-medium text-[#181725]">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      {onSelectedProductIdsChange && (
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds?.has(row.id) ?? false}
+                          onChange={(e) => {
+                            const next = new Set(selectedProductIds ?? []);
+                            if (e.target.checked) next.add(row.id);
+                            else next.delete(row.id);
+                            onSelectedProductIdsChange(next);
+                          }}
+                          className="shrink-0"
+                        />
+                      )}
+                      <span className="truncate max-w-[160px]" title={row.name}>{row.name}</span>
+                    </label>
+                  </td>
+                  <td className="sticky left-[180px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-[#7C7C7C]">
+                    {row.sku || '—'}
+                  </td>
+                  <td className="sticky left-[268px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-right tabular-nums text-[#7C7C7C]">
+                    {inr(row.basePrice)}
+                  </td>
+                  {cols.map((col, ci) => {
+                    const dirtyCell = isDirty(row, col, dirty);
+                    const excluded = isExcluded(row, col, dirty);
+                    const locked = cellLocked(row, col, dirty);
+                    const baseFb = usesBaseFallback(row, col, dirty);
+                    const price = effective(row, col, dirty);
+                    const isActiveCell = active?.r === ri && active?.c === ci;
+                    const inSel = selection.has(`${ri}:${ci}`);
+                    const isEdit = editing?.r === ri && editing?.c === ci;
+
+                    return (
+                      <td
+                        key={col.id}
+                        className={cn(
+                          'p-0 border-b border-l border-[#E9E3DD] text-right tabular-nums cursor-cell',
+                          dirtyCell && 'bg-amber-50',
+                          inSel && 'ring-1 ring-inset ring-primary/40',
+                          isActiveCell && 'ring-2 ring-inset ring-primary',
+                        )}
+                        onMouseDown={() => {
+                          setActive({ r: ri, c: ci });
+                          setAnchor({ r: ri, c: ci });
+                        }}
+                        onDoubleClick={() => startEdit(ri, ci)}
+                      >
+                        {isEdit ? (
+                          <input
+                            ref={editRef}
+                            value={editVal}
+                            onChange={(e) => setEditVal(e.target.value)}
+                            onBlur={() => commitEdit(ri, ci)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                commitEdit(ri, ci);
+                                setActive({ r: Math.min(ri + 1, rows.length - 1), c: ci });
+                              }
+                              if (e.key === 'Escape') setEditing(null);
+                            }}
+                            className="w-full h-9 px-2 text-right outline-none bg-white border-2 border-primary"
+                          />
+                        ) : (
+                          <div
+                            className={cn(
+                              'px-2 py-2 flex items-center justify-end gap-1 min-h-[36px]',
+                              excluded && 'line-through text-[#7C7C7C]',
+                              baseFb && !excluded && 'text-[#7C7C7C]',
+                              !baseFb && !excluded && 'text-[#181725] font-medium',
+                            )}
+                          >
+                            {locked && <Lock size={11} className="text-[#7C7C7C] shrink-0" />}
+                            {inr(price)}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {hasMore && (
+        <button
+          type="button"
+          disabled={loadingMore}
+          onClick={onLoadMore}
+          className="w-full h-11 rounded-[12px] border border-[#E9E3DD] font-semibold text-[#181725] flex items-center justify-center gap-2"
+        >
+          {loadingMore ? <Loader2 size={16} className="animate-spin" /> : null}
+          Load more products
+        </button>
+      )}
+
+      {colMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setColMenu(null)} />
+          <div
+            className="fixed z-50 bg-white border border-[#E9E3DD] rounded-[12px] shadow-lg py-1 min-w-[160px] text-[13px]"
+            style={{ left: colMenu.x, top: colMenu.y }}
+          >
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2"
+              onClick={() => {
+                const c = cols.find((x) => x.id === colMenu.id);
+                if (c) {
+                  setRename({ id: c.id, name: c.name });
+                  setRenameVal(c.name);
+                }
+                setColMenu(null);
+              }}
+            >
+              <Pencil size={14} /> Rename
+            </button>
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2"
+              onClick={() => void cloneList(colMenu.id)}
+            >
+              <Copy size={14} /> Clone
+            </button>
+            <Link
+              href={`/vendor/price-lists/${colMenu.id}`}
+              className="w-full px-3 py-2 hover:bg-[#FAF7F2] flex items-center gap-2"
+              onClick={() => setColMenu(null)}
+            >
+              Advanced editor →
+            </Link>
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-red-50 text-red-700 flex items-center gap-2"
+              onClick={() => void deactivateList(colMenu.id)}
+            >
+              <PowerOff size={14} /> Deactivate
+            </button>
+          </div>
+        </>
+      )}
+
+      {rename && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRename(null)} />
+          <div className="relative bg-white rounded-[12px] p-5 w-full max-w-sm space-y-3">
+            <h3 className="font-bold text-[#181725]">Rename list</h3>
+            <input
+              value={renameVal}
+              onChange={(e) => setRenameVal(e.target.value)}
+              className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px]"
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setRename(null)} className="flex-1 h-10 border rounded-[12px]">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void renameList()}
+                className="flex-1 h-10 bg-primary text-white rounded-[12px] font-semibold"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formulaCol && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setFormulaCol(null)} />
+          <div className="relative bg-white rounded-[12px] p-5 w-full max-w-md space-y-3">
+            <h3 className="font-bold text-[#181725]">Column formula</h3>
+            <p className="text-[12px] text-[#7C7C7C]">
+              Applies to {selectedProductIds && selectedProductIds.size > 0 ? 'selected rows' : 'all visible rows'}.
+              Example: =BASE-3%
+            </p>
+            <input
+              value={formulaText}
+              onChange={(e) => setFormulaText(e.target.value)}
+              className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-mono text-[13px]"
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setFormulaCol(null)} className="flex-1 h-10 border rounded-[12px]">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyFormulaToColumn}
+                className="flex-1 h-10 bg-primary text-white rounded-[12px] font-semibold"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

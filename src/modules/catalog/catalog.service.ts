@@ -1428,7 +1428,8 @@ export class CatalogService {
       promoPrice?: unknown;
     };
 
-    let priced = (await attachCustomerPricing(listings)) as Listing[];
+    const { filterExcludedProducts } = await import('@/modules/pricing/catalog-pricing');
+    let priced = filterExcludedProducts(await attachCustomerPricing(listings)) as Listing[];
     priced = (await attachActivePromotions(priced)) as Listing[];
 
     const unitPrice = (p: Listing): number => {

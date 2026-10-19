@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { attachCustomerPricing, filterExcludedProducts } from '@/modules/pricing/catalog-pricing';
 import { attachActivePromotions } from '@/modules/promotion/promotion-catalog';
 import { totalStockQty } from '@/lib/inventoryHelpers';
 
@@ -145,7 +145,7 @@ export async function GET(
       take: CANDIDATE_TAKE,
     });
 
-    let priced = (await attachCustomerPricing(candidates)) as Listing[];
+    let priced = filterExcludedProducts(await attachCustomerPricing(candidates)) as Listing[];
     priced = (await attachActivePromotions(priced)) as Listing[];
 
     const groups = new Map<string, Listing[]>();

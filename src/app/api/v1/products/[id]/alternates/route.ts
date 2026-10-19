@@ -14,7 +14,7 @@ import type { Prisma } from '@prisma/client';
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { attachCustomerPricing, filterExcludedProducts } from '@/modules/pricing/catalog-pricing';
 import { withLegacyInventory } from '@/lib/inventoryHelpers';
 
 const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'pcs', 'kgs', 'ltr', 'pack']);
@@ -40,7 +40,7 @@ async function respond<T extends { id: string; basePrice: unknown }>(
   );
   return NextResponse.json({
     success: true,
-    data: { alternates: await attachCustomerPricing(enriched), matchType },
+    data: { alternates: filterExcludedProducts(await attachCustomerPricing(enriched)), matchType },
   });
 }
 

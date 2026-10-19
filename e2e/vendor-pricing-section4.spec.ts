@@ -775,4 +775,77 @@ test.describe('Section 4 — Pricing & bulk pricing', () => {
     expect(res.status).not.toBe(404);
     expect([200, 403]).toContain(res.status);
   });
+
+  test('Pricing workspace: GET workspace + review + explain routes', async ({ page }) => {
+    await openProducts(page);
+
+    const ws = await pageJson<{
+      success?: boolean;
+      data?: { baseVersion?: string | null; priceLists?: unknown[]; products?: unknown[] };
+    }>(page, '/api/v1/vendor/price-lists/workspace?limit=5');
+    expect(ws.status).not.toBe(404);
+    expect([200, 403]).toContain(ws.status);
+    if (ws.status !== 200 || !ws.json.success) return;
+
+    expect(ws.json.data).toHaveProperty('baseVersion');
+    expect(Array.isArray(ws.json.data?.priceLists)).toBe(true);
+    expect(Array.isArray(ws.json.data?.products)).toBe(true);
+
+    const publishes = await pageJson<{ success?: boolean }>(
+      page,
+      '/api/v1/vendor/price-lists/publishes?limit=5',
+    );
+    expect([200, 403]).toContain(publishes.status);
+
+    const effective = await pageJson<{ success?: boolean }>(
+      page,
+      '/api/v1/vendor/price-lists/assignments/effective',
+    );
+    expect([200, 403]).toContain(effective.status);
+
+    // UI shell
+    await page.goto('/vendor/price-lists', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await expect(page.getByRole('button', { name: /Prices/i }).first()).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.getByText(/ex-GST/i).first()).toBeVisible();
+  });
+
+  test('Pricing workspace: publish review rejects empty / validates cells', async ({ page }) => {
+    await openProducts(page);
+    const ws = await pageJson<{
+      success?: boolean;
+      data?: {
+        baseVersion?: string | null;
+        priceLists?: Array<{ id: string }>;
+        products?: Array<{ id: string; basePrice: number }>;
+      };
+    }>(page, '/api/v1/vendor/price-lists/workspace?limit=5');
+    if (ws.status !== 200 || !ws.json.success) return;
+    const listId = ws.json.data?.priceLists?.[0]?.id;
+    const product = ws.json.data?.products?.[0];
+    test.skip(!listId || !product, 'No list/product for review');
+
+    const review = await pageJson<{
+      success?: boolean;
+      data?: { summary?: { blocks?: number }; diffs?: unknown[] };
+      error?: { code?: string };
+    }>(page, '/api/v1/vendor/price-lists/workspace/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseVersion: ws.json.data?.baseVersion ?? null,
+        cells: [
+          {
+            priceListId: listId,
+            productId: product!.id,
+            customPrice: 0,
+          },
+        ],
+      }),
+    });
+    expect(review.status).toBe(200);
+    expect(review.json.success).toBe(true);
+    expect((review.json.data?.summary?.blocks ?? 0) > 0).toBe(true);
+  });
 });

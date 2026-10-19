@@ -106,7 +106,7 @@ const VENDOR_FEATURES: PortalFeatureMap = {
   dashboard:     { label: 'Store Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard'] },
   products:      { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/vendor/products'] },
   brandMappings: { label: 'Brand Mappings', actions: MODULE_ACTIONS.brandMappings, routes: ['/vendor/brand-mappings'] },
-  priceLists:    { label: 'Price Lists', actions: MODULE_ACTIONS.priceLists, routes: ['/vendor/price-lists'] },
+  priceLists:    { label: 'Pricing', actions: MODULE_ACTIONS.priceLists, routes: ['/vendor/price-lists'] },
   orders:        { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders', '/vendor/all-orders'] },
   returns:       { label: 'Returns', actions: MODULE_ACTIONS.returns, routes: ['/vendor/returns'] },
   inventory:     { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },

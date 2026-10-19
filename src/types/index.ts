@@ -119,6 +119,8 @@ export interface VendorProduct extends Product {
     hasStorePromotion?: boolean;
     /** True when `price` is a server-resolved customer-specific price (price list / override). */
     customerPriceApplied?: boolean;
+    /** Hidden wins — product not offered to this buyer for this supplier. */
+    unavailableForAccount?: boolean;
     /** Optional SKU for in-store / overlay search matching. */
     sku?: string;
     /** Product tags for search matching. */

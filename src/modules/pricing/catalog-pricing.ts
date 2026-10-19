@@ -67,14 +67,22 @@ export async function getCatalogCustomerContext(): Promise<CustomerContext | nul
   };
 }
 
+export type PricedProduct<T> = T & {
+  customerPricing?: CatalogPrice;
+  /** Hidden wins — not offered to this customer for this vendor. */
+  unavailableForAccount?: boolean;
+};
+
 /**
  * Attach `customerPricing` to every product the logged-in customer has a
- * special price for. Anonymous sessions and resolver failures both leave
- * the products untouched — pricing must never break public browsing.
+ * special price for. Excluded products are marked `unavailableForAccount`
+ * (and keep customerPricing.source === 'excluded'). Anonymous sessions and
+ * resolver failures leave products untouched — pricing must never break
+ * public browsing.
  */
 export async function attachCustomerPricing<T extends PriceableProduct>(
   products: T[],
-): Promise<Array<T & { customerPricing?: CatalogPrice }>> {
+): Promise<Array<PricedProduct<T>>> {
   if (products.length === 0) return products;
 
   try {
@@ -93,10 +101,24 @@ export async function attachCustomerPricing<T extends PriceableProduct>(
 
     return products.map((p) => {
       const cp = priceMap.get(p.id);
-      return cp ? { ...p, customerPricing: cp } : p;
+      if (!cp) return p;
+      if (cp.excluded) {
+        return { ...p, customerPricing: cp, unavailableForAccount: true };
+      }
+      return { ...p, customerPricing: cp };
     });
   } catch (err) {
     console.error('[catalog-pricing] attachCustomerPricing failed, serving base prices:', err);
     return products;
   }
+}
+
+/**
+ * Drop products the customer cannot buy (Hidden wins). Use on listing
+ * surfaces; PDP keeps the row and surfaces unavailableForAccount instead.
+ */
+export function filterExcludedProducts<T extends { unavailableForAccount?: boolean }>(
+  products: T[],
+): T[] {
+  return products.filter((p) => !p.unavailableForAccount);
 }
