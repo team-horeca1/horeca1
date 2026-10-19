@@ -1,6 +1,6 @@
 import { brandPublicPath, productPublicPath, vendorPublicPath } from '@/lib/publicSlug';
 
-const OG_CARD_VERSION = '5';
+const OG_CARD_VERSION = '6';
 
 export type ShareKind =
   | 'product'
@@ -144,7 +144,7 @@ export function collectionShareContent(opts: {
     text: `Browse ${opts.name} on Horeca1.`,
     path: `/collections/${opts.slug}`,
     image: opts.image,
-    ogPath: `/api/og/collection/${encodeURIComponent(opts.slug)}?format=portrait${v}`,
+    ogPath: `/api/og/collection/${encodeURIComponent(opts.slug)}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
     downloadName: `horeca1-collection-${opts.slug}.png`,
     subtitle: count,
   };
@@ -169,7 +169,7 @@ export function dealShareContent(opts: {
       : `${opts.title} on Horeca1.`,
     path: vendorPublicPath({ id: opts.vendorId }),
     image: opts.image,
-    ogPath: `/api/og/deal/${opts.id}?format=portrait`,
+    ogPath: `/api/og/deal/${opts.id}?format=portrait&cv=${OG_CARD_VERSION}`,
     downloadName: `horeca1-deal-${opts.id}.png`,
     subtitle: vendor || 'Store offer',
     priceLabel: opts.priceLabel,
@@ -193,9 +193,10 @@ export function articleShareContent(opts: {
     text: `🌟 *${opts.name}*${titleLine ? ` (${titleLine})` : ''}\n"${opts.quote}"\n\n📖 Read the full story on Horeca1 Voices:`,
     path: `/voices/${opts.slug}`,
     image: opts.photoUrl,
-    ogPath: `/api/og/voices/${encodeURIComponent(opts.slug)}?format=portrait`,
+    ogPath: `/api/og/voices/${encodeURIComponent(opts.slug)}?format=portrait&cv=${OG_CARD_VERSION}`,
     downloadName: `horeca1-voices-${opts.slug}.png`,
     subtitle: titleLine || 'Horeca1 Voices',
-    preRenderedImageUrl: opts.preRenderedImageUrl,
+    // Prefer live OG route (cached) so redesigns are never stuck on stale ImageKit PNGs.
+    preRenderedImageUrl: null,
   };
 }

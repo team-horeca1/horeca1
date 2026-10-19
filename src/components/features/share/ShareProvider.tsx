@@ -24,8 +24,7 @@ export function ShareProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   const prefetch = useCallback((c: ShareableContent) => {
-    const url = c.preRenderedImageUrl || c.ogPath;
-    prefetchShareImage(url);
+    prefetchShareImage(c.ogPath);
   }, []);
 
   const openShare = useCallback(

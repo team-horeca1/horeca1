@@ -2,8 +2,7 @@ import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
 import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
-import { productPublicPath } from '@/lib/publicSlug';
-import { qrPngDataUrl } from '@/lib/share-cards/qr';
+import { loadShareFonts } from '@/lib/share-cards/fonts';
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import {
@@ -55,13 +54,6 @@ export async function renderProductShareImage(
 
   if (!product?.vendor?.id) return null;
 
-  const pageUrl = `${origin}${productPublicPath({
-    id,
-    slug: product.slug,
-    vendorId: product.vendor.id,
-    vendorSlug: product.vendor.slug,
-  })}`;
-
   const master = product.brandMappings?.[0]?.brandMasterProduct;
   const rawImage =
     product.imageUrl ||
@@ -98,10 +90,10 @@ export async function renderProductShareImage(
   const mrpLine = grossMrp != null ? formatAmount(grossMrp) : undefined;
   const discountLine = pct != null && pct > 0 ? `${pct}% OFF` : undefined;
 
-  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
-    qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, rawImage),
+  const [imageUrl, logoUrl, fonts] = await Promise.all([
+    resolveOgImage(origin, rawImage, { maxPx: 600 }),
     loadHorecaLogoDataUrl(),
+    loadShareFonts(),
   ]);
 
   return new ImageResponse(
@@ -120,12 +112,11 @@ export async function renderProductShareImage(
         imageUrl={imageUrl}
         imageFit="contain"
         logoUrl={logoUrl}
-        pageUrl={pageUrl}
-        qrDataUrl={qrDataUrl}
       />
     ),
     {
       ...OG_SIZES[format],
+      fonts,
       headers: ogCacheHeaders(product.updatedAt),
     },
   );

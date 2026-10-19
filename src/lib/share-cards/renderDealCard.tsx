@@ -2,8 +2,7 @@ import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
 import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
-import { vendorPublicPath } from '@/lib/publicSlug';
-import { qrPngDataUrl } from '@/lib/share-cards/qr';
+import { loadShareFonts } from '@/lib/share-cards/fonts';
 import { prisma } from '@/lib/prisma';
 import {
   formatInr,
@@ -65,7 +64,6 @@ export async function renderDealShareImage(
 
   const vendorName =
     promo.vendor.displayName || promo.vendor.businessName || 'Horeca1 supplier';
-  const pageUrl = `${origin}${vendorPublicPath(promo.vendor)}`;
 
   let headline = promo.name;
   if (promo.type === 'pct_discount' && promo.discountPct) {
@@ -83,10 +81,10 @@ export async function renderDealShareImage(
   const valid = formatEnd(promo.endDate);
   if (valid) details.push(valid);
 
-  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
-    qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, promo.vendor.bannerUrl || promo.vendor.logoUrl),
+  const [imageUrl, logoUrl, fonts] = await Promise.all([
+    resolveOgImage(origin, promo.vendor.bannerUrl || promo.vendor.logoUrl, { maxPx: 1000 }),
     loadHorecaLogoDataUrl(),
+    loadShareFonts(),
   ]);
 
   return new ImageResponse(
@@ -102,12 +100,11 @@ export async function renderDealShareImage(
         imageUrl={imageUrl}
         imageFit="cover"
         logoUrl={logoUrl}
-        pageUrl={pageUrl}
-        qrDataUrl={qrDataUrl}
       />
     ),
     {
       ...OG_SIZES[format],
+      fonts,
       headers: ogCacheHeaders(promo.updatedAt),
     },
   );

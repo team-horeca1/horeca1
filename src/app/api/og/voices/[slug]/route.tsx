@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { VoiceShareCard } from '@/lib/share-cards/templates';
 import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
-import { qrPngDataUrl } from '@/lib/share-cards/qr';
+import { loadShareFonts } from '@/lib/share-cards/fonts';
 import { getPublishedVoiceStoryBySlug } from '@/modules/voices/voice.service';
 import { voiceTitleLine } from '@/sanity/lib/types';
 import { getOrRenderOgCard } from '@/lib/share-cards/ogCache';
@@ -33,11 +33,10 @@ export async function GET(
     const quote = story.quote;
     const badge = story.badge ?? 'HORECA1 VOICES';
     const titleLine = voiceTitleLine(story.role, story.venue);
-    const articleUrl = `${origin}/voices/${slug}`;
-    const [qrDataUrl, photoUrl, logoUrl] = await Promise.all([
-      qrPngDataUrl(articleUrl),
-      resolveOgImage(origin, story.photoOgUrl || story.photoUrl),
+    const [photoUrl, logoUrl, fonts] = await Promise.all([
+      resolveOgImage(origin, story.photoOgUrl || story.photoUrl, { maxPx: 1000 }),
       loadHorecaLogoDataUrl(),
+      loadShareFonts(),
     ]);
 
     return new ImageResponse(
@@ -50,12 +49,11 @@ export async function GET(
           titleLine={titleLine}
           photoUrl={photoUrl}
           logoUrl={logoUrl}
-          articleUrl={articleUrl}
-          qrDataUrl={qrDataUrl}
         />
       ),
       {
         ...OG_SIZES[format],
+        fonts,
         headers: ogCacheHeaders(story.publishedAt),
       },
     );

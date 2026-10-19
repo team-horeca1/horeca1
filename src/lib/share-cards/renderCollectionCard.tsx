@@ -2,7 +2,7 @@ import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
 import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
-import { qrPngDataUrl } from '@/lib/share-cards/qr';
+import { loadShareFonts } from '@/lib/share-cards/fonts';
 import { prisma } from '@/lib/prisma';
 import {
   OG_SIZES,
@@ -17,7 +17,6 @@ export async function renderCollectionShareImage(
   req?: Request,
 ): Promise<ImageResponse | null> {
   const origin = shareSiteOrigin(req);
-  const pageUrl = `${origin}/collections/${slug}`;
 
   const collection = await prisma.collection.findFirst({
     where: { slug, isActive: true },
@@ -48,10 +47,10 @@ export async function renderCollectionShareImage(
       ? `${itemCount} product${itemCount === 1 ? '' : 's'}`
       : undefined;
 
-  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
-    qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, collection.bannerImageUrl || collection.imageUrl),
+  const [imageUrl, logoUrl, fonts] = await Promise.all([
+    resolveOgImage(origin, collection.bannerImageUrl || collection.imageUrl, { maxPx: 600 }),
     loadHorecaLogoDataUrl(),
+    loadShareFonts(),
   ]);
 
   return new ImageResponse(
@@ -66,12 +65,11 @@ export async function renderCollectionShareImage(
         imageUrl={imageUrl}
         imageFit="contain"
         logoUrl={logoUrl}
-        pageUrl={pageUrl}
-        qrDataUrl={qrDataUrl}
       />
     ),
     {
       ...OG_SIZES[format],
+      fonts,
       headers: ogCacheHeaders(collection.createdAt),
     },
   );

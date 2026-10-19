@@ -2,13 +2,17 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
-export function absoluteMediaUrl(origin: string, url: string | null | undefined): string | null {
+export function absoluteMediaUrl(
+  origin: string,
+  url: string | null | undefined,
+  opts?: { maxPx?: number },
+): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
-  if (/^(https?:|data:|blob:)/i.test(trimmed)) return ogSafeRaster(trimmed);
-  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  return ogSafeRaster(`${origin.replace(/\/$/, '')}${path}`);
+  if (/^(https?:|data:|blob:)/i.test(trimmed)) return ogSafeRaster(trimmed, opts?.maxPx);
+  const p = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return ogSafeRaster(`${origin.replace(/\/$/, '')}${p}`, opts?.maxPx);
 }
 
 // In-memory cache for resolved base64 data URLs to prevent repeat remote network fetches and Sharp re-encodings
@@ -21,16 +25,21 @@ const MAX_IMAGE_CACHE = 150;
  * Using sharp, this reads local public files directly or fetches remote CDNs,
  * then converts them into an inline PNG data URL for guaranteed 100% reliable rendering.
  */
-export async function resolveOgImage(origin: string, url: string | null | undefined): Promise<string | null> {
+export async function resolveOgImage(
+  origin: string,
+  url: string | null | undefined,
+  opts?: { maxPx?: number },
+): Promise<string | null> {
   if (!url) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
+  const maxPx = opts?.maxPx ?? 600;
 
   // Already a data URL
   if (trimmed.startsWith('data:')) return trimmed;
 
   // Fast path: In-memory cached data URL
-  const cacheKey = `${origin}:${trimmed}`;
+  const cacheKey = `${origin}:${trimmed}:w${maxPx}`;
   const cached = resolvedImageCache.get(cacheKey);
   if (cached) return cached;
 
@@ -46,9 +55,9 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
       }
     }
 
-    // 2. Remote URL or fallback
+    // 2. Remote URL or fallback — ImageKit already resized via transform params
     if (!inputBuffer) {
-      const absUrl = absoluteMediaUrl(origin, trimmed);
+      const absUrl = absoluteMediaUrl(origin, trimmed, { maxPx });
       if (!absUrl) return null;
 
       const controller = new AbortController();
@@ -65,10 +74,9 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
     }
 
     if (inputBuffer && inputBuffer.length > 0) {
-      // Fast Sharp encoding: 600x600 inside with compressionLevel: 1 and effort: 1
       const pngBuffer = await sharp(inputBuffer)
         .flatten({ background: '#ffffff' })
-        .resize({ width: 600, height: 600, fit: 'inside', withoutEnlargement: true })
+        .resize({ width: maxPx, height: maxPx, fit: 'inside', withoutEnlargement: true })
         .png({ compressionLevel: 1, effort: 1 })
         .toBuffer();
       const dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
@@ -84,7 +92,7 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
     console.warn('[resolveOgImage] Sharp conversion fallback:', err);
   }
 
-  return absoluteMediaUrl(origin, trimmed);
+  return absoluteMediaUrl(origin, trimmed, { maxPx });
 }
 
 let logoDataUrl: Promise<string | null> | null = null;
@@ -110,29 +118,25 @@ export function loadHorecaLogoDataUrl(): Promise<string | null> {
 
 /**
  * next/og (Satori) cannot decode webp/avif/svg directly.
- * Instead of dropping them, convert CDN URLs (ImageKit, Sanity, etc.) to JPG/PNG
- * ensuring transparent backgrounds are cleanly flattened on white (never black).
+ * ImageKit: request resized PNG with white bg so sharp does little work.
  */
-function ogSafeRaster(url: string): string | null {
-  // ImageKit URL: convert to PNG/JPG with clean white background
+function ogSafeRaster(url: string, maxPx = 600): string | null {
   if (url.includes('ik.imagekit.io') || url.includes('imagekit.io')) {
+    const transform = `w-${maxPx},h-${maxPx},c-at_max,f-png,bg-FFFFFF`;
     if (url.includes('tr=')) {
-      return url.replace(/tr=([^&]*)/, 'tr=f-png,bg-FFFFFF,$1');
+      return url.replace(/tr=([^&]*)/, `tr=${transform},$1`);
     }
     const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}tr=f-png,bg-FFFFFF`;
+    return `${url}${sep}tr=${transform}`;
   }
 
-  // Sanity CDN URL: force JPG with white background
   if (url.includes('cdn.sanity.io')) {
     const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}fm=jpg&bg=ffffff`;
+    return `${url}${sep}fm=jpg&bg=ffffff&w=${maxPx}`;
   }
 
-  // Generic webp/avif/svg check
   if (/\.(webp|avif|svg)(\?|$)/i.test(url)) {
     return null;
   }
   return url;
 }
-

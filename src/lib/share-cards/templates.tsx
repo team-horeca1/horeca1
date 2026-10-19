@@ -13,6 +13,7 @@ const SUCCESS = '#16A34A';
 const TINT_BG = '#FDF2F4';
 const TINT_BORDER = '#FCE7EB';
 const TINT_TEXT = '#6B1D2E';
+const FONT = 'Inter';
 
 export function RupeeGlyph(props: {
   size?: number;
@@ -62,6 +63,50 @@ export function ArrowUpRight(props: { size?: number; color?: string }) {
   );
 }
 
+function BadgeCheckGlyph(props: { size?: number }) {
+  const size = props.size ?? 28;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={{ display: 'flex' }}
+    >
+      <circle cx="12" cy="12" r="10" fill="#3B82F6" />
+      <path
+        d="M8.5 12.5l2.2 2.2 4.8-5"
+        stroke="#FFFFFF"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShoppingBagGlyph(props: { size?: number; color?: string }) {
+  const size = props.size ?? 18;
+  const color = props.color ?? '#FFFFFF';
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: 'flex' }}
+    >
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+
 export function StarGlyph(props: { size?: number; color?: string; style?: CSSProperties }) {
   const { size = 18, color = '#EAB308', style } = props;
   return (
@@ -83,7 +128,6 @@ export function StarGlyph(props: { size?: number; color?: string; style?: CSSPro
 
 function parsePriceNumber(raw?: string | null): string | null {
   if (!raw) return null;
-  // Strip "Rs. ", "₹", and spaces
   const cleaned = raw.replace(/^Rs\.?\s*/i, '').replace(/^₹\s*/, '').trim();
   return cleaned || null;
 }
@@ -92,13 +136,8 @@ function parseOfferText(offer?: string | null): { price: string; suffix: string;
   if (!offer) return null;
   const trimmed = offer.trim();
   if (trimmed.includes('%')) {
-    return {
-      price: trimmed,
-      suffix: '',
-      isCurrency: false,
-    };
+    return { price: trimmed, suffix: '', isCurrency: false };
   }
-  // Match patterns like "Rs. 380 at 10+" or "₹380 at 10+" or "380 at 10+"
   const match = trimmed.match(/^(?:Rs\.?|₹)?\s*([0-9,.]+)\s*(at\s+[0-9]+.*|\/.*)?$/i);
   if (match && match[1]) {
     return {
@@ -107,11 +146,7 @@ function parseOfferText(offer?: string | null): { price: string; suffix: string;
       isCurrency: true,
     };
   }
-  return {
-    price: trimmed,
-    suffix: '',
-    isCurrency: false,
-  };
+  return { price: trimmed, suffix: '', isCurrency: false };
 }
 
 function renderStatSegment(seg: string, isPortrait: boolean): ReactNode {
@@ -138,63 +173,6 @@ function renderStatSegment(seg: string, isPortrait: boolean): ReactNode {
   );
 }
 
-function QrBox(props: {
-  qrDataUrl?: string | null;
-  href: string;
-  size?: number;
-  isPortrait?: boolean;
-}) {
-  const boxSize = props.size || (props.isPortrait ? 154 : 138);
-  const imgSize = boxSize - 20;
-
-  return (
-    <div
-      style={{
-        ...flexCol,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
-        border: '2px solid #E5E7EB',
-        borderRadius: 22,
-        padding: 10,
-        width: boxSize,
-        height: boxSize,
-        flexShrink: 0,
-      }}
-    >
-      {props.qrDataUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={props.qrDataUrl}
-          width={imgSize}
-          height={imgSize}
-          alt=""
-          style={{ width: imgSize, height: imgSize, objectFit: 'contain' }}
-        />
-      ) : (
-        <div
-          style={{
-            ...flexCol,
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: imgSize,
-            height: imgSize,
-            backgroundColor: '#F9FAFB',
-            borderRadius: 12,
-            fontSize: 12,
-            fontWeight: 700,
-            color: INK_MUTED,
-            textAlign: 'center',
-            padding: 8,
-          }}
-        >
-          {props.href.replace(/^https?:\/\//, '').slice(0, 24)}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function clampTitle(title: string, max = 72): string {
   const t = title.trim();
   if (t.length <= max) return t;
@@ -217,7 +195,7 @@ const shell: CSSProperties = {
   height: '100%',
   backgroundColor: CARD_BG,
   color: INK_PRIMARY,
-  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  fontFamily: FONT,
   position: 'relative',
   overflow: 'hidden',
   justifyContent: 'space-between',
@@ -247,7 +225,7 @@ function BrandLockup(props: { logoUrl?: string | null; isPortrait: boolean }) {
           justifyContent: 'center',
           backgroundColor: PRIMARY,
           color: '#FFFFFF',
-          fontWeight: 900,
+          fontWeight: 700,
           fontSize: props.isPortrait ? 28 : 24,
           width: props.isPortrait ? 64 : 56,
           height: props.isPortrait ? 64 : 56,
@@ -257,13 +235,199 @@ function BrandLockup(props: { logoUrl?: string | null; isPortrait: boolean }) {
       >
         H1
       </div>
-      <span style={{ fontSize: props.isPortrait ? 36 : 30, fontWeight: 900, color: INK_PRIMARY }}>
+      <span style={{ fontSize: props.isPortrait ? 36 : 30, fontWeight: 700, color: INK_PRIMARY }}>
         Horeca1
       </span>
     </div>
   );
 }
 
+function HeaderChip(props: { label: string; isPortrait: boolean }) {
+  return (
+    <div
+      style={{
+        ...flexRow,
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        border: '1.5px solid #E5E7EB',
+        padding: props.isPortrait ? '10px 18px' : '8px 14px',
+        borderRadius: 24,
+      }}
+    >
+      <span
+        style={{
+          fontSize: props.isPortrait ? 16 : 14,
+          fontWeight: 700,
+          letterSpacing: 1.2,
+          color: PRIMARY,
+          marginRight: 6,
+        }}
+      >
+        {props.label}
+      </span>
+      <ArrowUpRight size={props.isPortrait ? 20 : 17} color={PRIMARY} />
+    </div>
+  );
+}
+
+/** Brand share card — mirrors BrandStoreCard: cover + scrim + name/check/categories/items pill. */
+export function BrandShareCard(props: {
+  format: 'portrait' | 'square';
+  name: string;
+  categoryLine?: string;
+  productCount?: number;
+  imageUrl?: string | null;
+  bgColor?: string | null;
+  logoUrl?: string | null;
+}) {
+  const isPortrait = props.format === 'portrait';
+  const topPad = isPortrait ? 48 : 36;
+  const sidePad = isPortrait ? 52 : 40;
+  const bottomPad = isPortrait ? 44 : 36;
+  const coverH = isPortrait ? 980 : 780;
+  const bg = props.bgColor?.trim() || PRIMARY;
+  const count = props.productCount ?? 0;
+  const initial = (props.name.trim()[0] || 'B').toUpperCase();
+
+  return (
+    <div style={{ ...shell, padding: `${topPad}px ${sidePad}px ${bottomPad}px` }}>
+      <div style={{ ...flexRow, width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
+        <BrandLockup logoUrl={props.logoUrl} isPortrait={isPortrait} />
+        <HeaderChip label="BRAND STORE" isPortrait={isPortrait} />
+      </div>
+
+      <div
+        style={{
+          ...flexCol,
+          width: '100%',
+          height: coverH,
+          marginTop: isPortrait ? 28 : 20,
+          borderRadius: 28,
+          overflow: 'hidden',
+          position: 'relative',
+          backgroundColor: bg,
+          justifyContent: 'flex-end',
+        }}
+      >
+        {props.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={props.imageUrl}
+            alt=""
+            width={1080}
+            height={coverH}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              ...flexCol,
+              position: 'absolute',
+              inset: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 120,
+              fontWeight: 700,
+              color: 'rgba(255,255,255,0.35)',
+            }}
+          >
+            {initial}
+          </div>
+        )}
+
+        {/* Bottom scrim */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: '58%',
+            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)',
+          }}
+        />
+
+        <div
+          style={{
+            ...flexCol,
+            position: 'relative',
+            padding: isPortrait ? '36px 40px 40px' : '28px 32px 32px',
+            color: '#FFFFFF',
+          }}
+        >
+          <div style={{ ...flexRow, alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: isPortrait ? 52 : 40,
+                fontWeight: 700,
+                lineHeight: 1.15,
+                letterSpacing: -0.6,
+                color: '#FFFFFF',
+                maxWidth: isPortrait ? 820 : 700,
+                overflow: 'hidden',
+              }}
+            >
+              {clampTitle(props.name, isPortrait ? 48 : 40)}
+            </span>
+            <div style={{ marginLeft: 12, display: 'flex' }}>
+              <BadgeCheckGlyph size={isPortrait ? 34 : 28} />
+            </div>
+          </div>
+
+          {props.categoryLine ? (
+            <span
+              style={{
+                fontSize: isPortrait ? 26 : 20,
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.82)',
+                marginTop: 10,
+              }}
+            >
+              {clampTitle(props.categoryLine, 56)}
+            </span>
+          ) : null}
+
+          {count > 0 ? (
+            <div
+              style={{
+                ...flexRow,
+                alignItems: 'center',
+                alignSelf: 'flex-start',
+                marginTop: isPortrait ? 22 : 16,
+                backgroundColor: 'rgba(255,255,255,0.20)',
+                border: '1.5px solid rgba(255,255,255,0.30)',
+                borderRadius: 999,
+                padding: isPortrait ? '10px 18px' : '8px 14px',
+              }}
+            >
+              <ShoppingBagGlyph size={isPortrait ? 18 : 15} />
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: isPortrait ? 22 : 17,
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  letterSpacing: 0.2,
+                }}
+              >
+                {count} {count === 1 ? 'item' : 'items'}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Voices share card — mirrors VoiceStoryCard layout (no QR). */
 export function VoiceShareCard(props: {
   format: 'portrait' | 'square';
   name: string;
@@ -271,62 +435,34 @@ export function VoiceShareCard(props: {
   quote: string;
   titleLine: string;
   photoUrl: string | null;
-  articleUrl: string;
-  qrDataUrl?: string | null;
   logoUrl?: string | null;
 }) {
   const isPortrait = props.format === 'portrait';
   const topPad = isPortrait ? 48 : 36;
   const sidePad = isPortrait ? 52 : 40;
   const bottomPad = isPortrait ? 44 : 36;
-  const imageH = isPortrait ? 550 : 420;
+  const imageH = isPortrait ? 620 : 460;
   const initial = (props.name.trim()[0] || 'V').toUpperCase();
   const quote = `\u201C${props.quote}\u201D`;
+  const badge = (props.badge || 'HORECA1 VOICES').toUpperCase();
 
   return (
     <div style={{ ...shell, padding: `${topPad}px ${sidePad}px ${bottomPad}px` }}>
-      {/* TOP BRAND HEADER */}
       <div style={{ ...flexRow, width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
         <BrandLockup logoUrl={props.logoUrl} isPortrait={isPortrait} />
-
-        <div
-          style={{
-            ...flexRow,
-            alignItems: 'center',
-            backgroundColor: '#F9FAFB',
-            border: '1.5px solid #E5E7EB',
-            padding: isPortrait ? '10px 18px' : '8px 14px',
-            borderRadius: 24,
-          }}
-        >
-          <span
-            style={{
-              fontSize: isPortrait ? 16 : 14,
-              fontWeight: 800,
-              letterSpacing: 1.2,
-              color: PRIMARY,
-              marginRight: 6,
-            }}
-          >
-            {props.badge || 'HORECA1 VOICES'}
-          </span>
-          <ArrowUpRight size={isPortrait ? 20 : 17} color={PRIMARY} />
-        </div>
+        <HeaderChip label="HORECA1 VOICES" isPortrait={isPortrait} />
       </div>
 
-      {/* EDITORIAL PHOTO STAGE */}
       <div
         style={{
           ...flexCol,
           width: '100%',
           height: imageH,
           marginTop: isPortrait ? 24 : 16,
-          marginBottom: isPortrait ? 24 : 16,
+          marginBottom: isPortrait ? 28 : 18,
           backgroundColor: STAGE_BG,
           borderRadius: 28,
           border: `2px solid ${STAGE_BORDER}`,
-          alignItems: 'center',
-          justifyContent: 'center',
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -338,43 +474,81 @@ export function VoiceShareCard(props: {
             alt=""
             width={1080}
             height={imageH}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
           <div
             style={{
               ...flexCol,
-              width: 180,
-              height: 180,
-              borderRadius: 28,
-              backgroundColor: '#EDE9FE',
+              width: '100%',
+              height: '100%',
               alignItems: 'center',
               justifyContent: 'center',
+              backgroundColor: '#EDE9FE',
               fontSize: 84,
-              fontWeight: 900,
+              fontWeight: 700,
               color: PRIMARY,
             }}
           >
             {initial}
           </div>
         )}
+
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 45%)',
+          }}
+        />
+
+        {badge ? (
+          <div
+            style={{
+              ...flexRow,
+              position: 'absolute',
+              top: isPortrait ? 28 : 22,
+              left: isPortrait ? 28 : 22,
+              alignItems: 'center',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              border: '1.5px solid rgba(255,255,255,0.6)',
+              borderRadius: 999,
+              padding: isPortrait ? '10px 18px' : '8px 14px',
+            }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                backgroundColor: PRIMARY,
+                marginRight: 10,
+              }}
+            />
+            <span
+              style={{
+                fontSize: isPortrait ? 16 : 13,
+                fontWeight: 700,
+                letterSpacing: 1.1,
+                color: PRIMARY,
+              }}
+            >
+              {badge}
+            </span>
+          </div>
+        ) : null}
       </div>
 
-      {/* EDITORIAL HEADLINE & QUOTE SECTION */}
       <div style={{ ...flexCol, width: '100%', flex: 1, justifyContent: 'space-between' }}>
         <div style={{ ...flexCol }}>
           <div
             style={{
-              fontSize: isPortrait ? 48 : 38,
-              fontWeight: 900,
+              fontSize: isPortrait ? 44 : 34,
+              fontWeight: 700,
               lineHeight: 1.15,
               color: INK_PRIMARY,
-              letterSpacing: -0.6,
-              maxHeight: isPortrait ? 116 : 90,
+              letterSpacing: -0.5,
+              maxHeight: isPortrait ? 110 : 84,
               overflow: 'hidden',
             }}
           >
@@ -384,25 +558,25 @@ export function VoiceShareCard(props: {
           {props.titleLine ? (
             <div
               style={{
-                fontSize: isPortrait ? 26 : 21,
-                fontWeight: 700,
-                color: INK_SECONDARY,
+                fontSize: isPortrait ? 24 : 19,
+                fontWeight: 500,
+                color: INK_MUTED,
                 marginTop: 8,
               }}
             >
-              {clampTitle(props.titleLine, 48)}
+              {clampTitle(props.titleLine, 56)}
             </div>
           ) : null}
 
           <div
             style={{
-              fontSize: isPortrait ? 28 : 22,
-              fontWeight: 500,
-              lineHeight: 1.35,
+              fontSize: isPortrait ? 26 : 20,
+              fontWeight: 400,
+              lineHeight: 1.4,
               color: INK_SECONDARY,
               marginTop: isPortrait ? 18 : 12,
               fontStyle: 'italic',
-              maxHeight: isPortrait ? 120 : 90,
+              maxHeight: isPortrait ? 130 : 100,
               overflow: 'hidden',
             }}
           >
@@ -410,57 +584,50 @@ export function VoiceShareCard(props: {
           </div>
         </div>
 
-        {/* TRUST LINE */}
-        <div style={{ ...flexRow, alignItems: 'center', marginBottom: isPortrait ? 14 : 10 }}>
-          <span style={{ fontSize: isPortrait ? 18 : 15, fontWeight: 700, color: PRIMARY, letterSpacing: 0.5 }}>
-            Horeca1 Voices
-          </span>
-          <span style={{ fontSize: 16, color: INK_SUBTLE, marginLeft: 10, marginRight: 10 }}>•</span>
-          <span style={{ fontSize: isPortrait ? 17 : 14, fontWeight: 600, color: INK_MUTED }}>
-            Real stories from leaders shaping the food industry
-          </span>
-        </div>
-      </div>
-
-      {/* BOTTOM FOOTER / CTA & QR CODE */}
-      <div
-        style={{
-          ...flexRow,
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          paddingTop: isPortrait ? 22 : 16,
-          borderTop: `2px solid ${DIVIDER}`,
-        }}
-      >
-        <div style={{ ...flexCol }}>
-          <div
-            style={{
-              ...flexRow,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: PRIMARY,
-              color: '#FFFFFF',
-              fontSize: isPortrait ? 24 : 20,
-              fontWeight: 800,
-              padding: isPortrait ? '16px 36px' : '12px 28px',
-              borderRadius: 18,
-              letterSpacing: 0.3,
-            }}
-          >
-            Read Full Story
+        <div
+          style={{
+            ...flexRow,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            marginTop: isPortrait ? 28 : 18,
+            paddingTop: isPortrait ? 22 : 16,
+            borderTop: `2px solid ${DIVIDER}`,
+          }}
+        >
+          <div style={{ ...flexRow, alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: isPortrait ? 24 : 19,
+                fontWeight: 700,
+                color: PRIMARY,
+              }}
+            >
+              Read story
+            </span>
+            <span style={{ marginLeft: 8, display: 'flex' }}>
+              <svg
+                width={isPortrait ? 22 : 18}
+                height={isPortrait ? 22 : 18}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={PRIMARY}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </span>
           </div>
-          <span style={{ fontSize: isPortrait ? 15 : 13, fontWeight: 600, color: INK_SUBTLE, marginTop: 8 }}>
-            Scan QR code to read the complete interview
-          </span>
         </div>
-
-        <QrBox qrDataUrl={props.qrDataUrl} href={props.articleUrl} isPortrait={isPortrait} />
       </div>
     </div>
   );
 }
 
+/** Product / vendor / collection / deal share card (no QR). */
 export function CommerceShareCard(props: {
   format: 'portrait' | 'square';
   kicker: string;
@@ -468,19 +635,13 @@ export function CommerceShareCard(props: {
   subtitle?: string;
   statLine?: string;
   offer?: string;
-  /** Selling price */
   price?: string;
-  /** Strike-through MRP / prior price */
   originalPrice?: string;
-  /** e.g. "5% OFF" */
   discount?: string;
   cta: string;
   imageUrl?: string | null;
-  /** cover = store banner. contain = full brand or product image, scaled to the card. */
   imageFit?: 'cover' | 'contain';
   logoUrl?: string | null;
-  pageUrl: string;
-  qrDataUrl?: string | null;
 }) {
   const isPortrait = props.format === 'portrait';
   const topPad = isPortrait ? 48 : 36;
@@ -499,36 +660,11 @@ export function CommerceShareCard(props: {
 
   return (
     <div style={{ ...shell, padding: `${topPad}px ${sidePad}px ${bottomPad}px` }}>
-      {/* TOP BRAND HEADER */}
       <div style={{ ...flexRow, width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
         <BrandLockup logoUrl={props.logoUrl} isPortrait={isPortrait} />
-
-        <div
-          style={{
-            ...flexRow,
-            alignItems: 'center',
-            backgroundColor: '#F9FAFB',
-            border: '1.5px solid #E5E7EB',
-            padding: isPortrait ? '10px 18px' : '8px 14px',
-            borderRadius: 24,
-          }}
-        >
-          <span
-            style={{
-              fontSize: isPortrait ? 16 : 14,
-              fontWeight: 800,
-              letterSpacing: 1.2,
-              color: PRIMARY,
-              marginRight: 6,
-            }}
-          >
-            {kicker === 'PRODUCT' ? 'HORECA1' : kicker}
-          </span>
-          <ArrowUpRight size={isPortrait ? 20 : 17} color={PRIMARY} />
-        </div>
+        <HeaderChip label={kicker === 'PRODUCT' ? 'HORECA1' : kicker} isPortrait={isPortrait} />
       </div>
 
-      {/* PRODUCT / STORE IMAGE STAGE (38-42% card height) */}
       <div
         style={{
           ...flexCol,
@@ -570,7 +706,7 @@ export function CommerceShareCard(props: {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 88,
-              fontWeight: 900,
+              fontWeight: 700,
               color: PRIMARY,
             }}
           >
@@ -579,14 +715,12 @@ export function CommerceShareCard(props: {
         )}
       </div>
 
-      {/* PRODUCT INFORMATION CONTAINER */}
       <div style={{ ...flexCol, width: '100%', flex: 1, justifyContent: 'space-between' }}>
-        {/* Title and Vendor/Pack metadata */}
         <div style={{ ...flexCol }}>
           <div
             style={{
               fontSize: isPortrait ? 50 : 38,
-              fontWeight: 900,
+              fontWeight: 700,
               lineHeight: 1.16,
               color: INK_PRIMARY,
               letterSpacing: -0.8,
@@ -627,7 +761,6 @@ export function CommerceShareCard(props: {
           ) : null}
         </div>
 
-        {/* PRICING & DEALS ROW */}
         {(priceNum || props.discount || offerParsed) ? (
           <div
             style={{
@@ -638,7 +771,6 @@ export function CommerceShareCard(props: {
               flexWrap: 'wrap',
             }}
           >
-            {/* HERO SELLING PRICE */}
             {priceNum ? (
               <div style={{ ...flexRow, alignItems: 'center', color: INK_PRIMARY }}>
                 <RupeeGlyph
@@ -650,7 +782,7 @@ export function CommerceShareCard(props: {
                 <span
                   style={{
                     fontSize: isPortrait ? 60 : 46,
-                    fontWeight: 900,
+                    fontWeight: 700,
                     letterSpacing: -1.2,
                     fontVariantNumeric: 'tabular-nums',
                   }}
@@ -660,7 +792,6 @@ export function CommerceShareCard(props: {
               </div>
             ) : null}
 
-            {/* STRIKETHROUGH ORIGINAL MRP */}
             {mrpNum ? (
               <div
                 style={{
@@ -689,7 +820,6 @@ export function CommerceShareCard(props: {
               </div>
             ) : null}
 
-            {/* DISCOUNT PILL */}
             {props.discount ? (
               <div
                 style={{
@@ -698,7 +828,7 @@ export function CommerceShareCard(props: {
                   backgroundColor: SUCCESS,
                   color: '#FFFFFF',
                   fontSize: isPortrait ? 22 : 17,
-                  fontWeight: 800,
+                  fontWeight: 700,
                   padding: isPortrait ? '6px 16px' : '4px 12px',
                   borderRadius: 12,
                   marginLeft: 14,
@@ -709,7 +839,6 @@ export function CommerceShareCard(props: {
               </div>
             ) : null}
 
-            {/* TIER / SLAB PRICING OFFER */}
             {offerParsed ? (
               <div
                 style={{
@@ -719,7 +848,7 @@ export function CommerceShareCard(props: {
                   border: `1.5px solid ${TINT_BORDER}`,
                   color: TINT_TEXT,
                   fontSize: isPortrait ? 24 : 18,
-                  fontWeight: 800,
+                  fontWeight: 700,
                   padding: isPortrait ? '8px 18px' : '6px 14px',
                   borderRadius: 14,
                   marginLeft: 16,
@@ -749,7 +878,7 @@ export function CommerceShareCard(props: {
                   border: `1.5px solid ${TINT_BORDER}`,
                   color: TINT_TEXT,
                   fontSize: isPortrait ? 22 : 17,
-                  fontWeight: 800,
+                  fontWeight: 700,
                   padding: isPortrait ? '8px 18px' : '6px 14px',
                   borderRadius: 14,
                   marginLeft: 16,
@@ -761,7 +890,6 @@ export function CommerceShareCard(props: {
           </div>
         ) : null}
 
-        {/* TRUST / COMMERCE LINE */}
         <div style={{ ...flexRow, alignItems: 'center', marginBottom: isPortrait ? 16 : 10 }}>
           <span style={{ fontSize: isPortrait ? 18 : 15, fontWeight: 700, color: PRIMARY, letterSpacing: 0.5 }}>
             Available on Horeca1
@@ -773,40 +901,32 @@ export function CommerceShareCard(props: {
         </div>
       </div>
 
-      {/* BOTTOM FOOTER / CTA & QR CODE */}
       <div
         style={{
           ...flexRow,
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           width: '100%',
           paddingTop: isPortrait ? 22 : 16,
           borderTop: `2px solid ${DIVIDER}`,
         }}
       >
-        <div style={{ ...flexCol }}>
-          <div
-            style={{
-              ...flexRow,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: PRIMARY,
-              color: '#FFFFFF',
-              fontSize: isPortrait ? 24 : 20,
-              fontWeight: 800,
-              padding: isPortrait ? '16px 36px' : '12px 28px',
-              borderRadius: 18,
-              letterSpacing: 0.3,
-            }}
-          >
-            {props.cta || 'Open in Horeca1'}
-          </div>
-          <span style={{ fontSize: isPortrait ? 15 : 13, fontWeight: 600, color: INK_SUBTLE, marginTop: 8 }}>
-            Scan QR code to view live stock & details
-          </span>
+        <div
+          style={{
+            ...flexRow,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: PRIMARY,
+            color: '#FFFFFF',
+            fontSize: isPortrait ? 24 : 20,
+            fontWeight: 700,
+            padding: isPortrait ? '16px 36px' : '12px 28px',
+            borderRadius: 18,
+            letterSpacing: 0.3,
+          }}
+        >
+          {props.cta || 'Open in Horeca1'}
         </div>
-
-        <QrBox qrDataUrl={props.qrDataUrl} href={props.pageUrl} isPortrait={isPortrait} />
       </div>
     </div>
   );

@@ -54,7 +54,7 @@ const STALE_AFTER_MS = 15 * 60 * 1000;
 const REDIS_TTL_SEC = 7 * 24 * 60 * 60;
 const REDIS_TIMEOUT_MS = 200;
 const MAX_REDIS_CARDS = 500;
-const REDIS_KEY_PREFIX = 'og:card:v6:';
+const REDIS_KEY_PREFIX = 'og:card:v7:';
 const REDIS_INDEX = 'og:card:index';
 
 function redisKey(cacheKey: string): string {
@@ -177,12 +177,6 @@ async function writeRedisCard(cacheKey: string, card: CachedCard): Promise<void>
   });
 }
 
-async function cheapCompress(bytes: ArrayBuffer): Promise<ArrayBuffer> {
-  const sharp = (await import('sharp')).default;
-  const compressed = await sharp(Buffer.from(bytes)).png({ compressionLevel: 6, effort: 1 }).toBuffer();
-  return toPngBytes(compressed);
-}
-
 function scheduleHeavyCompress(cacheKey: string, source: ArrayBuffer, renderedAt: number): void {
   void (async () => {
     try {
@@ -192,6 +186,11 @@ function scheduleHeavyCompress(cacheKey: string, source: ArrayBuffer, renderedAt
         .toBuffer();
       const small = toPngBytes(compressed);
       const key = redisKey(cacheKey);
+      // Update in-memory entry if it still matches this render.
+      const mem = cardCache.get(cacheKey);
+      if (mem && mem.renderedAt === renderedAt) {
+        remember(cacheKey, { ...mem, bytes: small });
+      }
       await redisCall(async () => {
         const meta = parseMeta((await redis.hgetBuffer(key, 'meta')) ?? undefined);
         if (!meta || meta.createdAt !== renderedAt) return;
@@ -212,6 +211,7 @@ async function renderAndStore(
   if (!imageResponse) return null;
 
   const rawBuffer = await imageResponse.arrayBuffer();
+  // Serve Satori PNG immediately — heavy compress runs after the response.
   const raw = toPngBytes(rawBuffer);
   const contentType = imageResponse.headers.get('content-type') || 'image/png';
   const etag = imageResponse.headers.get('etag') || `"og-${started.toString(36)}"`;
@@ -219,18 +219,9 @@ async function renderAndStore(
     imageResponse.headers.get('cache-control') ||
     'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800';
 
-  let bytes = raw;
-  if (contentType.includes('png') && raw.byteLength > 32) {
-    try {
-      bytes = await cheapCompress(raw);
-    } catch (optErr) {
-      console.warn('[ogCache] Sharp compression skipped:', optErr);
-    }
-  }
-
   const renderedAt = Date.now();
   const card: CachedCard = {
-    bytes,
+    bytes: raw,
     contentType,
     etag,
     cacheControl,

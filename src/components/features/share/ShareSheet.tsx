@@ -35,7 +35,8 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
     setOgReady(false);
     setBusy(false);
 
-    const imageUrl = content.preRenderedImageUrl || content.ogPath;
+    // Always use the live OG route (Redis/memory cached) — never stale ImageKit PNGs.
+    const imageUrl = content.ogPath;
     prefetchShareImage(imageUrl);
 
     void (async () => {
@@ -51,7 +52,7 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   if (!isOpen || !content) return null;
 
   const pageUrl = shareAbsoluteUrl(content.path, origin);
-  const imageUrl = content.preRenderedImageUrl || content.ogPath;
+  const imageUrl = content.ogPath;
 
   const handleNativeShare = async () => {
     setBusy(true);
