@@ -201,7 +201,7 @@ export function RecommendedProducts() {
                         <Link
                             href={`/product/${product.id}`}
                             key={product.id}
-                            className="group bg-white rounded-2xl border border-gray-100 p-4 transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/50 flex flex-col h-full relative"
+                            className="group bg-white rounded-2xl border border-[#CDC4BA] p-4 transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/50 hover:border-primary flex flex-col h-full relative"
                         >
                             {/* Badge */}
                             {product.badge && (

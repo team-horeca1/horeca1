@@ -15,6 +15,10 @@ import { BrandSuppliersPanel, type BrandSupplier } from '@/components/features/b
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { brandShareContent } from '@/lib/share-cards/types';
 import { Hero, type HeroContent } from '@/components/features/Hero';
+import { VendorOfferPicker } from '@/components/features/homepage/VendorOfferPicker';
+import { useCart } from '@/context/CartContext';
+import { toast } from 'sonner';
+import type { VendorProduct } from '@/types';
 
 const PRODUCT_IMAGE_FALLBACK = '/images/placeholders/no-product.svg';
 
@@ -170,7 +174,9 @@ function resolveProductImage(product: BrandProduct): string {
 
 export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: BrandStoreProps) {
     const pincode = useDeliveryPincode();
-    const [activeTab, setActiveTab] = useState<StoreTab>(initialSkuId ? 'suppliers' : 'catalogue');
+    const [activeTab, setActiveTab] = useState<StoreTab>('catalogue');
+    const [offerProduct, setOfferProduct] = useState<BrandProduct | null>(null);
+    const { addToCart } = useCart();
     const [brand, setBrand] = useState<BrandStoreData | null>(null);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -188,6 +194,21 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
             .then((json) => {
                 if (!json.success || !json.data) return;
                 const d = json.data;
+                const products: BrandProduct[] = (d.products ?? []).map((p: Record<string, unknown>) => ({
+                    id: p.id as string,
+                    name: p.name as string,
+                    image: (p.image as string) ?? '',
+                    category: p.category as string,
+                    categories: (p.categories as BrandCategoryLink[]) ?? [],
+                    packSize: (p.packSize as string) ?? '',
+                    unit: (p.unit as string) ?? '',
+                    vegNonVeg: (p.vegNonVeg as string) ?? null,
+                    storageType: (p.storageType as string) ?? null,
+                    shelfLifeDays: typeof p.shelfLifeDays === 'number' ? p.shelfLifeDays : null,
+                    tags: Array.isArray(p.tags) ? (p.tags as string[]) : [],
+                    fssaiRef: (p.fssaiRef as string) ?? null,
+                    distributors: (p.distributors as BrandDistributor[]) ?? [],
+                }));
                 setBrand({
                     id: d.id,
                     slug: d.slug,
@@ -198,21 +219,7 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                     logoImage: d.logo ?? '',
                     tagline: d.tagline ?? '',
                     coverage: d.coverage ?? undefined,
-                    products: (d.products ?? []).map((p: Record<string, unknown>) => ({
-                        id: p.id as string,
-                        name: p.name as string,
-                        image: (p.image as string) ?? '',
-                        category: p.category as string,
-                        categories: (p.categories as BrandCategoryLink[]) ?? [],
-                        packSize: (p.packSize as string) ?? '',
-                        unit: (p.unit as string) ?? '',
-                        vegNonVeg: (p.vegNonVeg as string) ?? null,
-                        storageType: (p.storageType as string) ?? null,
-                        shelfLifeDays: typeof p.shelfLifeDays === 'number' ? p.shelfLifeDays : null,
-                        tags: Array.isArray(p.tags) ? (p.tags as string[]) : [],
-                        fssaiRef: (p.fssaiRef as string) ?? null,
-                        distributors: (p.distributors as BrandDistributor[]) ?? [],
-                    })),
+                    products,
                     vendors: (d.vendors ?? []).map((v: Record<string, unknown>) => ({
                         id: v.id as string,
                         name: v.name as string,
@@ -226,10 +233,14 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                         creditEnabled: !!v.creditEnabled,
                     })),
                 });
+                if (initialSkuId) {
+                    const hit = products.find((p) => p.id === initialSkuId);
+                    if (hit) setOfferProduct(hit);
+                }
             })
             .catch(() => { /* stay null */ })
             .finally(() => setLoading(false));
-    }, [brandId, pincode]);
+    }, [brandId, pincode, initialSkuId]);
 
     const catalogProductsForTree = useMemo(() => {
         if (!brand) return [];
@@ -374,7 +385,34 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
 
     const openSku = (product: BrandProduct) => {
         setSelectedSkuId(product.id);
-        setActiveTab('suppliers');
+        setOfferProduct(product);
+    };
+
+    const offerFor = (product: BrandProduct, dist: BrandDistributor): VendorProduct => {
+        const vendor = brand?.vendors.find((v) => v.id === dist.vendorId);
+        const now = new Date();
+        return {
+            id: dist.distributorProductId,
+            name: product.name,
+            displayName: product.name,
+            description: '',
+            price: dist.price,
+            images: product.image ? [product.image] : [],
+            category: product.category || '',
+            packSize: product.packSize || '',
+            unit: product.unit || '',
+            stock: dist.stock,
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+            vendorId: dist.vendorId,
+            vendorName: dist.vendorName || vendor?.name || 'Supplier',
+            vendorSlug: dist.vendorSlug || vendor?.slug,
+            vendorLogo: vendor?.logo,
+            bulkPrices: [],
+            creditBadge: !!vendor?.creditEnabled,
+            minOrderQuantity: 1,
+        };
     };
 
     const shareContent = brandShareContent({
@@ -688,6 +726,20 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                         onBrowseCatalogue={() => {
                             setSelectedSkuId('');
                             setActiveTab('catalogue');
+                        }}
+                    />
+                )}
+                {offerProduct && (
+                    <VendorOfferPicker
+                        productName={offerProduct.name}
+                        offers={offerProduct.distributors.map((dist) => offerFor(offerProduct, dist))}
+                        pincode={pincode || undefined}
+                        onClose={() => setOfferProduct(null)}
+                        onAdd={(offer) => {
+                            const added = addToCart(offer, offer.minOrderQuantity || 1);
+                            if (!added) return;
+                            toast.success(`Added from ${offer.vendorName || 'supplier'}`);
+                            setOfferProduct(null);
                         }}
                     />
                 )}

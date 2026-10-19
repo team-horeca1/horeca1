@@ -8,7 +8,8 @@ export type AttentionReasonCode =
   | 'payment_unpaid'
   | 'partial'
   | 'cancel_requested'
-  | 'sla_overdue';
+  | 'sla_overdue'
+  | 'abandoned_cart';
 
 export const ATTENTION_LABELS: Record<AttentionReasonCode, string> = {
   low_stock: 'Low stock on one or more lines',
@@ -16,6 +17,7 @@ export const ATTENTION_LABELS: Record<AttentionReasonCode, string> = {
   partial: 'Partially fulfilled',
   cancel_requested: 'Customer cancellation pending',
   sla_overdue: 'Open longer than 2 hours',
+  abandoned_cart: 'Abandoned cart — call the customer. Paying turns this into a normal order.',
 };
 
 export function computeAttentionReasons(input: {
@@ -23,11 +25,17 @@ export function computeAttentionReasons(input: {
   paymentStatus?: string | null;
   isPartial?: boolean;
   createdAt?: string | Date | null;
+  abandonedAt?: string | Date | null;
   hasPendingCancelRequest?: boolean;
   /** true if any line has stockAvailable < ordered quantity */
   hasLowStock?: boolean;
 }): AttentionReasonCode[] {
   const reasons: AttentionReasonCode[] = [];
+  const abandoned = !!input.abandonedAt && input.paymentStatus !== 'paid' && input.status === 'pending';
+  if (abandoned) {
+    reasons.push('abandoned_cart');
+    return reasons;
+  }
   if (input.hasLowStock) reasons.push('low_stock');
   if (input.paymentStatus === 'unpaid' && input.status !== 'cancelled' && input.status !== 'draft') {
     reasons.push('payment_unpaid');

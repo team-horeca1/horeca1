@@ -914,7 +914,7 @@ export default function CartPage() {
                                             </div>
                                             <div className="min-w-0">
                                                 <h3 className="text-[17px] font-bold text-[#181725] hover:text-primary transition-colors">{shipment.vendor}</h3>
-                                                <p className="text-[13px] text-gray-400 font-medium">{getShipmentItemCount(shipment.items)} items · ₹{getShipmentTotal(shipment.items).toFixed(0)}</p>
+                                                <p className="text-[13px] text-gray-400 font-medium">{getShipmentItemCount(shipment.items)} {getShipmentItemCount(shipment.items) === 1 ? 'item' : 'items'} · ₹{getShipmentTotal(shipment.items).toFixed(0)}</p>
                                             </div>
                                         </Link>
                                         <div className="flex items-center gap-3 shrink-0">

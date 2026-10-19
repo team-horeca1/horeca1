@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { productShareContent, vendorProductHref } from '@/lib/share-cards/types';
+import { brandPublicPath, productPublicPath } from '@/lib/publicSlug';
 import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
@@ -507,7 +508,9 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         () =>
             productShareContent({
                 id: product.id,
+                slug: product.slug,
                 vendorId: product.vendorId,
+                vendorSlug: product.vendorSlug,
                 title: product.displayName ?? product.name,
                 vendorName: product.vendorName,
                 image: product.images?.[0] ?? null,
@@ -521,6 +524,21 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         <ShareButton content={shareContent} variant="overlay" className="size-9" />
     );
 
+    const productName = product.displayName ?? product.name;
+    const productHref = productPublicPath({
+        id: product.id,
+        slug: product.slug,
+        vendorId: product.vendorId,
+        vendorSlug: product.vendorSlug,
+    });
+    const renderProductPhotoLink = () => (
+        <Link
+            href={productHref}
+            aria-label={`Open ${productName}`}
+            className="absolute inset-0 z-10"
+        />
+    );
+
     const onCardClick = (e: React.MouseEvent) => {
         if (isOutOfStock) {
             e.preventDefault();
@@ -532,12 +550,13 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         {variant === 'list' ? (
             <div
                 className={cn(
-                    "w-full h-full bg-white rounded-xl overflow-hidden relative flex flex-col",
-                    isHighlighted ? "border-2 border-primary shadow-lg ring-2 ring-primary/25" : "border-[0.5px] border-primary",
+                    "w-full h-full bg-white rounded-xl overflow-hidden relative flex flex-col transition-all duration-200",
+                    isHighlighted ? "border-2 border-primary shadow-lg ring-2 ring-primary/25" : "border border-[#CDC4BA] hover:border-primary",
                     isOutOfStock ? "opacity-75" : ""
                 )}
             >
                 <div className="relative h-[112px] shrink-0 bg-white">
+                    {renderProductPhotoLink()}
                     <Image
                         src={product.images[0] || '/images/placeholders/no-product.svg'}
                         alt={product.name}
@@ -562,7 +581,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     <div className="h-4 truncate">
                         {product.brandSlug && product.brandName ? (
                             <Link
-                                href={`/brand/${product.brandSlug}`}
+                                href={brandPublicPath(product.brandSlug || '')}
                                 onClick={(e) => e.stopPropagation()}
                                 className="block truncate text-[11px] leading-4 font-medium text-text-muted hover:text-primary hover:underline"
                             >
@@ -585,7 +604,9 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         "mt-0.5 text-[14px] font-semibold leading-snug line-clamp-2 min-h-[2.8em] text-balance",
                         isOutOfStock ? "text-gray-400" : "text-text"
                     )}>
-                        {product.displayName ?? product.name}
+                        <Link href={productHref} className="hover:underline">
+                            {productName}
+                        </Link>
                     </h3>
                     <p className="mt-0.5 text-[11px] text-text-muted truncate">
                         {product.packSize || product.unit || '1 unit'}
@@ -609,7 +630,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         )}
                     </div>
 
-                    <div className="mt-2 min-h-[115px] rounded-lg border border-divider bg-white p-1.5 flex flex-col">
+                    <div className="mt-2 min-h-[115px] rounded-lg border border-[#CDC4BA] bg-white p-1.5 flex flex-col">
                             {savingsSlabs.length > 0 && !isOutOfStock ? (
                                 <>
                                     <p className="mb-1 text-center text-[10px] font-semibold uppercase text-primary">
@@ -628,7 +649,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                                     onClick={(e) => handleTierSelect(e, tier.minQty)}
                                                     className={cn(
                                                         "rounded-lg border bg-white px-1.5 py-1 text-center transition-colors",
-                                                        isActive ? "border-primary" : "border-divider hover:border-primary/40"
+                                                        isActive ? "border-primary" : "border-[#CDC4BA] hover:border-primary/40"
                                                     )}
                                                 >
                                                     <span className="block text-[10px] font-semibold text-text-muted whitespace-nowrap">
@@ -699,12 +720,13 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         "sm:hidden bg-white rounded-2xl overflow-hidden transition-all duration-300 group p-0 relative flex flex-col h-full",
                         isHighlighted
                             ? "border-2 border-primary shadow-lg ring-2 ring-primary/25"
-                            : "border border-gray-100",
-                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-0.5 hover:border-primary/30"
+                            : "border border-[#CDC4BA]",
+                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-0.5 hover:border-primary"
                     )}
                 >
                     {/* Full-width Image Container */}
                     <div className="relative w-full aspect-square bg-white overflow-hidden">
+                        {renderProductPhotoLink()}
                         {/* Image wrapper centered in the top area (excluding the bottom 30px bar) */}
                         <div className="absolute top-0 left-0 right-0 bottom-7 flex items-center justify-center p-2">
                             <div className="relative w-full h-full">
@@ -796,12 +818,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 "text-[12px] font-bold leading-[1.25] line-clamp-2 min-h-[2.5em] text-pretty",
                                 isOutOfStock ? "text-gray-400" : "text-[#181725]"
                             )}>
-                                {product.displayName ?? product.name}
+                                <Link href={productHref} className="hover:underline">
+                                    {productName}
+                                </Link>
                             </h3>
                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                 {product.brandSlug && product.brandName && (
                                     <Link
-                                        href={`/brand/${product.brandSlug}`}
+                                        href={brandPublicPath(product.brandSlug || '')}
                                         onClick={(e) => e.stopPropagation()}
                                         className="relative z-20 text-[10px] font-semibold text-primary hover:underline shrink-0"
                                     >
@@ -843,13 +867,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         "hidden sm:flex bg-white rounded-[22px] overflow-hidden transition-all duration-500 group p-4 md:p-5 relative flex-col gap-3 h-full",
                         isHighlighted
                             ? "border-2 border-primary shadow-lg ring-2 ring-primary/25"
-                            : "border border-gray-100",
-                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-1 hover:border-primary/30"
+                            : "border border-[#CDC4BA]",
+                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-1 hover:border-primary"
                     )}
                 >
                     <div className="absolute top-4 right-4 z-20">{shareButton}</div>
 
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-white border border-gray-100 flex items-center justify-center">
+                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-white flex items-center justify-center">
+                        {renderProductPhotoLink()}
                         <div className="relative w-[85%] h-[85%]">
                             <Image
                                 src={product.images[0] || '/images/placeholders/no-product.svg'}
@@ -870,12 +895,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             "text-[15px] font-bold leading-[1.35] line-clamp-2 h-[2.7em]",
                             isOutOfStock ? "text-gray-400" : "text-[#181725]"
                         )}>
-                            {product.displayName ?? product.name}
+                            <Link href={productHref} className="hover:underline">
+                                {productName}
+                            </Link>
                         </h3>
                         <div className="flex items-center gap-2 flex-wrap">
                             {product.brandSlug && product.brandName ? (
                                 <Link
-                                    href={`/brand/${product.brandSlug}`}
+                                    href={brandPublicPath(product.brandSlug || '')}
                                     onClick={(e) => e.stopPropagation()}
                                     className="relative z-20 text-[11px] font-semibold text-primary hover:underline shrink-0"
                                 >
@@ -974,7 +1001,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             return (
                                 <div
                                     key={i}
-                                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-primary-light/40 transition-all"
+                                    className="flex items-center gap-3 p-3 rounded-2xl border border-[#CDC4BA] hover:border-primary hover:bg-primary-light/40 transition-all"
                                 >
                                     <div className="relative w-14 h-14 shrink-0">
                                         <div className="absolute inset-0 rounded-xl bg-gray-50 overflow-hidden">
@@ -1084,7 +1111,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 const altImg = alt.images?.[0] || alt.imageUrl || alt.vendor.logoUrl || null;
                                 return (
                                     <a key={alt.id} href={vendorProductHref(alt.vendor.id, alt.id)}
-                                        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-[#f7fbf8] transition-all group"
+                                        className="flex items-center gap-4 p-4 rounded-2xl border border-[#CDC4BA] hover:border-primary hover:bg-[#f7fbf8] transition-all group"
                                         onClick={(e) => e.stopPropagation()}>
                                         <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden relative">
                                             {altImg ? (

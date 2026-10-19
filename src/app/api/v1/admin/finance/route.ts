@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import { requirePermission } from '@/lib/permissions/engine';
 
 export const GET = adminOnly(async (_req: NextRequest, ctx) => {
@@ -71,7 +72,7 @@ export const GET = adminOnly(async (_req: NextRequest, ctx) => {
           status: true,
           method: true,
           createdAt: true,
-          vendor: { select: { id: true, businessName: true } },
+          vendor: { select: { id: true, businessName: true, displayName: true } },
         },
       }),
 
@@ -108,7 +109,7 @@ export const GET = adminOnly(async (_req: NextRequest, ctx) => {
         })),
         recentPayments: recentPayments.map(p => ({
           id: p.id,
-          vendor: p.vendor.businessName,
+          vendor: storeDisplayName(p.vendor),
           vendorId: p.vendor.id,
           amount: Number(p.amount),
           status: p.status,

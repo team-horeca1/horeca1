@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
         ],
       },
       include: {
-        vendor: { select: { id: true, businessName: true, logoUrl: true, minOrderValue: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true, minOrderValue: true, rating: true } },
         inventories: { select: { qtyAvailable: true } },
         category: { select: { id: true, name: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, take: 3 },

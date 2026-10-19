@@ -22,6 +22,7 @@ import {
   groupProductImportIssues,
   type GroupedImportIssue,
 } from '@/modules/import-export/productImportIssueExplain';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface ColumnDef {
   key: string;
@@ -44,7 +45,7 @@ export interface ImportModalConfig {
   /** GET categories endpoint (tolerates tree or {categories:[]} shapes). */
   categoriesEndpoint: string;
   /** When provided, renders a vendor selector (admin importing on behalf of a vendor). */
-  vendors?: Array<{ id: string; businessName: string }>;
+  vendors?: Array<{ id: string; businessName: string; displayName?: string | null }>;
 }
 
 type EditSlab = { minQty: number; grossRate: number; promoGrossRate?: number | null };
@@ -639,7 +640,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                     <p className="text-[13px] text-[#7C7C7C] font-medium">Choose whose catalog these products belong to. Leave blank for a catalog-level import (no stock/slabs).</p>
                     <select value={vendorId} onChange={e => setVendorId(e.target.value)} className={selectCls}>
                       <option value="">— Catalog level (no vendor) —</option>
-                      {config.vendors.map(v => <option key={v.id} value={v.id}>{v.businessName}</option>)}
+                      {config.vendors.map(v => <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>)}
                     </select>
                   </div>
                 )}
@@ -831,42 +832,42 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                                     if (col.key === 'slab1Qty') {
                                       return (
                                         <td key={col.key} className={cn("px-1 py-0.5", col.bg)}>
-                                          <input type="number" value={s1q} placeholder="—" onChange={e => setSlab(item.row, item, 0, 'minQty', parseInt(e.target.value) || 0)} className={cn(cellInput, 'text-right')} />
+                                          <input type="number" value={s1q} placeholder="—" onChange={e => setSlab(item.row, item, 0, 'minQty', parseInt(e.target.value) || 0)} className={cn(cellInput, 'text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')} />
                                         </td>
                                       );
                                     }
                                     if (col.key === 'slab1Rate') {
                                       return (
                                         <td key={col.key} className={cn("px-1 py-0.5", col.bg)}>
-                                          <input type="number" step="0.01" value={s1r} placeholder="—" onChange={e => setSlab(item.row, item, 0, 'grossRate', parseFloat(e.target.value) || 0)} className={cn(cellInput, 'text-right')} />
+                                          <input type="number" step="0.01" value={s1r} placeholder="—" onChange={e => setSlab(item.row, item, 0, 'grossRate', parseFloat(e.target.value) || 0)} className={cn(cellInput, 'text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')} />
                                         </td>
                                       );
                                     }
                                     if (col.key === 'slab1PromoRate') {
                                       return (
                                         <td key={col.key} className={cn("px-1 py-0.5", col.bg)}>
-                                          <input type="number" step="0.01" value={s1p} placeholder="—" onChange={e => setSlab(item.row, item, 0, 'promoGrossRate', e.target.value === '' ? null : (parseFloat(e.target.value) || 0))} className={cn(cellInput, 'text-right')} />
+                                          <input type="number" step="0.01" value={s1p} placeholder="—" onChange={e => setSlab(item.row, item, 0, 'promoGrossRate', e.target.value === '' ? null : (parseFloat(e.target.value) || 0))} className={cn(cellInput, 'text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')} />
                                         </td>
                                       );
                                     }
                                     if (col.key === 'slab2Qty') {
                                       return (
                                         <td key={col.key} className={cn("px-1 py-0.5", col.bg)}>
-                                          <input type="number" value={s2q} placeholder="—" onChange={e => setSlab(item.row, item, 1, 'minQty', parseInt(e.target.value) || 0)} className={cn(cellInput, 'text-right')} />
+                                          <input type="number" value={s2q} placeholder="—" onChange={e => setSlab(item.row, item, 1, 'minQty', parseInt(e.target.value) || 0)} className={cn(cellInput, 'text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')} />
                                         </td>
                                       );
                                     }
                                     if (col.key === 'slab2Rate') {
                                       return (
                                         <td key={col.key} className={cn("px-1 py-0.5", col.bg)}>
-                                          <input type="number" step="0.01" value={s2r} placeholder="—" onChange={e => setSlab(item.row, item, 1, 'grossRate', parseFloat(e.target.value) || 0)} className={cn(cellInput, 'text-right')} />
+                                          <input type="number" step="0.01" value={s2r} placeholder="—" onChange={e => setSlab(item.row, item, 1, 'grossRate', parseFloat(e.target.value) || 0)} className={cn(cellInput, 'text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')} />
                                         </td>
                                       );
                                     }
                                     if (col.key === 'slab2PromoRate') {
                                       return (
                                         <td key={col.key} className={cn("px-1 py-0.5", col.bg)}>
-                                          <input type="number" step="0.01" value={s2p} placeholder="—" onChange={e => setSlab(item.row, item, 1, 'promoGrossRate', e.target.value === '' ? null : (parseFloat(e.target.value) || 0))} className={cn(cellInput, 'text-right')} />
+                                          <input type="number" step="0.01" value={s2p} placeholder="—" onChange={e => setSlab(item.row, item, 1, 'promoGrossRate', e.target.value === '' ? null : (parseFloat(e.target.value) || 0))} className={cn(cellInput, 'text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')} />
                                         </td>
                                       );
                                     }
@@ -920,7 +921,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                                         }}
                                         className={cn(
                                           cellInput,
-                                          col.type === 'number' ? 'text-right font-mono' : 'text-left',
+                                          col.type === 'number' ? 'text-right font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none' : 'text-left',
                                           col.key === 'sku' || col.key === 'hsn' ? 'font-mono text-[11px]' : ''
                                         )}
                                         placeholder="—"

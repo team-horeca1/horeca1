@@ -3,6 +3,7 @@
 import { Loader2, Pencil, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fmtDate, fmtMoney, STATUS_STYLE, type CreditWalletRow } from './adminCreditTypes';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface AdminCreditWalletCardProps {
   wallet: CreditWalletRow;
@@ -58,7 +59,7 @@ export function AdminCreditWalletCard({
             isH1 ? 'bg-[#F8E8EC] text-[#6B1D2E]' : 'bg-[#F5F5F5] text-[#7C7C7C]',
           )}
         >
-          {isH1 ? 'H1 Platform Wallet' : w.vendor?.businessName ?? 'Vendor'}
+          {isH1 ? 'H1 Platform Wallet' : storeDisplayName(w.vendor ?? {}) || w.vendor?.businessName || 'Vendor'}
         </span>
         {reserved > 0 && (
           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">

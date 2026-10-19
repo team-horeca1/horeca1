@@ -177,6 +177,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     if (search) {
       where.OR = [
         { businessName: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
         { slug: { contains: search, mode: 'insensitive' } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
       ];
@@ -193,6 +194,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       select: {
         id: true,
         businessName: true,
+        displayName: true,
         slug: true,
         logoUrl: true,
         rating: true,

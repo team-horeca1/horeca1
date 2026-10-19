@@ -1010,7 +1010,7 @@ function CheckoutPageContent() {
                     }).catch(() => { /* reconciliation / payment.failed webhook is the safety net */ });
 
                     if (isRazorpayUserCancel(popupErr)) {
-                        setOrderError('Payment cancelled. You can try again when ready.');
+                        setOrderError('Payment was not completed. The order is saved as Abandoned so the store can call you. You can pay again from Orders and it will become a normal order.');
                         return;
                     }
                     throw popupErr;

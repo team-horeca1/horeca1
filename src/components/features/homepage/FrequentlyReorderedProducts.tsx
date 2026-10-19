@@ -168,7 +168,7 @@ export function FrequentlyReorderedProducts() {
               : products.map((p) => (
                   <div
                     key={p.productId}
-                    className="w-[96px] md:w-[110px] shrink-0 bg-white border border-divider rounded-[10px] p-1.5 shadow-cdl-1"
+                    className="w-[96px] md:w-[110px] shrink-0 bg-white border border-[#CDC4BA] rounded-[10px] p-1.5 shadow-cdl-1 hover:border-primary transition-colors"
                   >
                     <Link href={vendorProductHref(p.vendorId, p.productId)} className="block">
                       <div className="relative h-11 md:h-12 rounded-md bg-ivory overflow-hidden mb-1.5">

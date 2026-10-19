@@ -136,6 +136,93 @@ export async function healRejectedDistributorsWithLiveMappings(filter: {
   return result.count;
 }
 
+function normaliseProductName(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/** Exact catalogue match: same name, or the same name plus pack size. */
+export function namesMatchForMapping(
+  masterName: string,
+  masterPack: string | null | undefined,
+  storeName: string,
+  storePack: string | null | undefined,
+): boolean {
+  const master = normaliseProductName(masterName);
+  const store = normaliseProductName(storeName);
+  if (!master || !store) return false;
+  if (master === store) return true;
+  return normaliseProductName(`${masterName} ${masterPack ?? ''}`) === normaliseProductName(`${storeName} ${storePack ?? ''}`);
+}
+
+/**
+ * Approving a distributor must not publish fuzzy guesses.
+ * Exact-name and manually linked rows become verified. Everything else is rejected.
+ */
+export async function settleMappingsOnDistributorApprove(
+  brandId: string,
+  vendorId: string,
+  userId: string,
+) {
+  const mappings = await prisma.brandProductMapping.findMany({
+    where: {
+      brandId,
+      status: { in: ['pending_review', 'auto_mapped', 'verified'] },
+      distributorProduct: { vendorId },
+    },
+    select: {
+      id: true,
+      status: true,
+      matchedBy: true,
+      brandMasterProduct: { select: { name: true, packSize: true } },
+      distributorProduct: { select: { name: true, packSize: true } },
+    },
+  });
+
+  const verifyIds: string[] = [];
+  const rejectIds: string[] = [];
+  for (const mapping of mappings) {
+    const exact = namesMatchForMapping(
+      mapping.brandMasterProduct.name,
+      mapping.brandMasterProduct.packSize,
+      mapping.distributorProduct.name,
+      mapping.distributorProduct.packSize,
+    );
+    const trusted = mapping.matchedBy === 'manually_verified' || exact;
+    if (trusted) {
+      if (mapping.status !== 'verified') verifyIds.push(mapping.id);
+    } else {
+      rejectIds.push(mapping.id);
+    }
+  }
+
+  if (verifyIds.length > 0) {
+    await prisma.brandProductMapping.updateMany({
+      where: { id: { in: verifyIds } },
+      data: {
+        status: 'verified',
+        reviewedBy: userId,
+        reviewNote: 'Confirmed on distributor approval',
+      },
+    });
+  }
+  if (rejectIds.length > 0) {
+    await prisma.brandProductMapping.updateMany({
+      where: { id: { in: rejectIds } },
+      data: {
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewNote: 'Not an exact product match',
+      },
+    });
+  }
+
+  return { verified: verifyIds.length, rejected: rejectIds.length };
+}
+
 export async function approveDistributorByBrand(
   brandId: string,
   vendorId: string,

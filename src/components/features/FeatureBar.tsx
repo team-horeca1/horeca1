@@ -6,13 +6,7 @@ import {
   BadgePercent,
   ShieldCheck,
   CreditCard,
-  Package,
-  Users,
 } from 'lucide-react';
-
-function fmt(n: number) {
-  return n.toLocaleString('en-IN');
-}
 
 const FEATURES = [
   {
@@ -41,17 +35,13 @@ const FEATURES = [
   },
 ];
 
-type StatItem = {
+type RailItem = (typeof FEATURES)[number] | {
   kind: 'stat';
-  icon: typeof Package;
+  icon: typeof Truck;
   title: string;
   description: string;
   value: string;
 };
-
-type RailItem =
-  | StatItem
-  | (typeof FEATURES)[number];
 
 function TrustCard({ item }: { item: RailItem }) {
   return (
@@ -88,8 +78,6 @@ function TrustCard({ item }: { item: RailItem }) {
 }
 
 export function FeatureBar() {
-  const [display, setDisplay] = useState({ productsSold: 122, customers: 1 });
-  const [stats, setStats] = useState<{ productsSold: number; customers: number } | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
@@ -100,54 +88,7 @@ export function FeatureBar() {
     return () => mq.removeEventListener('change', sync);
   }, []);
 
-  useEffect(() => {
-    fetch('/api/v1/stats/home')
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.success && json.data) {
-          setStats({
-            productsSold: Number(json.data.productsSold) || 122,
-            customers: Number(json.data.customers) || 1,
-          });
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!stats) return;
-    const end = stats;
-    const duration = 1200;
-    const startTime = performance.now();
-    let frame: number;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - startTime) / duration);
-      const ease = 1 - (1 - t) ** 3;
-      setDisplay({
-        productsSold: Math.round(end.productsSold * ease),
-        customers: Math.round(end.customers * ease),
-      });
-      if (t < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [stats]);
-
-  const statsItems: StatItem[] = [
-    {
-      kind: 'stat',
-      icon: Package,
-      value: `${fmt(display.productsSold || 120)}+`,
-      title: 'Products Sold',
-      description: 'Wholesale deliveries',
-    },
-    {
-      kind: 'stat',
-      icon: Users,
-      value: `${fmt(display.customers || 1)}+`,
-      title: 'Active Outlets',
-      description: 'Restaurants & cafes',
-    },
+  const statsItems: RailItem[] = [
     {
       kind: 'stat',
       icon: Truck,

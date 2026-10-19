@@ -115,7 +115,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         id: true, name: true, brand: true, packSize: true, imageUrl: true, basePrice: true,
         category: { select: { id: true, name: true } },
         brandMappings: {
-          where: { status: { in: ['auto_mapped', 'verified', 'pending_review'] } },
+          where: { status: { in: ['auto_mapped', 'verified'] } },
           include: {
             brandMasterProduct: {
               select: {
@@ -153,12 +153,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     }> = [];
 
     for (const p of products) {
-      const brandMappings = p.brandMappings;
-      const liveMappings = brandMappings.filter(m => m.status === 'auto_mapped' || m.status === 'verified');
-      const pendingMappings = brandMappings.filter(m => m.status === 'pending_review');
-
-      // Each LIVE mapping = its own row (a vendor product can legitimately appear under
-      // multiple brand storefronts; the vendor needs per-link controls).
+      const liveMappings = p.brandMappings;
+      // Live mappings
       for (const m of liveMappings) {
         mapped.push({
           mappingId: m.id,
@@ -171,26 +167,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         });
       }
 
-      // Pending suggestions: ONE row per product, with ALL candidates nested. Vendor picks one
-      // (or none). Sorted highest-confidence first so the most likely match leads.
-      if (pendingMappings.length > 0) {
-        pendingReview.push({
-          productId: p.id,
-          productName: p.name,
-          productImage: p.imageUrl,
-          brand: p.brand,
-          packSize: p.packSize,
-          basePrice: Number(p.basePrice),
-          suggestions: pendingMappings.map(m => ({
-            mappingId: m.id,
-            confidenceScore: Number(m.confidenceScore),
-            brandMasterProduct: m.brandMasterProduct,
-          })),
-        });
-      }
-
-      // Unmapped: nothing live, nothing pending — vendor needs to manually pick a brand SKU.
-      if (liveMappings.length === 0 && pendingMappings.length === 0) {
+      // Unmapped: no live mapping — vendor can manually pick a brand SKU
+      if (liveMappings.length === 0) {
         unmapped.push({
           productId: p.id,
           name: p.name,
@@ -219,8 +197,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         brandImage: string | null;
         brandCategory: string | null;
         mappingId: string | null;
-        mappingStatus: 'mapped' | 'pending' | 'unmapped';
-        linkStatus: 'auto_mapped' | 'verified' | 'pending_review' | null;
+        mappingStatus: 'mapped' | 'unmapped';
+        linkStatus: 'auto_mapped' | 'verified' | null;
         distributorAuthStatus: AuthStatus;
       };
 
@@ -232,13 +210,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       const rows: TableRow[] = [];
 
       for (const p of products) {
-        const brandMappings = p.brandMappings;
-        const liveMappings = brandMappings.filter(
-          (m) => m.status === 'auto_mapped' || m.status === 'verified',
-        );
-        const pendingMappings = brandMappings.filter((m) => m.status === 'pending_review');
+        const liveMappings = p.brandMappings;
         const distributorCategory = p.category?.name ?? null;
-
         if (liveMappings.length > 0) {
           for (const m of liveMappings) {
             if (brandFilter && m.brandMasterProduct.brand.id !== brandFilter) continue;
@@ -263,39 +236,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
               distributorAuthStatus: authStatusFor(m.brandMasterProduct.brand.id),
             });
           }
-        }
-
-        if (pendingMappings.length > 0) {
-          for (const pending of pendingMappings) {
-            if (brandFilter && pending.brandMasterProduct.brand.id !== brandFilter) continue;
-            const alreadyLive = liveMappings.some(
-              (m) => m.brandMasterProduct.brand.id === pending.brandMasterProduct.brand.id,
-            );
-            if (alreadyLive) continue;
-            rows.push({
-              productId: p.id,
-              distributorProductName: p.name,
-              distributorPackSize: p.packSize,
-              distributorImage: p.imageUrl,
-              distributorCategory,
-              basePrice: Number(p.basePrice),
-              brandId: pending.brandMasterProduct.brand.id,
-              brandName: pending.brandMasterProduct.brand.name,
-              brandMasterProductId: pending.brandMasterProduct.id,
-              brandItemName: pending.brandMasterProduct.name,
-              brandPackSize: pending.brandMasterProduct.packSize,
-              brandSku: pending.brandMasterProduct.sku,
-              brandImage: pending.brandMasterProduct.imageUrl,
-              brandCategory: brandCategoryLabel(pending.brandMasterProduct),
-              mappingId: pending.id,
-              mappingStatus: 'pending',
-              linkStatus: 'pending_review',
-              distributorAuthStatus: authStatusFor(pending.brandMasterProduct.brand.id),
-            });
-          }
-        }
-
-        if (liveMappings.length === 0 && pendingMappings.length === 0) {
+        } else {
           rows.push({
             productId: p.id,
             distributorProductName: p.name,

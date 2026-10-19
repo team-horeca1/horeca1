@@ -73,10 +73,7 @@ function MappedCountControl({
     count: number;
     onOpen: () => void;
 }) {
-    const label = mappedLabel(count);
-    if (count <= 0) {
-        return <span>{label}</span>;
-    }
+    const label = count <= 0 ? 'Map products' : mappedLabel(count);
     return (
         <button
             type="button"

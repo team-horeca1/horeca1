@@ -18,12 +18,13 @@
   --color-cream: #faf5ec;
   --color-beige: #ede4d6;
   --color-divider: #e9e3dd;
+  --color-card-border: #cdc4ba;
 
   /* Text */
   --color-text: #1c1c1c;
   --color-text-secondary: #667085;
   --color-text-muted: #6b7280;
-  --color-border: #e9e3dd;
+  --color-border: #cdc4ba;
 
   /* Semantic */
   --color-success: #16a34a;
@@ -289,4 +290,17 @@
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
+}
+
+/* Hide native number spinners. Arrow-key / wheel stepping is blocked in
+   DisableNativeNumberStepping — CSS alone does not stop that. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

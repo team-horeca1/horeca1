@@ -1,13 +1,12 @@
 import type { ApprovalStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
-import { getApprovedDistributorKeys, distributorAuthKey } from '@/lib/brandAuthorizedDistributor';
+import { getApprovedDistributorKeys, distributorAuthKey, namesMatchForMapping } from '@/lib/brandAuthorizedDistributor';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
 import { listActivePageHeroSlides } from '@/modules/homepage/page-hero.service';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
-import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } from './brand-mapper';
 import { assertLeafCategory, createMasterProductWithSku, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { pushMasterCategoriesToVendorListings } from '@/modules/catalog/master-sync.service';
 import type {
@@ -925,11 +924,6 @@ export class BrandService {
       }
     }
 
-    // Embed first so the AI signal is available, then auto-map. Non-blocking.
-    embedBrandMasterProduct(product.id)
-      .catch(console.error)
-      .finally(() => runMappingForProduct(product.id).catch(console.error));
-
     return product;
   }
 
@@ -1090,15 +1084,6 @@ export class BrandService {
       }
     }
 
-    // Re-embed + re-map when name (or other text-affecting fields) changed.
-    if (input.name || input.packSize !== undefined || input.unit !== undefined
-        || input.categoryId !== undefined || input.categoryIds !== undefined
-        || input.aliasNames !== undefined || input.description !== undefined
-        || input.tags !== undefined) {
-      embedBrandMasterProduct(productId)
-        .catch(console.error)
-        .finally(() => runMappingForProduct(productId).catch(console.error));
-    }
 
     return updated;
   }
@@ -1228,6 +1213,145 @@ export class BrandService {
     };
   }
 
+  async listProductLinkDesk(userId: string, vendorId: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
+    const masters = await prisma.brandMasterProduct.findMany({
+      where: { brandId, isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, sku: true, packSize: true, unit: true, imageUrl: true },
+    });
+    const mappings = await prisma.brandProductMapping.findMany({
+      where: {
+        brandId,
+        status: { not: 'rejected' },
+        distributorProduct: { vendorId },
+      },
+      select: {
+        id: true,
+        status: true,
+        matchedBy: true,
+        brandMasterProductId: true,
+        distributorProduct: { select: { id: true, name: true, packSize: true } },
+      },
+    });
+    const masterById = new Map(masters.map((master) => [master.id, master]));
+    const linkByMaster = new Map<string, (typeof mappings)[number]>();
+    for (const mapping of mappings) {
+      const master = masterById.get(mapping.brandMasterProductId);
+      const exact = master
+        ? namesMatchForMapping(
+            master.name,
+            master.packSize,
+            mapping.distributorProduct.name,
+            mapping.distributorProduct.packSize,
+          )
+        : false;
+      // Guessed auto-matches stay off this desk. Only a confirmed or exact link is shown.
+      if (mapping.status !== 'verified' && mapping.matchedBy !== 'manually_verified' && !exact) continue;
+      const current = linkByMaster.get(mapping.brandMasterProductId);
+      if (!current || (mapping.status === 'verified' && current.status !== 'verified')) {
+        linkByMaster.set(mapping.brandMasterProductId, mapping);
+      }
+    }
+    return {
+      masters: masters.map((master) => {
+        const link = linkByMaster.get(master.id);
+        return {
+          id: master.id,
+          name: master.name,
+          sku: master.sku,
+          packSize: master.packSize,
+          unit: master.unit,
+          imageUrl: master.imageUrl,
+          link: link
+            ? {
+                mappingId: link.id,
+                status: link.status,
+                distributorProductId: link.distributorProduct.id,
+                distributorProductName: link.distributorProduct.name,
+                distributorPackSize: link.distributorProduct.packSize,
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
+  async searchVendorProductsForLink(vendorId: string, query: string) {
+    const q = query.trim();
+    return prisma.product.findMany({
+      where: {
+        vendorId,
+        isActive: true,
+        slug: { not: { startsWith: '_deleted_' } },
+        ...(q ? { name: { contains: q, mode: 'insensitive' as const } } : {}),
+      },
+      take: 12,
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, packSize: true, imageUrl: true },
+    });
+  }
+
+  async linkMasterToVendorProduct(
+    userId: string,
+    vendorId: string,
+    masterProductId: string,
+    distributorProductId: string,
+    actingBrandId?: string | null,
+  ) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
+    const master = await prisma.brandMasterProduct.findFirst({
+      where: { id: masterProductId, brandId },
+      select: { id: true },
+    });
+    if (!master) throw Errors.notFound('Brand product');
+    const storeProduct = await prisma.product.findFirst({
+      where: { id: distributorProductId, vendorId, slug: { not: { startsWith: '_deleted_' } } },
+      select: { id: true },
+    });
+    if (!storeProduct) throw Errors.notFound('Store product');
+
+    await prisma.brandProductMapping.updateMany({
+      where: {
+        brandId,
+        brandMasterProductId: masterProductId,
+        status: { not: 'rejected' },
+        distributorProduct: { vendorId },
+        distributorProductId: { not: distributorProductId },
+      },
+      data: {
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewNote: 'Replaced by a manual link',
+      },
+    });
+
+    return prisma.brandProductMapping.upsert({
+      where: {
+        brandMasterProductId_distributorProductId: {
+          brandMasterProductId: masterProductId,
+          distributorProductId,
+        },
+      },
+      create: {
+        brandId,
+        brandMasterProductId: masterProductId,
+        distributorProductId,
+        confidenceScore: 1,
+        status: 'verified',
+        matchedBy: 'manually_verified',
+        reviewedBy: userId,
+      },
+      update: {
+        status: 'verified',
+        matchedBy: 'manually_verified',
+        reviewedBy: userId,
+        confidenceScore: 1,
+        reviewNote: null,
+      },
+    });
+  }
+
   // ── Brand: reject / flag an incorrect mapping ─────────────────────────
   async brandRejectMapping(userId: string, mappingId: string, reviewNote?: string, actingBrandId?: string | null) {
     const brandId = await this.getBrandIdForUser(userId, actingBrandId);
@@ -1254,19 +1378,12 @@ export class BrandService {
   // surface what changed in the UI later if needed.
   async triggerMapping(userId: string, actingBrandId?: string | null) {
     const brandId = await this.getBrandIdForUser(userId, actingBrandId);
-    const before = await prisma.brandProductMapping.count({ where: { brandId } });
-    try {
-      await runMappingForBrand(brandId);
-    } catch (err) {
-      console.error('runMappingForBrand failed', err);
-      throw err;
-    }
-    const after = await prisma.brandProductMapping.count({ where: { brandId } });
+    const count = await prisma.brandProductMapping.count({ where: { brandId } });
     return {
-      message: after > before ? `Mapped ${after - before} new distributor product(s)` : 'No new matches found',
-      before,
-      after,
-      newMappings: after - before,
+      message: 'Automated mapping is disabled. Please map products manually.',
+      before: count,
+      after: count,
+      newMappings: 0,
     };
   }
 
@@ -1506,10 +1623,6 @@ export async function syncProductToBrand(
         },
       });
 
-      // Embed and map in the background
-      embedBrandMasterProduct(brandMasterProduct.id)
-        .catch(console.error)
-        .finally(() => runMappingForProduct(brandMasterProduct!.id).catch(console.error));
     } else {
       // Brand owns name/slug — only fill empty scalars; backfill masterProductId.
       brandMasterProduct = await prisma.brandMasterProduct.update({

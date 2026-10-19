@@ -66,6 +66,8 @@ export class PaymentService {
       throw Errors.notFound('Order');
     }
 
+    const resumedIds: string[] = [];
+    try {
     for (const o of orders) {
       if (o.status === 'cancelled') {
         throw Errors.badRequest(`Order ${o.orderNumber} is cancelled`);
@@ -75,6 +77,10 @@ export class PaymentService {
       }
       if (!canInitiateRazorpay(o.paymentMethod)) {
         throw Errors.badRequest(`Order ${o.orderNumber} cannot be paid online`);
+      }
+      if (o.abandonedAt) {
+        await orderService.resumeAbandonedOrder(o.id);
+        resumedIds.push(o.id);
       }
     }
 
@@ -132,6 +138,16 @@ export class PaymentService {
       currency: razorpayOrder.currency,
       key_id: process.env.RAZORPAY_KEY_ID,
     };
+    } catch (err) {
+      for (const id of resumedIds) {
+        try {
+          await orderService.markPaymentAbandoned(id, 'Payment could not be started');
+        } catch (rollbackErr) {
+          console.error('[Payment] Could not return order to abandoned after a failed pay start:', rollbackErr);
+        }
+      }
+      throw err;
+    }
   }
 
   async verify(
@@ -161,6 +177,15 @@ export class PaymentService {
       throw Errors.forbidden('Payment does not belong to this account');
     }
 
+    for (const payment of payments) {
+      if (payment.status === 'captured') continue;
+      try {
+        await orderService.resumeAbandonedOrder(payment.orderId);
+      } catch (err) {
+        console.error('[Payment] Could not reserve stock while resuming abandoned cart:', err);
+      }
+    }
+
     // Idempotency: already captured by a prior verify or webhook
     if (payments.every((p) => p.status === 'captured')) {
       try {
@@ -179,11 +204,11 @@ export class PaymentService {
       }),
       prisma.order.updateMany({
         where: { id: { in: payments.map((p) => p.orderId) }, status: { not: 'cancelled' } },
-        data: { paymentStatus: 'paid', paymentMethod: 'online' },
+        data: { paymentStatus: 'paid', paymentMethod: 'online', abandonedAt: null },
       }),
       prisma.order.updateMany({
         where: { id: { in: payments.map((p) => p.orderId) }, status: 'pending' },
-        data: { status: 'confirmed' },
+        data: { status: 'confirmed', abandonedAt: null },
       }),
     ]);
 
@@ -280,6 +305,15 @@ export class PaymentService {
         return { processed: false, event };
       }
 
+      for (const payment of payments) {
+        if (payment.status === 'captured') continue;
+        try {
+          await orderService.resumeAbandonedOrder(payment.orderId);
+        } catch (err) {
+          console.error('[Payment] Could not reserve stock while resuming abandoned cart:', err);
+        }
+      }
+
       // Idempotency: already captured by /verify or a prior webhook delivery
       if (payments.every(p => p.status === 'captured')) {
         return { processed: true, event };
@@ -308,11 +342,11 @@ export class PaymentService {
         // not resurrect a cancelled order or rewind one already in fulfilment.
         prisma.order.updateMany({
           where: { id: { in: payments.map(p => p.orderId) }, status: { not: 'cancelled' } },
-          data: { paymentStatus: 'paid', paymentMethod: 'online' },
+          data: { paymentStatus: 'paid', paymentMethod: 'online', abandonedAt: null },
         }),
         prisma.order.updateMany({
           where: { id: { in: payments.map(p => p.orderId) }, status: 'pending' },
-          data: { status: 'confirmed' },
+          data: { status: 'confirmed', abandonedAt: null },
         }),
       ]);
 
@@ -342,8 +376,8 @@ export class PaymentService {
       return { processed: true, event };
     }
 
-    // 4. Handle payment.failed — mark payment failed AND cancel unpaid pending
-    // orders so reserved stock is released (same path as customer abandon).
+    // 4. Handle payment.failed — mark payment failed and park the order as an
+    // abandoned cart (stock released, not cancelled) so sales can call.
     if (event === 'payment.failed') {
       const entity = payload.payment?.entity;
       if (!entity) return { processed: false, event };
@@ -394,7 +428,7 @@ export class PaymentService {
 
   /**
    * Customer dismissed Razorpay (or verify failed client-side). Ownership-checked.
-   * Cancels unpaid pending online orders and releases reserved stock.
+   * Parks unpaid pending online orders as abandoned carts and releases stock.
    */
   async abandon(razorpayOrderId: string, userId: string) {
     const payments = await prisma.payment.findMany({ where: { razorpayOrderId } });
@@ -409,8 +443,9 @@ export class PaymentService {
   }
 
   /**
-   * Mark linked payments failed and cancel unpaid pending online orders.
-   * Idempotent. Used by abandon API, payment.failed webhook, and reconciliation.
+   * Mark linked payments failed and park unpaid pending online orders as
+   * abandoned carts. Idempotent. Used by abandon API, payment.failed webhook,
+   * and reconciliation. Does not cancel the order.
    */
   async failUnpaidCheckout(razorpayOrderId: string, reason: string) {
     const payments = await prisma.payment.findMany({ where: { razorpayOrderId } });
@@ -430,17 +465,17 @@ export class PaymentService {
       });
     }
 
-    let cancelled = 0;
+    let abandoned = 0;
     for (const payment of payments) {
       if (payment.status === 'captured') continue;
       const order = await prisma.order.findUnique({
         where: { id: payment.orderId },
         select: {
           id: true,
-          vendorId: true,
           status: true,
           paymentStatus: true,
           paymentMethod: true,
+          abandonedAt: true,
         },
       });
       if (!order) continue;
@@ -448,13 +483,8 @@ export class PaymentService {
       if (order.paymentMethod !== 'online') continue;
       if (order.status !== 'pending') continue;
 
-      await orderService.updateStatus(
-        order.id,
-        order.vendorId,
-        'cancelled',
-        reason,
-      );
-      cancelled++;
+      const result = await orderService.markPaymentAbandoned(order.id, reason);
+      if (result.abandoned) abandoned++;
     }
 
     if (!alreadyFailed) {
@@ -469,6 +499,6 @@ export class PaymentService {
       }
     }
 
-    return { processed: true, cancelled, alreadyFailed };
+    return { processed: true, cancelled: abandoned, abandoned, alreadyFailed };
   }
 }

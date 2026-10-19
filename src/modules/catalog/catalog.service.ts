@@ -10,7 +10,6 @@ import { Prisma, type ApprovalStatus, type MasterProduct } from '@prisma/client'
 import { prisma } from '@/lib/prisma';
 import { ApiError, Errors } from '@/middleware/errorHandler';
 import { emitEvent } from '@/events/emitter';
-import { runMappingForVendorProduct, embedDistributorProduct } from '@/modules/brand/brand-mapper';
 import {
   formatVendorSku,
   nextMasterSku,
@@ -28,6 +27,7 @@ import {
 } from '@/lib/product-edit-policy';
 import { auditProductDiff, logProductFieldChanges } from '@/lib/product-audit';
 import { PRODUCT_CREDIT_ELIGIBLE } from '@/lib/productCreditEligible';
+import { hasProductImage } from '@/lib/productImage';
 import { canTransitionApproval } from '@/modules/catalog/approval-state';
 import { transitionProductApproval } from '@/modules/catalog/approval-state.service';
 
@@ -1070,7 +1070,7 @@ export class CatalogService {
           },
         },
       },
-      vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true, vendorCode: true } },
+      vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true, vendorCode: true, minOrderValue: true, rating: true } },
       brandMappings: productBrandMappingsInclude,
     };
 
@@ -1398,6 +1398,7 @@ export class CatalogService {
                   id: true,
                   businessName: true,
                   displayName: true,
+                  slug: true,
                   logoUrl: true,
                   minOrderValue: true,
                   rating: true,
@@ -1931,9 +1932,9 @@ export class CatalogService {
     // Resolve store-scoped unique slug format: [store]-[product-name]-[sku] with auto-increment fallback
     const vendorRow = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { slug: true, businessName: true },
+      select: { slug: true, businessName: true, displayName: true },
     });
-    const storeSlug = vendorRow?.slug || vendorRow?.businessName || '';
+    const storeSlug = vendorRow?.slug || vendorRow?.displayName || vendorRow?.businessName || '';
     const finalSlug = await resolveUniqueProductSlug(
       prisma,
       vendorId,
@@ -1946,6 +1947,11 @@ export class CatalogService {
     // That auto-pending Brand blocked product approval (QA-04). New brands must
     // go through explicit POST /api/v1/vendor/brands/suggest ("Request brand").
     // Legacy text-only brands with no Brand row still do not block approval.
+
+    const goingLive = !isDraft && ((productData as { isActive?: boolean }).isActive ?? true);
+    if (goingLive && !hasProductImage(productData.imageUrl, productData.images)) {
+      throw Errors.badRequest('Add a product photo before this listing can go live.');
+    }
 
     const draftBasePrice =
       productData.basePrice != null && productData.basePrice > 0 ? productData.basePrice : 0.01;
@@ -2011,13 +2017,6 @@ export class CatalogService {
       });
     }
 
-    // Fire-and-forget: embed first, THEN run brand mapping so the AI signal is available.
-    // Skip the auto-mapper when we already created a verified mapping above.
-    if (!isDraft && approvalStatus === 'approved' && !brandMaster) {
-      embedDistributorProduct(created.id)
-        .catch(() => {})
-        .finally(() => runMappingForVendorProduct(created.id).catch(() => {}));
-    }
 
     return created;
   }
@@ -2272,6 +2271,14 @@ export class CatalogService {
       data.isActive = true;
     }
 
+    const nextImage = data.imageUrl !== undefined ? data.imageUrl : product.imageUrl;
+    const nextImages = data.images !== undefined ? data.images : product.images;
+    const willBeActive = data.isActive === true || (data.isActive !== false && product.isActive && !isDraftSave);
+    const newlyLive = willBeActive && (!product.isActive || isPublishing);
+    if (newlyLive && !hasProductImage(nextImage, nextImages)) {
+      throw Errors.badRequest('Add a product photo before this listing can go live.');
+    }
+
     if (product.approvalStatus === 'approved' && !isResubmit) {
       delete data.masterProductId;
     }
@@ -2435,9 +2442,6 @@ export class CatalogService {
           productName: updated.name,
           approvedBy: '',
         });
-        embedDistributorProduct(updated.id)
-          .catch(() => {})
-          .finally(() => runMappingForVendorProduct(updated.id).catch(() => {}));
       } else if (updated.approvalStatus === 'pending') {
         emitEvent('ProductSubmitted', {
           productId: updated.id,
@@ -2670,10 +2674,6 @@ export class CatalogService {
         approvedBy: adminUserId,
       });
     }
-    // Fire-and-forget: embed then run brand mapping once approved.
-    embedDistributorProduct(product.id)
-      .catch(() => {})
-      .finally(() => runMappingForVendorProduct(product.id).catch(() => {}));
     return product;
   }
 

@@ -19,6 +19,7 @@ import CustomerReturnSection from '@/components/features/return/CustomerReturnSe
 import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel } from '@/lib/razorpayClient';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { isAbandonedCart } from '@/lib/abandonedOrder';
 
 interface ApiOrderItem {
     id: string;
@@ -46,6 +47,7 @@ interface ApiOrder {
     status: string;
     paymentStatus: string;
     paymentMethod: string | null;
+    abandonedAt?: string | null;
     customerPoNumber?: string | null;
     subtotal: string | number;
     taxAmount?: string | number;
@@ -266,7 +268,7 @@ export default function OrderDetailPage() {
                     signal: AbortSignal.timeout(15_000),
                 }).catch(() => {});
                 if (isRazorpayUserCancel(popupErr)) {
-                    toast.message('Payment cancelled. You can try again when ready.');
+                    toast.message('Payment was not completed. This order stays in Abandoned. Pay again and it becomes a normal order.');
                     return;
                 }
                 throw popupErr;
@@ -406,7 +408,10 @@ export default function OrderDetailPage() {
         );
     }
 
-    const statusCfg = STATUS_CONFIG[order.status] ?? { label: order.status, textColor: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', icon: null };
+    const abandoned = isAbandonedCart(order);
+    const statusCfg = abandoned
+        ? { label: 'Abandoned', textColor: 'text-amber-800', bgColor: 'bg-amber-50', borderColor: 'border-amber-300', icon: <Clock size={14} /> }
+        : (STATUS_CONFIG[order.status] ?? { label: order.status, textColor: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', icon: null });
     const paymentCfg = PAYMENT_STATUS[order.paymentStatus] ?? { label: order.paymentStatus, color: 'text-gray-500', bg: 'bg-gray-50' };
     const subtotal = typeof order.subtotal === 'string' ? parseFloat(order.subtotal) : order.subtotal;
     const total = typeof order.totalAmount === 'string' ? parseFloat(order.totalAmount) : order.totalAmount;
@@ -416,8 +421,8 @@ export default function OrderDetailPage() {
     const walletApplied = Number(order.walletApplied) || 0;
     const canPayNow =
         order.paymentStatus === 'unpaid' &&
-        isOfflinePaymentMethod(order.paymentMethod) &&
-        order.status !== 'cancelled';
+        order.status !== 'cancelled' &&
+        (isOfflinePaymentMethod(order.paymentMethod) || abandoned);
     const showDiscco = canPayNow && creditWalletUsable(vendorCredit ?? undefined, total);
     const showPlatformCredit = canPayNow && creditWalletUsable(platformCredit ?? undefined, total);
 

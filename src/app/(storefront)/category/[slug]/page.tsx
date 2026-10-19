@@ -59,18 +59,23 @@ function findChildByName(parent: CatNode, name: string): CatNode | null {
   return null;
 }
 
-async function loadParentProducts(parent: CatNode, pincode?: string): Promise<BrowseSku[]> {
+async function loadParentProducts(
+  parent: CatNode,
+  pincode?: string,
+): Promise<{ items: BrowseSku[]; noVendorsForPincode: boolean }> {
   const ids = productCategoryIds({ parent, child: null });
+  let noVendorsForPincode = false;
   const groups = await mapWithConcurrency(ids, CATEGORY_FETCH_CONCURRENCY, async (id) => {
     const link = linkFor(parent, id);
     try {
-      const { items } = await dal.categories.getProducts(id, { pincode, limit: PRODUCT_LIMIT });
-      return items.map((item) => ({ ...item, subCategories: [link] }));
+      const result = await dal.categories.getProducts(id, { pincode, limit: PRODUCT_LIMIT });
+      if (result.noVendorsForPincode) noVendorsForPincode = true;
+      return result.items.map((item) => ({ ...item, subCategories: [link] }));
     } catch {
       return [] as BrowseSku[];
     }
   });
-  return mergeCategorySkuItems(groups);
+  return { items: mergeCategorySkuItems(groups), noVendorsForPincode };
 }
 
 function CategoryBrowseContent() {
@@ -80,6 +85,7 @@ function CategoryBrowseContent() {
 
   const [tree, setTree] = useState<CatNode[]>([]);
   const [products, setProducts] = useState<BrowseSku[]>([]);
+  const [noVendorsForPincode, setNoVendorsForPincode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const loadedKeyRef = useRef('');
@@ -130,6 +136,7 @@ function CategoryBrowseContent() {
         const found = findBySlug(nodes, slug);
         if (!found) {
           setProducts([]);
+          setNoVendorsForPincode(false);
           loadedKeyRef.current = '';
           return;
         }
@@ -138,14 +145,16 @@ function CategoryBrowseContent() {
         if (key === loadedKeyRef.current) return;
 
         setLoading(true);
-        const items = await loadParentProducts(found.parent, validPin);
+        const result = await loadParentProducts(found.parent, validPin);
         if (cancelled) return;
         loadedKeyRef.current = key;
-        setProducts(items);
+        setProducts(result.items);
+        setNoVendorsForPincode(Boolean(validPin) && result.noVendorsForPincode);
       } catch {
         if (!cancelled) {
           setTree([]);
           setProducts([]);
+          setNoVendorsForPincode(false);
           loadedKeyRef.current = '';
         }
       } finally {
@@ -237,12 +246,16 @@ function CategoryBrowseContent() {
             <ShoppingBag size={28} />
           </div>
           <h3 className="text-base md:text-lg font-bold text-text mb-1 text-balance">
-            No products in {displayName}
+            {noVendorsForPincode
+              ? 'There is no vendor servicing on this pincode'
+              : `No products in ${displayName}`}
           </h3>
           <p className="text-text-secondary text-sm mb-4 text-pretty">
-            Nothing listed in this category right now.
+            {noVendorsForPincode
+              ? 'Try another delivery area, or browse categories while we expand coverage.'
+              : 'Nothing listed in this category right now.'}
           </p>
-          {activeChild ? (
+          {activeChild && !noVendorsForPincode ? (
             <Link
               href={`/category/${activeParent.slug}`}
               className="inline-flex min-h-12 items-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-dark transition-colors"

@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
           month: 'short',
           year: 'numeric',
         });
-        supplierDeliveryMessage = `We've received your order! Your delivery is scheduled for ${weekday}, ${pretty}.`;
+        supplierDeliveryMessage = `Supplier delivery. Earliest delivery is ${weekday}, ${pretty}.`;
       }
     }
 

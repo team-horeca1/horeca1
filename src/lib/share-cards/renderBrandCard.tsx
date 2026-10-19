@@ -1,8 +1,8 @@
 import 'server-only';
 import { ImageResponse } from 'next/og';
-import { CommerceShareCard } from '@/lib/share-cards/templates';
+import { BrandShareCard } from '@/lib/share-cards/templates';
 import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
-import { qrPngDataUrl } from '@/lib/share-cards/qr';
+import { loadShareFonts } from '@/lib/share-cards/fonts';
 import { prisma } from '@/lib/prisma';
 import {
   OG_SIZES,
@@ -17,7 +17,6 @@ export async function renderBrandShareImage(
   req?: Request,
 ): Promise<ImageResponse | null> {
   const origin = shareSiteOrigin(req);
-  const pageUrl = `${origin}/brand/${slug}`;
 
   const brand = await prisma.brand.findFirst({
     where: {
@@ -28,61 +27,47 @@ export async function renderBrandShareImage(
     select: {
       name: true,
       slug: true,
-      tagline: true,
       logoUrl: true,
       bannerUrl: true,
       categories: true,
+      bgColor: true,
+      showcaseImages: true,
       updatedAt: true,
-      masterProducts: {
-        where: { isActive: true },
-        take: 8,
-        select: { imageUrl: true, images: true },
-      },
-      authorizedDistributors: {
-        where: { status: 'approved' },
-        select: { id: true },
+      _count: {
+        select: { masterProducts: { where: { isActive: true } } },
       },
     },
   });
 
   if (!brand) return null;
 
-  const vendorCount = brand.authorizedDistributors.length;
-  const statLine =
-    vendorCount > 0
-      ? `Available via ${vendorCount} vendor${vendorCount === 1 ? '' : 's'} near you`
-      : undefined;
+  const cover =
+    brand.showcaseImages?.[0] ||
+    brand.bannerUrl ||
+    brand.logoUrl ||
+    null;
+  const categoryLine = brand.categories?.slice(0, 2).join(' · ') || undefined;
+  const productCount = brand._count.masterProducts;
 
-  const masterPhoto =
-    brand.masterProducts.find((p) => p.imageUrl || p.images?.[0]) ?? null;
-  const [qrDataUrl, imageUrl] = await Promise.all([
-    qrPngDataUrl(pageUrl),
-    resolveOgImage(
-      origin,
-      brand.logoUrl ||
-        brand.bannerUrl ||
-        masterPhoto?.imageUrl ||
-        masterPhoto?.images?.[0] ||
-        null,
-    ),
+  const [imageUrl, fonts] = await Promise.all([
+    resolveOgImage(origin, cover, { maxPx: 1000 }),
+    loadShareFonts(),
   ]);
 
   return new ImageResponse(
     (
-      <CommerceShareCard
+      <BrandShareCard
         format={format}
-        kicker="BRAND STORE"
-        title={brand.name}
-        subtitle={brand.tagline || brand.categories?.slice(0, 3).join(' · ') || undefined}
-        statLine={statLine}
-        cta="Find us on Horeca1"
+        name={brand.name}
+        categoryLine={categoryLine}
+        productCount={productCount}
         imageUrl={imageUrl}
-        pageUrl={pageUrl}
-        qrDataUrl={qrDataUrl}
+        bgColor={brand.bgColor}
       />
     ),
     {
       ...OG_SIZES[format],
+      fonts,
       headers: ogCacheHeaders(brand.updatedAt),
     },
   );

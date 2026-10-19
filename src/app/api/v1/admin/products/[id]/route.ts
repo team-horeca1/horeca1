@@ -14,6 +14,8 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { CatalogService, assertLeafCategory, findOrCreateMaster } from '@/modules/catalog/catalog.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { hasProductImage } from '@/lib/productImage';
+import { claimUniqueProductSlug } from '@/lib/productSlug';
 
 // Helper: extract the [id] segment from the URL
 function extractId(req: NextRequest): string {
@@ -118,6 +120,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         categoryId: true,
         sku: true,
         isActive: true,
+        imageUrl: true,
+        images: true,
         approvalStatus: true,
         taxPercent: true,
         basePrice: true,
@@ -126,6 +130,9 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (!existing) throw Errors.notFound('Product');
 
     const { priceSlabs, categoryIds, primaryCategoryId, listingStatus: reqListingStatus, ...productData } = data;
+    if (typeof productData.slug === 'string' && productData.slug.trim()) {
+      productData.slug = await claimUniqueProductSlug(prisma, productData.slug, id);
+    }
 
     const isDraftSave = reqListingStatus === 'draft';
     const isPublishing =
@@ -193,12 +200,19 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       }
     }
 
+    const becomingLive =
+      !isDraftSave &&
+      (isPublishing || (existing.isActive === false && updatePayload.isActive === true));
+    if (becomingLive && !hasProductImage(updatePayload.imageUrl ?? existing.imageUrl, updatePayload.images ?? existing.images)) {
+      throw Errors.badRequest('Add a product photo before this listing can go live.');
+    }
+
     const product = await prisma.$transaction(async (tx) => {
       const updated = await tx.product.update({
         where: { id },
         data: updatePayload,
         include: {
-          vendor: { select: { id: true, businessName: true } },
+          vendor: { select: { id: true, businessName: true, displayName: true } },
           category: { select: { id: true, name: true } },
           inventories: { select: { qtyAvailable: true } },
           priceSlabs: { orderBy: { sortOrder: 'asc' } },

@@ -70,6 +70,7 @@ interface OrderPayment {
 interface OrderVendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
     slug: string;
     logoUrl: string | null;
     addressLine: string | null;
@@ -105,6 +106,8 @@ interface OrderData {
     deliveryAddressSnapshot: any;
     vendor: OrderVendor;
     user: OrderUser;
+    outlet?: { id: string; name: string } | null;
+    abandonedAt?: string | null;
     items: OrderItem[];
     payments: OrderPayment[];
     deliverySlot: { dayOfWeek: string; slotStart: string; slotEnd: string } | null;
@@ -1192,6 +1195,13 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
             )}
 
             {/* Rejection reason banner */}
+            {order.abandonedAt && order.paymentStatus !== 'paid' && order.status === 'pending' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-[14px] p-5 print:hidden">
+                    <p className="text-[13px] font-bold text-amber-900">Abandoned cart</p>
+                    <p className="text-[13px] text-amber-800 mt-0.5">Payment was not completed. Call the customer. If they pay, this becomes a normal order.</p>
+                </div>
+            )}
+
             {order.status === 'cancelled' && order.rejectionReason && (
                 <div className="bg-[#FFF8ED] border border-[#FFDCB3] rounded-[14px] p-5 flex gap-3 print:hidden">
                     <AlertTriangle size={18} className="text-[#F59E0B] shrink-0 mt-0.5" />
@@ -1229,7 +1239,8 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Customer Profile</h4>
-                                    <p className="text-[13px] font-bold text-[#374151] truncate">{order.user.fullName}</p>
+                                    <p className="text-[13px] font-bold text-[#374151] truncate">{order.outlet?.name || order.user.businessName || order.user.fullName}</p>
+                                    <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.fullName}</p>
                                     <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.email}</p>
                                     {order.user.phone && <p className="text-[11px] text-[#9CA3AF] font-semibold font-mono mt-0.5">{order.user.phone}</p>}
                                 </div>
@@ -1307,7 +1318,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             {order.vendor && (
                                 <div className="mt-3 pt-2 border-t border-[#F3F4F6] text-[12px] text-[#4B5563]">
                                     <span className="text-[10px] uppercase font-bold text-[#9CA3AF] block mb-1">Vendor Partner:</span>
-                                    <span className="font-bold text-primary block truncate">{order.vendor.businessName}</span>
+                                    <span className="font-bold text-primary block truncate">{order.vendor.displayName || order.vendor.businessName}</span>
                                     {(() => {
                                         const vendorAddress = [
                                             order.vendor.addressLine,

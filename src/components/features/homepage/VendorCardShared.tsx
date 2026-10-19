@@ -8,6 +8,7 @@ import type { Vendor } from '@/types';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
 import { PLACEHOLDERS } from '@/lib/constants';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 export const VENDOR_COVERS = [
   '/images/placeholders/no-vendor.svg',
@@ -51,16 +52,17 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
   const remainingCategories = Math.max(0, vendor.categories.length - 3);
   const years = vendorYears(vendor.createdAt);
   const nextDelivery = vendor.nextDeliveryDate ? formatNextDelivery(vendor.nextDeliveryDate) : null;
-  const vendorHref = `/vendor/${vendor.id}`;
+  const vendorHref = vendorPublicPath(vendor);
   const shareContent = vendorShareContent({
     id: vendor.id,
+    slug: vendor.slug,
     name: vendor.name,
     image: vendor.logo || cover,
   });
 
   return (
     <article
-      className={`group relative flex flex-col bg-white rounded-2xl overflow-hidden border border-border/80 
+      className={`group relative flex flex-col bg-white rounded-2xl overflow-hidden border border-[#CDC4BA] 
         shadow-[0_2px_10px_-2px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_36px_-6px_rgba(107,29,46,0.14)] 
         hover:border-primary/40 hover:-translate-y-1.5 transition-all duration-300
         ${fluid ? 'w-full max-w-[480px] mx-auto min-[500px]:max-w-none' : 'flex-none w-[280px] sm:w-[295px]'}`}
@@ -105,10 +107,12 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
               <span className="tabular-nums">{vendor.productCount}+ products</span>
             </span>
           )}
-          <span className="inline-flex h-6 items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-950 px-2 rounded-full text-[11px] font-bold tabular-nums">
-            <Star size={12} className="text-amber-500 fill-amber-500" />
-            {vendor.rating ? Number(vendor.rating).toFixed(1) : '4.8'}
-          </span>
+          {Number(vendor.rating) > 0 && (
+            <span className="inline-flex h-6 items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-950 px-2 rounded-full text-[11px] font-bold tabular-nums">
+              <Star size={12} className="text-amber-500 fill-amber-500" />
+              {Number(vendor.rating).toFixed(1)}
+            </span>
+          )}
           {years && (
             <span className="inline-flex h-6 items-center text-[11px] font-medium text-text-secondary bg-stone-100 px-2 rounded-full border border-stone-200/70">
               {years}

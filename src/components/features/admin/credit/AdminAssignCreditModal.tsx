@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EntityPicker } from './EntityPicker';
 import { INPUT_CLS, type CreditWalletRow, type PickOption } from './adminCreditTypes';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 type RepaymentMode = '' | 'REPAY_BEFORE_NEXT_USE' | 'ALLOW_USAGE_TILL_DUE';
 type BillingModel = 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY';
@@ -85,12 +86,13 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
     const vendors = (json?.data?.vendors ?? []) as Array<{
       id: string;
       businessName: string;
+      displayName?: string | null;
       slug: string;
       user: { fullName: string | null } | null;
     }>;
     return vendors.map((v) => ({
       id: v.id,
-      label: v.businessName,
+      label: storeDisplayName(v) || v.businessName,
       sub: v.user?.fullName ?? v.slug,
     }));
   }, []);
@@ -185,7 +187,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
             <label className={labelCls}>Wallet type</label>
             {isEdit && editing ? (
               <div className="rounded-[10px] border border-[#EEEEEE] bg-[#F8F8F8] px-3 py-2.5 text-[13px] font-semibold text-[#181725]">
-                {editing.vendorId ? (editing.vendor?.businessName ?? 'Vendor wallet') : 'H1 Platform Wallet'}
+                {editing.vendorId ? (storeDisplayName(editing.vendor ?? {}) || editing.vendor?.businessName || 'Vendor wallet') : 'H1 Platform Wallet'}
               </div>
             ) : (
               <EntityPicker

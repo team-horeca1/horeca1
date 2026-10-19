@@ -29,6 +29,7 @@ import {
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 /* ─── Public types ──────────────────────────────────────────────────────── */
 
@@ -55,7 +56,7 @@ export interface BulkEngineConfig {
   };
   categories: { id: string; name: string }[];
   brands: { name: string }[];
-  vendors?: { id: string; businessName: string }[]; // admin only
+  vendors?: { id: string; businessName: string; displayName?: string | null }[]; // admin only
   enableCustomerPricing: boolean;
   enableCombo: boolean;
 }
@@ -486,7 +487,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                     {config.vendors && (
                       <select value={rule.vendorId} onChange={(e) => setRule({ ...rule, vendorId: e.target.value })} className={cn(selectCls, 'col-span-2')}>
                         <option value="">Any vendor</option>
-                        {config.vendors.map((v) => <option key={v.id} value={v.id}>{v.businessName}</option>)}
+                        {config.vendors.map((v) => <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>)}
                       </select>
                     )}
                     <select value={rule.categoryId} onChange={(e) => setRule({ ...rule, categoryId: e.target.value })} className={selectCls}>

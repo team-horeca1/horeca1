@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   CalendarDays,
   ChevronLeft,
@@ -183,13 +184,13 @@ export default function AdminHolidaysPage() {
   return (
     <div className="max-w-[1100px] space-y-6 pb-12">
       <nav className="flex flex-wrap items-center gap-1.5 text-[12px] text-[#667085]" aria-label="Breadcrumb">
-        <a href="/admin/settings" className="hover:text-[#6B1D2E] font-medium">
+        <Link href="/admin/settings" className="hover:text-[#6B1D2E] font-medium">
           Settings
-        </a>
+        </Link>
         <span aria-hidden>/</span>
-        <a href="/admin/settings?tab=delivery" className="hover:text-[#6B1D2E] font-medium">
+        <Link href="/admin/settings?tab=delivery" className="hover:text-[#6B1D2E] font-medium">
           Delivery
-        </a>
+        </Link>
         <span aria-hidden>/</span>
         <span className="text-[#181725] font-semibold">Delivery Holidays</span>
       </nav>

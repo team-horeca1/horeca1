@@ -7,9 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
-import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorOutletContext, buildFulfillmentOutletWhere } from '@/lib/resolveVendorOutletContext';
 import { requirePermission } from '@/lib/permissions/engine';
+import {
+  buildCreatedAtFilter,
+  buildOrderStatusWhere,
+  buildPaymentMethodWhere,
+} from '@/lib/orderStatusFilter';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   requirePermission(ctx, 'orders.view');
@@ -30,63 +35,10 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const paymentStatus = params.get('paymentStatus') || undefined;
     const paymentMethod = params.get('paymentMethod') || undefined;
 
-    // Build createdAt filter — merge dateFrom + dateTo into one object
-    const createdAtFilter: { gte?: Date; lte?: Date } = {};
-    if (dateFrom) createdAtFilter.gte = new Date(dateFrom);
-    if (dateTo) createdAtFilter.lte = new Date(dateTo + 'T23:59:59Z');
-
-    // Brief filter → Prisma where fragment
-    let statusWhere: Record<string, unknown> = { status: { not: 'draft' } };
-    if (statusParam && statusParam !== 'all' && statusParam !== 'draft') {
-      switch (statusParam) {
-        case 'new':
-          // Accepted-only inbox — leave when status moves past confirmed
-          statusWhere = { status: 'confirmed' };
-          break;
-        case 'processing':
-          // Middle phases between Accepted and Delivered
-          statusWhere = {
-            status: { in: ['processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'] },
-          };
-          break;
-        case 'accepted':
-          statusWhere = { status: 'confirmed' };
-          break;
-        case 'partially_accepted':
-          statusWhere = { isPartial: true, status: { not: 'draft' } };
-          break;
-        case 'packed':
-          statusWhere = { status: 'processing' };
-          break;
-        case 'dispatched':
-          statusWhere = { status: 'shipped' };
-          break;
-        case 'completed':
-          // Legacy bookmark alias → same as delivered
-          statusWhere = { status: 'delivered' };
-          break;
-        default:
-          // Native enum values: confirmed, ready_for_dispatch, shipped, delivered, …
-          statusWhere = { status: statusParam };
-          break;
-      }
-    }
-
-    if (dateFrom || dateTo) {
-      const existingCreated = (statusWhere.createdAt as { gte?: Date; lte?: Date } | undefined) ?? {};
-      statusWhere = {
-        ...statusWhere,
-        createdAt: {
-          ...existingCreated,
-          ...createdAtFilter,
-          ...(existingCreated.gte && createdAtFilter.gte
-            ? { gte: existingCreated.gte > createdAtFilter.gte ? existingCreated.gte : createdAtFilter.gte }
-            : {}),
-          ...(existingCreated.lte && createdAtFilter.lte
-            ? { lte: existingCreated.lte < createdAtFilter.lte ? existingCreated.lte : createdAtFilter.lte }
-            : {}),
-        },
-      };
+    let statusWhere = buildOrderStatusWhere(statusParam);
+    const createdAtFilter = buildCreatedAtFilter(dateFrom, dateTo);
+    if (createdAtFilter) {
+      statusWhere = { ...statusWhere, createdAt: createdAtFilter };
     }
 
     // Build where clause — customer drafts are private until submitted
@@ -102,13 +54,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         ],
       }),
       ...(paymentStatus && { paymentStatus }),
-      ...(paymentMethod === 'credit'
-        ? { paymentMethod: { in: ['credit', 'vendor_credit', 'discco'] } }
-        : paymentMethod === 'cash' || paymentMethod === 'cod'
-          ? { paymentMethod: { in: ['cod', 'cash'] } }
-          : paymentMethod
-            ? { paymentMethod }
-            : {}),
+      ...buildPaymentMethodWhere(paymentMethod),
     };
 
     const orders = await prisma.order.findMany({
@@ -120,6 +66,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         id: true,
         orderNumber: true,
         status: true,
+        abandonedAt: true,
         isPartial: true,
         totalAmount: true,
         paymentStatus: true,
@@ -165,6 +112,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       const attentionReasons = computeAttentionReasons({
         status: o.status,
         paymentStatus: o.paymentStatus,
+        abandonedAt: o.abandonedAt,
         isPartial: o.isPartial,
         createdAt: o.createdAt,
         hasPendingCancelRequest: o.cancelRequest?.status === 'pending',

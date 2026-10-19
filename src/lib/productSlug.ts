@@ -67,41 +67,70 @@ export function mintUniqueImportSlug(
 }
 
 /**
- * Database-backed unique slug resolver for single product create/update.
- * Checks existing products in DB for the vendor and auto-increments -1, -2, -3...
- * if a collision is found.
+ * Slugs already used by a live product, a store, or a brand.
+ * A short public URL can open only one of those pages.
  */
-export async function resolveUniqueProductSlug(
-  db: Db,
-  vendorId: string | null | undefined,
-  store: string | null | undefined,
-  name: string,
-  sku?: string | null,
-  excludeProductId?: string,
-): Promise<string> {
-  const base = buildProductSlugBase(store, name, sku);
+export async function loadOccupiedSlugSet(db: Db): Promise<Set<string>> {
+  const client = db as PrismaClient;
+  const [products, vendors, brands] = await Promise.all([
+    client.product.findMany({
+      where: { NOT: { slug: { startsWith: '_deleted_' } } },
+      select: { slug: true },
+    }),
+    client.vendor.findMany({ select: { slug: true } }),
+    client.brand.findMany({ select: { slug: true } }),
+  ]);
+  return new Set(
+    [...products, ...vendors, ...brands].map((row) => row.slug.toLowerCase()),
+  );
+}
 
-  // Check if base slug is already used
-  const existingRows = await (db as PrismaClient).product.findMany({
-    where: {
-      ...(vendorId ? { vendorId } : { vendorId: null }),
-      ...(excludeProductId ? { id: { not: excludeProductId } } : {}),
-      slug: { startsWith: base.slice(0, 50) }, // broad prefix check to limit query size
-    },
-    select: { slug: true },
-  });
-
-  const taken = new Set(existingRows.map((r) => r.slug.toLowerCase()));
-
+function firstFreeSlug(base: string, taken: Set<string>): string {
   let candidate = base;
   let counter = 1;
-
   while (taken.has(candidate.toLowerCase())) {
     const suffix = `-${counter++}`;
     const maxBaseLen = 255 - suffix.length;
     const trimmedBase = base.length > maxBaseLen ? base.slice(0, maxBaseLen).replace(/-+$/, '') : base;
     candidate = `${trimmedBase}${suffix}`;
   }
-
   return candidate;
+}
+
+/** Keep `desired` if it is free; otherwise append -1, -2, ... */
+export async function claimUniqueProductSlug(
+  db: Db,
+  desired: string,
+  excludeProductId?: string,
+): Promise<string> {
+  const base = slugify(desired).slice(0, 240).replace(/-+$/, '') || 'product';
+  const taken = await loadOccupiedSlugSet(db);
+  if (excludeProductId) {
+    const current = await (db as PrismaClient).product.findUnique({
+      where: { id: excludeProductId },
+      select: { slug: true },
+    });
+    if (current?.slug) taken.delete(current.slug.toLowerCase());
+  }
+  return firstFreeSlug(base, taken);
+}
+
+/**
+ * Database-backed unique slug resolver for single product create/update.
+ * The slug must be free across every store, not only the current one,
+ * and must not match a store or brand address.
+ */
+export async function resolveUniqueProductSlug(
+  db: Db,
+  _vendorId: string | null | undefined,
+  store: string | null | undefined,
+  name: string,
+  sku?: string | null,
+  excludeProductId?: string,
+): Promise<string> {
+  return claimUniqueProductSlug(
+    db,
+    buildProductSlugBase(store, name, sku),
+    excludeProductId,
+  );
 }

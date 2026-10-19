@@ -3,11 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-    Search,
     Loader2,
     Plus,
-    Upload,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Pencil,
@@ -19,8 +16,6 @@ import {
     XCircle,
     AlertTriangle,
     AlertCircle,
-    FileSpreadsheet,
-    FileDown,
     ImageIcon,
     Info,
     Tag,
@@ -37,6 +32,7 @@ import {
 } from '@/lib/productUnits';
 import Link from 'next/link';
 import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload';
+import { ViewportTableScroll } from '@/components/ui/ViewportTableScroll';
 import ProductImportModal from '@/components/features/admin/ProductImportModal';
 import BulkProductToolbar from '@/components/features/shared/BulkProductToolbar';
 import VendorBulkGrid from '@/components/features/vendor/VendorBulkGrid';
@@ -58,12 +54,12 @@ import {
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
 import {
-    AdminRegistryPageHeader,
     AdminRegistryFilterBar,
     registryFilterPillClass,
     AdminRegistryViewToggle,
     useAdminDesktop,
 } from '@/components/features/admin/entity';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 // Types
 // ---------------------------------------------------------------------------
@@ -87,15 +83,23 @@ interface Product {
     approvalStatus: 'pending' | 'approved' | 'rejected';
     approvalNote: string | null;
     createdAt: string;
-    vendor: { id: string; businessName: string; vendorCode?: string | null } | null;
+    vendor: { id: string; businessName: string; displayName?: string | null; vendorCode?: string | null } | null;
     category: { id: string; name: string; parentId?: string | null } | null;
     categoryLinks?: { categoryId: string; isPrimary: boolean; category: { id: string; name: string } }[];
-    inventory?: { qtyAvailable: number } | null;
+    inventory?: { qtyAvailable: number; qtyReserved?: number } | null;
+    qtyAvailable?: number | null;
+    qtyReserved?: number | null;
     vendorCount?: number;
+    basePriceMin?: number | null;
+    basePriceMax?: number | null;
+    grossPriceMin?: number | null;
+    grossPriceMax?: number | null;
+    stockMin?: number | null;
+    stockMax?: number | null;
     isMasterRow?: boolean;
     vendors?: string[];
     vendorStock?: { vendor: string; qty: number }[];
-    totalStock?: number;
+    totalStock?: number | null;
     // Fields aligned with the vendor product form (admin API already returns these).
     packSize?: string | null;
     unit?: string | null;
@@ -114,6 +118,7 @@ interface Product {
 interface Vendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
     vendorCode?: string | null;
 }
 
@@ -121,6 +126,28 @@ interface Category {
     id: string;
     name: string;
     parentId?: string | null; // null = top-level, set = sub-category (rendered with leading "— ")
+}
+
+function formatInrAmount(value: number): string {
+    return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** One shared price, a min–max when vendors differ, or an em dash when nobody lists it. */
+function formatPriceRange(min: number | null | undefined, max: number | null | undefined): string {
+    if (min == null || max == null || !Number.isFinite(min) || !Number.isFinite(max)) return '—';
+    const low = formatInrAmount(min);
+    const high = formatInrAmount(max);
+    if (low === high) return `₹${low}`;
+    return `₹${low} – ₹${high}`;
+}
+
+/** One shared quantity, a min–max when vendors differ, or an em dash when nobody lists it. */
+function formatQtyRange(min: number | null | undefined, max: number | null | undefined): string {
+    if (min == null || max == null || !Number.isFinite(min) || !Number.isFinite(max)) return '—';
+    const low = Math.round(min).toLocaleString('en-IN');
+    const high = Math.round(max).toLocaleString('en-IN');
+    if (low === high) return low;
+    return `${low} – ${high}`;
 }
 
 interface BrandOption {
@@ -424,6 +451,7 @@ export default function ProductsPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [supplierCategories, setSupplierCategories] = useState<Category[] | null>(null);
     const [brands, setBrands] = useState<BrandOption[]>([]);
     const [brandSuggesting, setBrandSuggesting] = useState(false);
     const [gstSlabs, setGstSlabs] = useState<string[]>(TAX_OPTIONS_FALLBACK);
@@ -447,8 +475,6 @@ export default function ProductsPage() {
     const [searchInput, setSearchInput] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
-    // Vendor filter UI was dropped in the spreadsheet redesign; state kept for the query builder.
-    const [filterVendor] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [filterDrafts, setFilterDrafts] = useState(false);
     const [draftCount, setDraftCount] = useState(0);
@@ -553,6 +579,7 @@ export default function ProductsPage() {
                 toast.info('Showing first 500 products — narrow with filters if needed');
             }
             setGridListings(listings);
+            skipGridRefreshRef.current = true;
             setGridOpen(true);
         } catch {
             toast.error('Failed to load products for spreadsheet');
@@ -564,8 +591,24 @@ export default function ProductsPage() {
     const refreshGridListings = useCallback(async () => {
         const res = await fetch(buildGridListingsUrl());
         const json = await res.json();
-        if (json.success) setGridListings(json.data?.products ?? []);
+        if (!json.success) return;
+        const listings = (json.data?.products ?? []) as Product[];
+        const total = json.data?.pagination?.total ?? listings.length;
+        if (total > 500) {
+            toast.info('Showing first 500 products — narrow with filters if needed');
+        }
+        setGridListings(listings);
     }, [buildGridListingsUrl]);
+
+    const skipGridRefreshRef = useRef(false);
+    useEffect(() => {
+        if (!gridOpen) return;
+        if (skipGridRefreshRef.current) {
+            skipGridRefreshRef.current = false;
+            return;
+        }
+        void refreshGridListings();
+    }, [gridOpen, gridVendorId, filterCategory, refreshGridListings]);
 
     // -----------------------------------------------------------------------
     // Debounced search
@@ -627,6 +670,31 @@ export default function ProductsPage() {
             .catch(console.error);
     }, []);
 
+    // Category filter follows the chosen supplier. The full `categories` list
+    // stays available for the inline category editor.
+    useEffect(() => {
+        if (!gridVendorId) return;
+        let cancelled = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) setSupplierCategories(null);
+        });
+        fetch(`/api/v1/admin/categories?vendorId=${encodeURIComponent(gridVendorId)}`)
+            .then((res) => res.json())
+            .then((json: { success?: boolean; data?: { categories?: Category[] } | Category[] }) => {
+                if (cancelled || !json.success) return;
+                const raw = json.data && !Array.isArray(json.data) ? json.data.categories : json.data;
+                const list = Array.isArray(raw) ? raw : [];
+                setSupplierCategories(list);
+                setFilterCategory((prev) => (prev && !list.some((cat) => cat.id === prev) ? '' : prev));
+            })
+            .catch(() => {
+                if (!cancelled) setSupplierCategories([]);
+            });
+        return () => { cancelled = true; };
+    }, [gridVendorId]);
+
+    const categoryFilterOptions = gridVendorId ? (supplierCategories ?? []) : categories;
+
     // -----------------------------------------------------------------------
     // Fetch products
     // -----------------------------------------------------------------------
@@ -651,12 +719,58 @@ export default function ProductsPage() {
         async (targetPage = 1, currentLimit = pageSize) => {
             setLoading(true);
 
+            const mapListing = (p: Record<string, unknown>): Product => {
+                const invRows = p.inventories as Array<{ qtyAvailable: number; qtyReserved?: number }> | undefined;
+                const summedAvailable = invRows?.reduce((sum, row) => sum + Number(row.qtyAvailable || 0), 0) ?? 0;
+                const summedReserved = invRows?.reduce((sum, row) => sum + Number(row.qtyReserved || 0), 0) ?? 0;
+                const qtyAvailable = p.qtyAvailable != null ? Number(p.qtyAvailable) : summedAvailable;
+                const qtyReserved = p.qtyReserved != null ? Number(p.qtyReserved) : summedReserved;
+                const vendor = (p.vendor as Product['vendor']) ?? null;
+                return {
+                    id: String(p.id),
+                    name: String(p.name ?? 'Untitled product'),
+                    slug: String(p.slug ?? ''),
+                    sku: (p.vendorSku as string | null) || (p.sku as string | null) || null,
+                    hsn: (p.hsn as string | null) ?? null,
+                    brand: (p.brand as string | null) ?? null,
+                    basePrice: Number(p.basePrice) || 0,
+                    originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+                    imageUrl: (p.imageUrl as string | null) ?? null,
+                    taxPercent: Number(p.taxPercent) || 0,
+                    minOrderQty: Number(p.minOrderQty) || 1,
+                    creditEligible: true,
+                    description: (p.description as string | null) ?? null,
+                    isActive: !!p.isActive,
+                    listingStatus: (p.listingStatus as Product['listingStatus']) ?? 'submitted',
+                    approvalStatus: (p.approvalStatus as Product['approvalStatus']) ?? 'approved',
+                    approvalNote: (p.approvalNote as string | null) ?? null,
+                    createdAt: String(p.createdAt ?? ''),
+                    vendor,
+                    category: (p.category as Product['category']) ?? null,
+                    inventory: { qtyAvailable, qtyReserved },
+                    qtyAvailable,
+                    qtyReserved,
+                    totalStock: qtyAvailable,
+                    vendorCount: vendor ? 1 : 0,
+                    vendorStock: p.vendorStock as Product['vendorStock'],
+                    unit: (p.unit as string | null) ?? null,
+                    packSize: (p.packSize as string | null) ?? null,
+                    metadata: (p.metadata as Record<string, unknown>) ?? {},
+                    priceSlabs: p.priceSlabs as Product['priceSlabs'],
+                    isMasterRow: false,
+                };
+            };
+
             try {
-                if (filterDrafts) {
+                // Drafts, or a chosen supplier: show that vendor's real listings
+                // (price + stock), not the master catalog.
+                if (filterDrafts || gridVendorId) {
                     const params = new URLSearchParams();
-                    params.set('listingStatus', 'draft');
                     params.set('limit', String(currentLimit));
                     params.set('page', String(targetPage));
+                    if (filterDrafts) params.set('listingStatus', 'draft');
+                    if (gridVendorId) params.set('vendorId', gridVendorId);
+                    if (!filterDrafts && filterStatus) params.set('approvalStatus', filterStatus);
                     if (debouncedSearch) params.set('search', debouncedSearch);
                     if (filterCategory) params.set('categoryId', filterCategory);
 
@@ -665,35 +779,7 @@ export default function ProductsPage() {
 
                     if (json.success) {
                         const rows = (json.data?.products ?? []) as Array<Record<string, unknown>>;
-                        const incoming: Product[] = rows.map((p) => ({
-                            id: String(p.id),
-                            name: String(p.name ?? 'Untitled product'),
-                            slug: String(p.slug ?? ''),
-                            sku: (p.sku as string | null) ?? null,
-                            hsn: (p.hsn as string | null) ?? null,
-                            brand: (p.brand as string | null) ?? null,
-                            basePrice: Number(p.basePrice) || 0,
-                            originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
-                            imageUrl: (p.imageUrl as string | null) ?? null,
-                            taxPercent: Number(p.taxPercent) || 0,
-                            minOrderQty: Number(p.minOrderQty) || 1,
-                            creditEligible: true,
-                            description: (p.description as string | null) ?? null,
-                            isActive: !!p.isActive,
-                            listingStatus: (p.listingStatus as 'draft' | 'submitted') ?? 'draft',
-                            approvalStatus: (p.approvalStatus as Product['approvalStatus']) ?? 'approved',
-                            approvalNote: null,
-                            createdAt: String(p.createdAt ?? ''),
-                            vendor: p.vendor as Product['vendor'],
-                            category: p.category as Product['category'],
-                            inventory: (() => {
-                                const rows = p.inventories as Array<{ qtyAvailable: number }> | undefined;
-                                if (!rows?.length) return null;
-                                return { qtyAvailable: rows.reduce((s, r) => s + r.qtyAvailable, 0) };
-                            })(),
-                            metadata: p.metadata as Record<string, unknown> | undefined,
-                            isMasterRow: false,
-                        }));
+                        const incoming = rows.map(mapListing);
                         setProducts(incoming);
                         originalProductsRef.current = JSON.parse(JSON.stringify(incoming));
                         const pagination = json.data?.pagination;
@@ -701,8 +787,9 @@ export default function ProductsPage() {
                             setCurrentPage(pagination.page);
                             setTotalPages(pagination.totalPages);
                             setTotalProductsCount(pagination.total);
-                            setDraftCount(pagination.total);
+                            if (filterDrafts) setDraftCount(pagination.total);
                         }
+                        if (!filterDrafts && json.data?.stats) setStats(json.data.stats);
                     }
                     return;
                 }
@@ -732,7 +819,13 @@ export default function ProductsPage() {
                         uom: string | null;
                         category: { id: string; name: string } | null;
                         vendorCount: number;
-                        vendor?: { id: string; businessName: string; vendorCode?: string | null } | null;
+                        basePriceMin?: number | null;
+                        basePriceMax?: number | null;
+                        grossPriceMin?: number | null;
+                        grossPriceMax?: number | null;
+                        stockMin?: number | null;
+                        stockMax?: number | null;
+                        vendor?: { id: string; businessName: string; displayName?: string | null; vendorCode?: string | null } | null;
                         hsn?: string | null;
                         metadata?: any;
                     }) => ({
@@ -742,6 +835,10 @@ export default function ProductsPage() {
                         sku: m.sku,
                         brand: m.brand,
                         basePrice: 0,
+                        basePriceMin: m.basePriceMin ?? null,
+                        basePriceMax: m.basePriceMax ?? null,
+                        grossPriceMin: m.grossPriceMin ?? null,
+                        grossPriceMax: m.grossPriceMax ?? null,
                         originalPrice: null,
                         imageUrl: m.imageUrl,
                         hsn: m.hsn ?? null,
@@ -756,6 +853,9 @@ export default function ProductsPage() {
                         vendor: m.vendor ?? null,
                         category: m.category,
                         inventory: null,
+                        totalStock: null,
+                        stockMin: m.stockMin ?? null,
+                        stockMax: m.stockMax ?? null,
                         vendorCount: m.vendorCount,
                         unit: m.uom,
                         metadata: m.metadata ?? {},
@@ -782,13 +882,13 @@ export default function ProductsPage() {
                 setLoading(false);
             }
         },
-        [debouncedSearch, filterStatus, filterVendor, filterCategory, filterDrafts, pageSize],
+        [debouncedSearch, filterStatus, gridVendorId, filterCategory, filterDrafts, pageSize],
     );
 
     // Refetch on filter change (reset to page 1)
     useEffect(() => {
         fetchProducts(1);
-    }, [debouncedSearch, filterStatus, filterVendor, filterCategory, filterDrafts, fetchProducts]);
+    }, [debouncedSearch, filterStatus, gridVendorId, filterCategory, filterDrafts, fetchProducts]);
 
     // -----------------------------------------------------------------------
     // Inline Cell Editing Handlers
@@ -831,6 +931,19 @@ export default function ProductsPage() {
         try {
             const row = products.find(p => p.id === productId);
             const isMaster = row?.isMasterRow;
+            if (field === 'basePrice' && isMaster) {
+                toast.error('Choose a supplier to edit this rate');
+                handleCellChange(productId, 'basePrice', originalValue);
+                setSavingRows(prev => {
+                    const next = { ...prev };
+                    if (next[productId]) {
+                        delete next[productId][field];
+                        if (Object.keys(next[productId]).length === 0) delete next[productId];
+                    }
+                    return next;
+                });
+                return;
+            }
             const baseUrl = isMaster
                 ? `/api/v1/admin/master-products/${productId}`
                 : `/api/v1/admin/products/${productId}`;
@@ -891,6 +1004,62 @@ export default function ProductsPage() {
                 const next = { ...prev };
                 if (next[productId]) {
                     delete next[productId][field];
+                    if (Object.keys(next[productId]).length === 0) delete next[productId];
+                }
+                return next;
+            });
+        }
+    };
+
+    const handleStockEdit = async (productId: string, raw: string) => {
+        const row = originalProductsRef.current.find((p) => p.id === productId);
+        if (!row || row.isMasterRow) return;
+        const qty = parseInt(raw, 10);
+        const original = row.qtyAvailable ?? row.inventory?.qtyAvailable ?? row.totalStock ?? 0;
+        if (!Number.isFinite(qty) || qty < 0) {
+            toast.error('Enter a stock quantity');
+            handleCellChange(productId, 'qtyAvailable', original);
+            return;
+        }
+        if (qty === original) return;
+
+        setSavingRows((prev) => ({
+            ...prev,
+            [productId]: { ...(prev[productId] || {}), stock: true },
+        }));
+        try {
+            const res = await fetch('/api/v1/admin/inventory/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productIds: [productId], mode: 'set', value: qty }),
+            });
+            const json = await res.json();
+            if (!json.success || (json.updated === 0 && json.skipped > 0)) {
+                toast.error(json.error?.message ?? 'Could not update stock');
+                handleCellChange(productId, 'qtyAvailable', original);
+                return;
+            }
+            toast.success('Stock updated');
+            const nextRow = (p: Product): Product => (
+                p.id === productId
+                    ? {
+                        ...p,
+                        qtyAvailable: qty,
+                        totalStock: qty,
+                        inventory: { qtyAvailable: qty, qtyReserved: p.qtyReserved ?? p.inventory?.qtyReserved ?? 0 },
+                    }
+                    : p
+            );
+            setProducts((prev) => prev.map(nextRow));
+            originalProductsRef.current = originalProductsRef.current.map(nextRow);
+        } catch {
+            toast.error('Network error. Failed to save stock.');
+            handleCellChange(productId, 'qtyAvailable', original);
+        } finally {
+            setSavingRows((prev) => {
+                const next = { ...prev };
+                if (next[productId]) {
+                    delete next[productId].stock;
                     if (Object.keys(next[productId]).length === 0) delete next[productId];
                 }
                 return next;
@@ -1100,7 +1269,7 @@ export default function ProductsPage() {
                     tags?: string[] | null;
                     aliasNames?: string[] | null;
                     priceSlabs?: { minQty: number; price: number }[];
-                    vendor?: { id: string; businessName: string } | null;
+                    vendor?: { id: string; businessName: string; displayName?: string | null } | null;
                 } | undefined : undefined;
                 const links = Array.isArray(p.categoryLinks)
                     ? (p.categoryLinks as Array<{ categoryId: string; isPrimary: boolean }>)
@@ -1833,77 +2002,36 @@ export default function ProductsPage() {
     // Render
     // -----------------------------------------------------------------------
 
+    const catalogView = !gridVendorId && !filterDrafts;
+
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 pb-10 animate-in fade-in duration-500">
-            {/* ============================================================= */}
-            <AdminRegistryPageHeader
-                title="Product Management"
-                subtitle="Manage all products across every vendor"
-                actions={
-                    <>
-                        {canWriteProducts && (
-                            <BulkProductToolbar
-                                vendors={vendors}
-                                gridVendorId={gridVendorId}
-                                onGridVendorChange={setGridVendorId}
-                                onImport={openImport}
-                                onSpreadsheet={() => void openBulkGrid()}
-                                onExportCsv={() => handleExport('csv')}
-                                onExportXlsx={() => handleExport('xlsx')}
-                                spreadsheetLoading={gridLoading}
-                                showVendorPicker
-                                activeTab={gridOpen ? 'spreadsheet' : importOpen ? 'import' : null}
-                            />
-                        )}
-
-                        {canWriteProducts && draftCount > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setFilterDrafts(true);
-                                    setFilterStatus('');
-                                }}
-                                className="h-[44px] px-4 bg-white border border-[#D1D5DB] rounded-[12px] text-[13px] font-bold text-[#4F6BED] hover:bg-[#F0F4FF] transition-all flex items-center gap-2"
-                            >
-                                <Clock size={16} />
-                                Drafts ({draftCount})
-                            </button>
-                        )}
-
-                        {/* Add Product Button */}
-                        {canWriteProducts && (
-                            <button
-                                onClick={openCreate}
-                                className="h-[44px] px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] transition-all flex items-center gap-2 shadow-sm shadow-[#6B1D2E]/20 shrink-0"
-                            >
-                                <Plus size={16} strokeWidth={3} />
-                                Add Product
-                            </button>
-                        )}
-                    </>
-                }
-            />
+        <div className="admin-products-page max-w-[1600px] mx-auto space-y-4 pb-10 animate-in fade-in duration-500">
+            <style>{`
+              .admin-products-page input[type="number"]::-webkit-inner-spin-button,
+              .admin-products-page input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+              .admin-products-page input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+            `}</style>
 
             {/* ============================================================= */}
             {/* Stats Cards                                                     */}
             {/* ============================================================= */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                 {statCards.map((card, idx) => (
                     <div
                         key={idx}
-                        className="bg-white p-6 rounded-[14px] border border-[#D1D5DB] shadow-sm flex items-center gap-5"
+                        className="bg-white px-3 py-2 rounded-[10px] border border-[#D1D5DB] shadow-sm flex items-center gap-2.5"
                     >
                         <div
-                            className="w-[56px] h-[56px] rounded-[14px] flex items-center justify-center shrink-0"
+                            className="w-8 h-8 rounded-[8px] flex items-center justify-center shrink-0"
                             style={{ backgroundColor: card.bgColor, color: card.color }}
                         >
-                            <card.icon size={26} strokeWidth={2.5} />
+                            <card.icon size={16} strokeWidth={2.5} />
                         </div>
-                        <div>
-                            <p className="text-[12px] font-bold text-[#AEAEAE] mb-1 uppercase tracking-wider">
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider truncate">
                                 {card.label}
                             </p>
-                            <h3 className="text-[28px] font-[900] text-[#181725] leading-none">{card.value}</h3>
+                            <h3 className="text-[18px] font-[800] text-[#181725] leading-none tabular-nums">{card.value}</h3>
                         </div>
                     </div>
                 ))}
@@ -1913,13 +2041,12 @@ export default function ProductsPage() {
                 searchValue={searchInput}
                 onSearchChange={setSearchInput}
                 searchPlaceholder="Search products..."
-                leftSlot={
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {/* Status Pills */}
+                topSlot={
+                        <div className="flex items-center gap-1.5 flex-wrap">
                         {(
                             [
                                 { id: 'all', label: 'All Statuses' },
-                                { id: 'draft', label: 'Drafts' },
+                                { id: 'draft', label: draftCount > 0 ? `Drafts (${draftCount})` : 'Drafts' },
                                 { id: 'pending', label: 'Pending' },
                                 { id: 'approved', label: 'Approved' },
                                 { id: 'rejected', label: 'Rejected' },
@@ -1952,21 +2079,60 @@ export default function ProductsPage() {
                                 </button>
                             );
                         })}
-
-                        {/* Category Dropdown Filter */}
+                        {canWriteProducts && (
+                            <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+                                <BulkProductToolbar
+                                    vendors={vendors}
+                                    gridVendorId={gridVendorId}
+                                    onGridVendorChange={setGridVendorId}
+                                    onImport={openImport}
+                                    onSpreadsheet={() => void openBulkGrid()}
+                                    onExportCsv={() => handleExport('csv')}
+                                    onExportXlsx={() => handleExport('xlsx')}
+                                    spreadsheetLoading={gridLoading}
+                                    activeTab={gridOpen ? 'spreadsheet' : importOpen ? 'import' : null}
+                                />
+                                <button
+                                    onClick={openCreate}
+                                    className="h-[40px] px-4 bg-[#6B1D2E] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#5A1926] transition-all flex items-center gap-2 shadow-sm shrink-0"
+                                >
+                                    <Plus size={16} strokeWidth={3} />
+                                    Add Product
+                                </button>
+                            </div>
+                        )}
+                        </div>
+                }
+                leftSlot={
+                        <div className="flex items-center gap-2 flex-wrap">
                         <select
+                            aria-label="Choose supplier"
+                            value={gridVendorId}
+                            onChange={(e) => {
+                                setSupplierCategories(null);
+                                setGridVendorId(e.target.value);
+                            }}
+                            className="min-h-12 lg:h-[34px] bg-[#F9FAFB] border border-[#D1D5DB] rounded-[12px] lg:rounded-[8px] px-3.5 text-[13px] lg:text-[12px] font-semibold text-[#6B7280] outline-none focus:border-[#6B1D2E]/50 transition-all w-full lg:min-w-[180px] lg:w-auto cursor-pointer"
+                        >
+                            <option value="">Choose supplier</option>
+                            {vendors.map((v) => (
+                                <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>
+                            ))}
+                        </select>
+                        <select
+                            aria-label="Filter by category"
                             value={filterCategory}
                             onChange={e => setFilterCategory(e.target.value)}
                             className="min-h-12 lg:h-[34px] bg-[#F9FAFB] border border-[#D1D5DB] rounded-[12px] lg:rounded-[8px] px-3.5 text-[13px] lg:text-[12px] font-semibold text-[#6B7280] outline-none focus:border-[#6B1D2E]/50 transition-all w-full lg:min-w-[150px] lg:w-auto cursor-pointer"
                         >
                             <option value="">All Categories</option>
-                            {categories.map(c => (
+                            {categoryFilterOptions.map(c => (
                                 <option key={c.id} value={c.id}>
                                     {c.parentId ? `— ${c.name}` : c.name}
                                 </option>
                             ))}
                         </select>
-                    </div>
+                        </div>
                 }
                 trailingSlot={
                     <AdminRegistryViewToggle viewMode={viewMode} onChange={setViewMode} />
@@ -1987,7 +2153,7 @@ export default function ProductsPage() {
                             <Package size={32} />
                         </div>
                         <p className="text-[#AEAEAE] font-bold text-[14px]">
-                            {debouncedSearch || filterStatus || filterVendor || filterCategory
+                            {debouncedSearch || filterStatus || gridVendorId || filterCategory
                                 ? 'No products match your filters'
                                 : 'No products yet'}
                         </p>
@@ -1998,6 +2164,12 @@ export default function ProductsPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6 bg-[#FDFDFD]">
                                 {products.map((product) => {
                                     const grossPrice = product.basePrice * (1 + (product.taxPercent || 0) / 100);
+                                    const baseLabel = catalogView
+                                        ? formatPriceRange(product.basePriceMin, product.basePriceMax)
+                                        : `₹${product.basePrice.toFixed(2)}`;
+                                    const grossLabel = catalogView
+                                        ? formatPriceRange(product.grossPriceMin, product.grossPriceMax)
+                                        : `₹${grossPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                                     return (
                                         <div
                                             key={product.id}
@@ -2060,31 +2232,78 @@ export default function ProductsPage() {
 
                                                 {/* Prices */}
                                                 <div className="space-y-1.5 mt-auto pt-2 border-t border-[#F3F4F6]">
-                                                    <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563]">
+                                                    <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563] gap-3">
                                                         <span>Base Price:</span>
-                                                        <span className="text-[#181725]">₹{product.basePrice.toFixed(2)}</span>
+                                                        <span className="text-[#181725] tabular-nums text-right">{baseLabel}</span>
                                                     </div>
-                                                    <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563]">
-                                                        <span>GST Rate:</span>
-                                                        <span>{product.taxPercent ?? 0}%</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-[13px] font-bold border-t border-dashed border-[#F3F4F6] pt-1.5 text-[#6B1D2E]">
+                                                    {!catalogView && (
+                                                        <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563]">
+                                                            <span>GST Rate:</span>
+                                                            <span>{product.taxPercent ?? 0}%</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between text-[13px] font-bold border-t border-dashed border-[#F3F4F6] pt-1.5 text-[#6B1D2E] gap-3">
                                                         <span>Gross Price:</span>
-                                                        <span>₹{grossPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        <span className="tabular-nums text-right">{grossLabel}</span>
                                                     </div>
                                                 </div>
 
                                                 {/* Inventory */}
-                                                <div className="flex items-center justify-between border-t border-[#F3F4F6] pt-3 mt-4 -mx-5 px-5 bg-[#F9FAFB] rounded-b-[10px] h-[52px]">
+                                                {gridVendorId && !product.isMasterRow ? (
+                                                    <div className="space-y-1.5 border-t border-[#F3F4F6] pt-3 mt-4 -mx-5 px-5 bg-[#F9FAFB] rounded-b-[10px]">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <span className="text-[11px] font-bold text-[#9CA3AF] uppercase">Available</span>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                step={1}
+                                                                aria-label={`Available stock for ${product.name}`}
+                                                                value={product.qtyAvailable ?? product.inventory?.qtyAvailable ?? 0}
+                                                                onChange={(e) => handleCellChange(product.id, 'qtyAvailable', parseInt(e.target.value, 10) || 0)}
+                                                                onBlur={(e) => void handleStockEdit(product.id, e.target.value)}
+                                                                className="w-[72px] h-8 text-right text-[13px] font-extrabold text-[#181725] border border-[#E5E7EB] rounded-[8px] px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563]">
+                                                            <span>Reserved</span>
+                                                            <span className="tabular-nums text-[#7C7C7C]">{product.qtyReserved ?? product.inventory?.qtyReserved ?? 0}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[13px] font-bold">
+                                                            <span className="text-[#181725]">Net</span>
+                                                            <span className={cn(
+                                                                'tabular-nums',
+                                                                ((product.qtyAvailable ?? product.inventory?.qtyAvailable ?? 0) - (product.qtyReserved ?? product.inventory?.qtyReserved ?? 0)) > 0
+                                                                    ? 'text-[#181725]'
+                                                                    : 'text-[#AEAEAE]',
+                                                            )}>
+                                                                {(product.qtyAvailable ?? product.inventory?.qtyAvailable ?? 0) - (product.qtyReserved ?? product.inventory?.qtyReserved ?? 0)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                <div className="flex items-center justify-between border-t border-[#F3F4F6] pt-3 mt-4 -mx-5 px-5 bg-[#F9FAFB] rounded-b-[10px] min-h-[52px]">
                                                     <span className="text-[11px] font-bold text-[#9CA3AF] uppercase">Stock:</span>
-                                                    {(product.vendorCount ?? 0) > 0 ? (
-                                                        <span className="text-[13px] font-extrabold text-[#181725]">
-                                                            {product.totalStock ?? 0} <span className="text-[11px] text-[#AEAEAE] font-semibold">({product.vendorCount} vendor{product.vendorCount !== 1 ? 's' : ''})</span>
-                                                        </span>
+                                                    {!product.isMasterRow && product.vendor ? (
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            step={1}
+                                                            aria-label={`Stock for ${product.name}`}
+                                                            value={product.qtyAvailable ?? product.inventory?.qtyAvailable ?? product.totalStock ?? 0}
+                                                            onChange={(e) => handleCellChange(product.id, 'qtyAvailable', parseInt(e.target.value, 10) || 0)}
+                                                            onBlur={(e) => void handleStockEdit(product.id, e.target.value)}
+                                                            className="w-[72px] h-8 text-right text-[13px] font-extrabold text-[#181725] border border-[#E5E7EB] rounded-[8px] px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                        />
                                                     ) : (
-                                                        <span className="text-[10px] font-bold text-[#3B82F6] bg-[#EFF6FF] px-2 py-0.5 rounded-[4px] uppercase tracking-wider">Catalog</span>
+                                                        <span className={cn(
+                                                            'text-[13px] font-extrabold tabular-nums whitespace-nowrap',
+                                                            (product.stockMax ?? 0) > 0 ? 'text-[#181725]' : 'text-[#AEAEAE]',
+                                                        )}>
+                                                            {formatQtyRange(product.stockMin, product.stockMax)}
+                                                        </span>
                                                     )}
                                                 </div>
+                                                )}
                                             </div>
 
                                             {/* Action Buttons */}
@@ -2119,7 +2338,7 @@ export default function ProductsPage() {
                                 })}
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <ViewportTableScroll>
                             <table className="w-full text-left border-collapse min-w-[1200px] xl:min-w-[1280px]">
                                 <thead>
                                 {/* Product (left) + Actions (right) stay pinned while the
@@ -2146,24 +2365,42 @@ export default function ProductsPage() {
                                     <th className="px-3.5 py-2.5 min-w-[90px] xl:min-w-[100px] border-r border-[#D1D5DB]">
                                         Vendors
                                     </th>
-                                    <th className="px-3.5 py-2.5 min-w-[80px] xl:min-w-[90px] text-right border-r border-[#D1D5DB]">
+                                    <th className={cn('px-3.5 py-2.5 text-right border-r border-[#D1D5DB]', catalogView ? 'min-w-[160px]' : 'min-w-[80px] xl:min-w-[90px]')}>
                                         Base ₹
                                     </th>
-                                    <th className="px-3.5 py-2.5 min-w-[70px] xl:min-w-[75px] text-right border-r border-[#D1D5DB]">
-                                        GST %
-                                    </th>
-                                    <th className="px-3.5 py-2.5 min-w-[85px] xl:min-w-[95px] text-right text-[#6B1D2E] border-r border-[#D1D5DB]">
+                                    {!catalogView && (
+                                        <th className="px-3.5 py-2.5 min-w-[70px] xl:min-w-[75px] text-right border-r border-[#D1D5DB]">
+                                            GST %
+                                        </th>
+                                    )}
+                                    <th className={cn('px-3.5 py-2.5 text-right text-[#6B1D2E] border-r border-[#D1D5DB]', catalogView ? 'min-w-[160px]' : 'min-w-[85px] xl:min-w-[95px]')}>
                                         Gross ₹
                                     </th>
-                                    <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[125px] border-r border-[#D1D5DB]">
-                                        Unit
-                                    </th>
+                                    {!catalogView && (
+                                        <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[125px] border-r border-[#D1D5DB]">
+                                            Unit
+                                        </th>
+                                    )}
                                     <th className="px-3.5 py-2.5 min-w-[100px] xl:min-w-[110px] border-r border-[#D1D5DB]">
                                         Status
                                     </th>
-                                    <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[130px] border-r border-[#D1D5DB]">
+                                    {gridVendorId ? (
+                                        <>
+                                            <th className="px-3.5 py-2.5 min-w-[90px] text-right border-r border-[#D1D5DB]">
+                                                Available
+                                            </th>
+                                            <th className="px-3.5 py-2.5 min-w-[80px] text-right border-r border-[#D1D5DB]">
+                                                Reserved
+                                            </th>
+                                            <th className="px-3.5 py-2.5 min-w-[70px] text-right border-r border-[#D1D5DB]">
+                                                Net
+                                            </th>
+                                        </>
+                                    ) : (
+                                    <th className={cn('px-3.5 py-2.5 border-r border-[#D1D5DB]', catalogView ? 'min-w-[130px]' : 'min-w-[110px] xl:min-w-[130px]')}>
                                         Inventory
                                     </th>
+                                    )}
                                     <th className="px-3.5 py-2.5 text-right sticky right-0 bg-[#F8F9FB] z-20 min-w-[100px] xl:min-w-[110px] border-l border-[#D1D5DB]">
                                         Actions
                                     </th>
@@ -2265,63 +2502,75 @@ export default function ProductsPage() {
                                                 )}
                                             </td>
 
-                                            {/* Base price (taxable rate) */}
+                                            {/* Base price (taxable rate, or vendor range in the catalog view) */}
                                             <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#FAFAFA]/20 align-middle">
-                                                <div className="flex items-center justify-end gap-0.5 max-w-[90px] ml-auto">
-                                                    <span className="font-bold text-[#181725]">₹</span>
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={product.basePrice ?? ''}
-                                                        onChange={e => handleCellChange(product.id, 'basePrice', parseFloat(e.target.value) || 0)}
-                                                        onBlur={e => handleInlineEdit(product.id, 'basePrice', parseFloat(e.target.value) || 0, originalProductsRef.current.find(p => p.id === product.id)?.basePrice)}
-                                                        className={cn(cellInput, "text-right font-bold text-[#181725] px-1 py-0.5")}
-                                                    />
-                                                </div>
+                                                {catalogView ? (
+                                                    <span className="font-bold text-[#181725] tabular-nums whitespace-nowrap">
+                                                        {formatPriceRange(product.basePriceMin, product.basePriceMax)}
+                                                    </span>
+                                                ) : (
+                                                    <div className="flex items-center justify-end gap-0.5 max-w-[90px] ml-auto">
+                                                        <span className="font-bold text-[#181725]">₹</span>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={product.basePrice ?? ''}
+                                                            onChange={e => handleCellChange(product.id, 'basePrice', parseFloat(e.target.value) || 0)}
+                                                            onBlur={e => handleInlineEdit(product.id, 'basePrice', parseFloat(e.target.value) || 0, originalProductsRef.current.find(p => p.id === product.id)?.basePrice)}
+                                                            className={cn(cellInput, "text-right font-bold text-[#181725] px-1 py-0.5 w-[72px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none")}
+                                                        />
+                                                    </div>
+                                                )}
                                             </td>
 
-                                            {/* GST % */}
-                                            <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#FAFAFA]/20 align-middle">
-                                                <select
-                                                    value={String(product.taxPercent ?? 0)}
-                                                    onChange={e => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        handleCellChange(product.id, 'taxPercent', val);
-                                                        handleInlineEdit(product.id, 'taxPercent', val, originalProductsRef.current.find(p => p.id === product.id)?.taxPercent || 0);
-                                                    }}
-                                                    className={cn(cellInput, "text-right font-medium text-[#7C7C7C] w-[65px] ml-auto appearance-none")}
-                                                >
-                                                    {gstSlabSelectOptions(gstSlabs.map(Number), String(product.taxPercent ?? 0)).map(t => (
-                                                        <option key={t} value={t}>{t}%</option>
-                                                    ))}
-                                                </select>
-                                            </td>
+                                            {/* GST % — supplier listing only */}
+                                            {!catalogView && (
+                                                <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#FAFAFA]/20 align-middle">
+                                                    <select
+                                                        value={String(product.taxPercent ?? 0)}
+                                                        onChange={e => {
+                                                            const val = parseFloat(e.target.value) || 0;
+                                                            handleCellChange(product.id, 'taxPercent', val);
+                                                            handleInlineEdit(product.id, 'taxPercent', val, originalProductsRef.current.find(p => p.id === product.id)?.taxPercent || 0);
+                                                        }}
+                                                        className={cn(cellInput, "text-right font-medium text-[#7C7C7C] w-[65px] ml-auto appearance-none")}
+                                                    >
+                                                        {gstSlabSelectOptions(gstSlabs.map(Number), String(product.taxPercent ?? 0)).map(t => (
+                                                            <option key={t} value={t}>{t}%</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                            )}
 
                                             {/* Gross Price */}
                                             <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#6B1D2E]/[0.02] align-middle font-semibold">
-                                                <span className="font-extrabold text-[#6B1D2E] tabular-nums">
-                                                    ₹{(product.basePrice * (1 + (product.taxPercent || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                <span className="font-extrabold text-[#6B1D2E] tabular-nums whitespace-nowrap">
+                                                    {catalogView
+                                                        ? formatPriceRange(product.grossPriceMin, product.grossPriceMax)
+                                                        : `₹${(product.basePrice * (1 + (product.taxPercent || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                                 </span>
                                             </td>
 
-                                            {/* Unit */}
-                                            <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
-                                                <select
-                                                    value={product.unit || ''}
-                                                    onChange={e => {
-                                                        const val = e.target.value || null;
-                                                        handleCellChange(product.id, 'unit', val);
-                                                        handleInlineEdit(product.id, 'unit', val, originalProductsRef.current.find(p => p.id === product.id)?.unit || null);
-                                                    }}
-                                                    className={cn(cellInput, "text-[#7C7C7C] font-medium appearance-none")}
-                                                >
-                                                    <option value="">— Select Unit —</option>
-                                                    {UNIT_OPTIONS.map(u => (
-                                                        <option key={u} value={u}>{u}</option>
-                                                    ))}
-                                                </select>
-                                            </td>
+                                            {/* Unit — supplier listing only */}
+                                            {!catalogView && (
+                                                <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
+                                                    <select
+                                                        value={product.unit || ''}
+                                                        onChange={e => {
+                                                            const val = e.target.value || null;
+                                                            handleCellChange(product.id, 'unit', val);
+                                                            handleInlineEdit(product.id, 'unit', val, originalProductsRef.current.find(p => p.id === product.id)?.unit || null);
+                                                        }}
+                                                        className={cn(cellInput, "text-[#7C7C7C] font-medium appearance-none")}
+                                                    >
+                                                        <option value="">— Select Unit —</option>
+                                                        {UNIT_OPTIONS.map(u => (
+                                                            <option key={u} value={u}>{u}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                            )}
 
                                             {/* Status */}
                                             <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
@@ -2351,29 +2600,65 @@ export default function ProductsPage() {
                                                 )}
                                             </td>
 
-                                            {/* Inventory — aggregated across vendors */}
-                                            <td className="px-3.5 py-2 whitespace-nowrap border-r border-[#D1D5DB] align-middle">
-                                                {(product.vendorCount ?? 0) > 0 ? (
-                                                    <div
-                                                        className="cursor-default"
-                                                        title={product.vendorStock?.map(vs => `${vs.vendor}: ${vs.qty}`).join('\n')}
-                                                    >
+                                            {/* Inventory — three figures for a chosen supplier, one range otherwise */}
+                                            {gridVendorId ? (
+                                                <>
+                                                    <td className="px-3.5 py-2 whitespace-nowrap border-r border-[#D1D5DB] align-middle text-right">
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            step={1}
+                                                            aria-label={`Available stock for ${product.name}`}
+                                                            value={product.qtyAvailable ?? product.inventory?.qtyAvailable ?? 0}
+                                                            onChange={(e) => handleCellChange(product.id, 'qtyAvailable', parseInt(e.target.value, 10) || 0)}
+                                                            onBlur={(e) => void handleStockEdit(product.id, e.target.value)}
+                                                            className={cn(cellInput, "w-[72px] ml-auto text-right font-bold text-[#181725] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none")}
+                                                        />
+                                                    </td>
+                                                    <td className="px-3.5 py-2 whitespace-nowrap border-r border-[#D1D5DB] align-middle text-right">
+                                                        <span className="font-semibold tabular-nums text-[#7C7C7C]">
+                                                            {product.qtyReserved ?? product.inventory?.qtyReserved ?? 0}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3.5 py-2 whitespace-nowrap border-r border-[#D1D5DB] align-middle text-right">
                                                         <span className={cn(
-                                                            'font-bold',
-                                                            (product.totalStock ?? 0) > 0 ? 'text-[#181725]' : 'text-[#AEAEAE]',
+                                                            'font-bold tabular-nums',
+                                                            ((product.qtyAvailable ?? product.inventory?.qtyAvailable ?? 0) - (product.qtyReserved ?? product.inventory?.qtyReserved ?? 0)) > 0
+                                                                ? 'text-[#181725]'
+                                                                : 'text-[#AEAEAE]',
                                                         )}>
-                                                            {product.totalStock ?? 0}
+                                                            {(product.qtyAvailable ?? product.inventory?.qtyAvailable ?? 0) - (product.qtyReserved ?? product.inventory?.qtyReserved ?? 0)}
                                                         </span>
-                                                        <span className="text-[11px] text-[#AEAEAE] ml-1">
-                                                            across {product.vendorCount}
-                                                        </span>
-                                                    </div>
+                                                    </td>
+                                                </>
+                                            ) : (
+                                            <td className="px-3.5 py-2 whitespace-nowrap border-r border-[#D1D5DB] align-middle">
+                                                {!product.isMasterRow && product.vendor ? (
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        step={1}
+                                                        aria-label={`Stock for ${product.name}`}
+                                                        value={product.qtyAvailable ?? product.inventory?.qtyAvailable ?? product.totalStock ?? 0}
+                                                        onChange={(e) => handleCellChange(product.id, 'qtyAvailable', parseInt(e.target.value, 10) || 0)}
+                                                        onBlur={(e) => void handleStockEdit(product.id, e.target.value)}
+                                                        className={cn(cellInput, "w-[72px] text-right font-bold text-[#181725] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none")}
+                                                    />
                                                 ) : (
-                                                    <span className="text-[11px] font-medium text-[#AEAEAE]">
-                                                        —
+                                                    <span
+                                                        className={cn(
+                                                            'font-bold tabular-nums whitespace-nowrap',
+                                                            (product.stockMax ?? 0) > 0 ? 'text-[#181725]' : 'text-[#AEAEAE]',
+                                                        )}
+                                                        title={product.stockMin == null
+                                                            ? 'Choose a supplier to edit stock'
+                                                            : 'Lowest to highest supplier stock. Choose a supplier to edit.'}
+                                                    >
+                                                        {formatQtyRange(product.stockMin, product.stockMax)}
                                                     </span>
                                                 )}
                                             </td>
+                                            )}
 
                                             {/* Actions — pinned right */}
                                             <td className="px-3.5 py-2 sticky right-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-l border-[#D1D5DB] align-middle">
@@ -2440,7 +2725,7 @@ export default function ProductsPage() {
                                 })}
                             </tbody>
                         </table>
-                            </div>
+                            </ViewportTableScroll>
                         )}
 
                     {/* Footer / Pagination */}
@@ -2707,7 +2992,7 @@ export default function ProductsPage() {
                                     >
                                         <option value="">No vendor (Catalog product)</option>
                                         {vendors.map(v => (
-                                            <option key={v.id} value={v.id}>{v.businessName}</option>
+                                            <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>
                                         ))}
                                     </select>
                                 </FormSection>
@@ -3293,7 +3578,7 @@ export default function ProductsPage() {
 
             <VendorBulkGrid
                 open={gridOpen}
-                onClose={() => setGridOpen(false)}
+                onClose={() => { setGridOpen(false); void fetchProducts(currentPage); }}
                 products={gridProducts}
                 onComplete={() => { void refreshGridListings(); handleImportComplete(); }}
                 categories={categories}
@@ -3301,6 +3586,15 @@ export default function ProductsPage() {
                 patchUrl={(id: string) => `/api/v1/admin/products/${id}`}
                 readOnlyCommission={false}
                 isAdmin
+                vendors={vendors}
+                vendorId={gridVendorId}
+                onVendorChange={(id) => {
+                    setSupplierCategories(null);
+                    setGridVendorId(id);
+                }}
+                categoryOptions={categoryFilterOptions}
+                categoryId={filterCategory}
+                onCategoryChange={setFilterCategory}
             />
 
             <AdminBulkEngine

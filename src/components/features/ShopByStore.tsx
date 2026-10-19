@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { dal } from '@/lib/dal';
 import type { Vendor } from '@/types';
+import { vendorPublicPath } from '@/lib/publicSlug';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function ShopByStore() {
@@ -116,7 +117,7 @@ const StoreCard = ({ vendor }: { vendor: Vendor }) => {
     return (
         <div className="flex flex-col items-center w-full">
             <Link
-                href={`/vendor/${vendor.id}`}
+                href={vendorPublicPath(vendor)}
                 className="w-full flex flex-col items-center group"
             >
                 <img

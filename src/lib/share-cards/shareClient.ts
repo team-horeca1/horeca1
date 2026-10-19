@@ -1,4 +1,10 @@
-export type ShareCardResult = 'shared' | 'copied' | 'cancelled';
+export type ShareCardResult = 'shared' | 'copied' | 'cancelled' | 'unavailable';
+
+async function isRealPng(blob: Blob): Promise<boolean> {
+  if (blob.size < 100) return false;
+  const head = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+  return head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47;
+}
 
 const blobCache = new Map<string, Promise<Blob | null>>();
 
@@ -22,7 +28,7 @@ export function prefetchShareImage(imageUrl: string | null | undefined): void {
       .then(async (res) => {
         if (!res.ok) return null;
         const blob = await res.blob();
-        if (!blob.type.startsWith('image/')) return null;
+        if (!(await isRealPng(blob))) return null;
         return blob;
       })
       .catch(() => null),
@@ -71,8 +77,10 @@ export async function shareCard(opts: {
   fileName?: string;
   /** When true, skip waiting for image fetch — share text/url only. */
   skipFileWait?: boolean;
+  /** Attach the picture only. Do not fall through to a text share that drops the card. */
+  filesOnly?: boolean;
 }): Promise<ShareCardResult> {
-  const { title, text, url, imageUrl, skipFileWait } = opts;
+  const { title, text, url, imageUrl, skipFileWait, filesOnly } = opts;
   const caption = shareCaption(text, url);
   const fileName = opts.fileName || 'horeca1-share.png';
 
@@ -87,6 +95,8 @@ export async function shareCard(opts: {
       if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
     }
   }
+
+  if (filesOnly) return 'unavailable';
 
   try {
     if (navigator.share) {

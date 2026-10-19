@@ -552,7 +552,7 @@ interface ProductSuggestion {
     creditEligible?: boolean;
     category?: { id: string; name: string; slug: string } | null;
     categoryIds?: string[];
-    vendor?: { businessName: string } | null;
+    vendor?: { businessName: string; displayName?: string | null } | null;
 }
 
 /** Shape returned by GET /api/v1/brand-master-products */
@@ -1090,7 +1090,7 @@ export default function VendorProductsPage() {
                                         <div className="min-w-0">
                                             <p className="font-bold text-[#181725] truncate">{s.name}</p>
                                             <p className="text-[11px] text-[#AEAEAE] truncate">
-                                                {s.vendor?.businessName ? `Sold by ${s.vendor.businessName}` : 'Catalog product'}
+                                                {s.vendor ? `Sold by ${s.vendor.displayName || s.vendor.businessName}` : 'Catalog product'}
                                                 {s.sku ? ` • SKU: ${s.sku}` : ''}
                                             </p>
                                         </div>

@@ -492,7 +492,8 @@ export default function RegisterPageInner() {
             errors={fieldErrors}
             onFieldBlur={handleFieldBlur}
             layout="wide"
-            mode="register"
+            mode="full"
+            visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
           />
 
           <div className="mt-6">

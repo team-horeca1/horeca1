@@ -229,31 +229,25 @@ export default function AdminVoicesPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewTab, setPreviewTab] = useState<'card' | 'whatsapp'>('card');
-  const [categories, setCategories] = useState<EditorialCategory[]>(() => {
-    if (typeof window === 'undefined') return DEFAULT_EDITORIAL_CATEGORIES;
-    try {
-      const saved = localStorage.getItem('h1_editorial_categories');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // fallback
-    }
-    return DEFAULT_EDITORIAL_CATEGORIES;
-  });
+  const [categories, setCategories] = useState<EditorialCategory[]>(DEFAULT_EDITORIAL_CATEGORIES);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<EditorialCategory | null>(null);
+  const [categoryMode, setCategoryMode] = useState<'create' | 'edit'>('create');
+  const [keyManual, setKeyManual] = useState(false);
+  const [badgeManual, setBadgeManual] = useState(false);
+  const [categorySaving, setCategorySaving] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('h1_editorial_categories', JSON.stringify(categories));
-      } catch {
-        // ignore
-      }
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/admin/voices/categories', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(apiError(json, 'Could not load categories'));
+      const rows = json.data?.categories;
+      if (Array.isArray(rows) && rows.length > 0) setCategories(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not load categories');
     }
-  }, [categories]);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -272,7 +266,8 @@ export default function AdminVoicesPage() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadCategories();
+  }, [load, loadCategories]);
 
   const stats = useMemo(
     () => [
@@ -330,6 +325,76 @@ export default function AdminVoicesPage() {
     await load();
   };
 
+  const saveCategory = async () => {
+    if (!editingCategory) return;
+    if (!editingCategory.label.trim() || !editingCategory.key.trim()) {
+      toast.error('Name and key are required');
+      return;
+    }
+    setCategorySaving(true);
+    try {
+      const isEdit = categoryMode === 'edit';
+      const url = isEdit
+        ? `/api/v1/admin/voices/categories/${encodeURIComponent(editingCategory.key)}`
+        : '/api/v1/admin/voices/categories';
+      const res = await fetch(url, {
+        method: isEdit ? 'PATCH' : 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: editingCategory.key,
+          label: editingCategory.label.trim(),
+          badge: (editingCategory.badge || editingCategory.label).trim().toUpperCase(),
+          description: editingCategory.description?.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(apiError(json, 'Could not save category'));
+      const savedKey = typeof json.data?.key === 'string' ? json.data.key : editingCategory.key;
+      toast.success('Editorial category saved');
+      setShowCategoryModal(false);
+      if (!isEdit) {
+        const created = json.data as EditorialCategory;
+        setCategories((prev) => (prev.some((c) => c.key === savedKey) ? prev : [...prev, created]));
+        setForm((prev) => (prev ? { ...prev, category: savedKey as VoiceCategory } : prev));
+      }
+      await loadCategories();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save category');
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const openEditCategory = (cat: EditorialCategory) => {
+    setEditingCategory({ ...cat });
+    setCategoryMode('edit');
+    setKeyManual(true);
+    setBadgeManual(true);
+    setShowCategoryModal(true);
+  };
+
+  const removeCategory = async (cat: EditorialCategory) => {
+    if (!window.confirm(`Delete category "${cat.label}"?`)) return;
+    const res = await fetch(`/api/v1/admin/voices/categories/${encodeURIComponent(cat.key)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      toast.error(apiError(json, 'Could not delete category'));
+      return;
+    }
+    const remaining = categories.filter((c) => c.key !== cat.key);
+    setCategories(remaining);
+    setForm((prev) => {
+      if (!prev || prev.category !== cat.key) return prev;
+      return { ...prev, category: (remaining[0]?.key ?? '') as VoiceCategory };
+    });
+    toast.success('Category deleted');
+    await loadCategories();
+  };
+
   const uploadPhoto = async (file: File) => {
     if (!form) return;
     setUploading(true);
@@ -382,6 +447,115 @@ export default function AdminVoicesPage() {
     await load();
   };
 
+  const categoryModal = showCategoryModal && editingCategory ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-xl border border-divider p-6 w-full max-w-md space-y-4">
+        <div className="flex items-center justify-between border-b border-divider pb-3">
+          <h4 className="text-[16px] font-bold text-text">
+            {categoryMode === 'edit' ? 'Edit Editorial Category' : 'New Editorial Category'}
+          </h4>
+          <button
+            type="button"
+            onClick={() => setShowCategoryModal(false)}
+            className="p-1 rounded-lg text-text-muted hover:text-text hover:bg-neutral-100"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-[12px] font-bold text-text">Category Display Name</label>
+            <input
+              type="text"
+              value={editingCategory.label}
+              placeholder="e.g. Mixologist Spotlight"
+              onChange={(e) => {
+                const label = e.target.value;
+                setEditingCategory({
+                  ...editingCategory,
+                  label,
+                  key: categoryMode === 'create' && !keyManual ? slugify(label) : editingCategory.key,
+                  badge: categoryMode === 'create' && !badgeManual ? label.toUpperCase() : editingCategory.badge,
+                });
+              }}
+              className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="text-[12px] font-bold text-text">Key / Slug</label>
+            <input
+              type="text"
+              disabled={categoryMode === 'edit'}
+              value={editingCategory.key}
+              placeholder="e.g. mixologist"
+              onChange={(e) => {
+                setKeyManual(true);
+                setEditingCategory({
+                  ...editingCategory,
+                  key: slugify(e.target.value),
+                });
+              }}
+              className="w-full font-mono text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 disabled:bg-neutral-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-[12px] font-bold text-text">Badge Label</label>
+            <input
+              type="text"
+              value={editingCategory.badge}
+              placeholder="e.g. MIXOLOGIST SPOTLIGHT"
+              onChange={(e) => {
+                setBadgeManual(true);
+                setEditingCategory({
+                  ...editingCategory,
+                  badge: e.target.value.toUpperCase(),
+                });
+              }}
+              className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 uppercase"
+            />
+          </div>
+
+          <div>
+            <label className="text-[12px] font-bold text-text">Description</label>
+            <textarea
+              rows={2}
+              value={editingCategory.description || ''}
+              placeholder="Short explanation of this recognition"
+              onChange={(e) =>
+                setEditingCategory({
+                  ...editingCategory,
+                  description: e.target.value,
+                })
+              }
+              className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-divider">
+          <button
+            type="button"
+            onClick={() => setShowCategoryModal(false)}
+            className="px-4 py-2 rounded-xl text-[13px] font-semibold text-text-muted hover:bg-neutral-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canWrite || categorySaving}
+            onClick={() => void saveCategory()}
+            className="px-5 py-2 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark shadow-sm disabled:opacity-60"
+          >
+            {categorySaving ? 'Saving…' : 'Save Category'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // --- TWO COLUMN MODERN EDITOR VIEW ---
   if (form) {
     const photoShown = form.photoUrl && !form.clearPhoto;
@@ -390,6 +564,7 @@ export default function AdminVoicesPage() {
     const categoryBadge = categories.find((c) => c.key === form.category)?.badge || VOICE_BADGES[form.category] || 'HORECA1 VOICES';
 
     return (
+      <>
       <div className="space-y-6 pb-12">
         {/* Sticky Action Header Bar */}
         <div className="bg-white sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3.5 border-b border-divider shadow-2xs flex flex-wrap items-center justify-between gap-4">
@@ -477,17 +652,29 @@ export default function AdminVoicesPage() {
               <div>
                 <p className={labelClass}>
                   <span>1. Editorial Category</span>
-                  <span className="text-[10px] text-text-muted font-normal">Select the recognition category</span>
+                  <button
+                    type="button"
+                    disabled={!canWrite}
+                    onClick={() => {
+                      setEditingCategory({ key: '', label: '', badge: '', description: '' });
+                      setCategoryMode('create');
+                      setKeyManual(false);
+                      setBadgeManual(false);
+                      setShowCategoryModal(true);
+                    }}
+                    className="normal-case tracking-normal text-[11px] font-bold text-primary hover:underline disabled:opacity-60 inline-flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    Add category
+                  </button>
                 </p>
-                <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
                   {categories.map((opt) => {
                     const selected = form.category === opt.key;
                     const Icon = getCategoryIcon(opt.key);
                     return (
-                      <button
+                      <div
                         key={opt.key}
-                        type="button"
-                        onClick={() => setForm({ ...form, category: opt.key as VoiceCategory })}
                         className={cn(
                           'p-3 rounded-xl text-[12px] font-bold border-2 transition-all flex flex-col items-center text-center gap-1.5',
                           selected
@@ -495,9 +682,33 @@ export default function AdminVoicesPage() {
                             : 'border-divider/80 text-text-secondary hover:border-primary/40 bg-white'
                         )}
                       >
-                        <Icon size={18} className={selected ? 'text-primary' : 'text-text-muted'} />
-                        <span className="leading-tight">{opt.label}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, category: opt.key as VoiceCategory })}
+                          className="flex flex-col items-center text-center gap-1.5 w-full"
+                        >
+                          <Icon size={18} className={selected ? 'text-primary' : 'text-text-muted'} />
+                          <span className="leading-tight">{opt.label}</span>
+                        </button>
+                        {canWrite && (
+                          <span className="flex items-center gap-2 normal-case tracking-normal">
+                            <button
+                              type="button"
+                              onClick={() => openEditCategory(opt)}
+                              className="text-[10px] font-bold text-primary hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void removeCategory(opt)}
+                              className="text-[10px] font-bold text-error hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1023,6 +1234,8 @@ export default function AdminVoicesPage() {
           </div>
         </div>
       </div>
+      {categoryModal}
+      </>
     );
   }
 
@@ -1107,7 +1320,7 @@ export default function AdminVoicesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-[12px] font-bold text-primary">
-                      {categories.find((c) => c.key === story.category)?.badge ?? VOICE_BADGES[story.category] ?? story.category}
+                      {categories.find((c) => c.key === story.category)?.badge ?? story.categoryBadge ?? VOICE_BADGES[story.category] ?? story.category}
                     </td>
                     <td className="px-4 py-3">
                       <AdminStatusBadge
@@ -1225,11 +1438,15 @@ export default function AdminVoicesPage() {
               </div>
               <button
                 type="button"
+                disabled={!canWrite}
                 onClick={() => {
                   setEditingCategory({ key: '', label: '', badge: '', description: '' });
+                  setCategoryMode('create');
+                  setKeyManual(false);
+                  setBadgeManual(false);
                   setShowCategoryModal(true);
                 }}
-                className="px-4 py-2 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark inline-flex items-center gap-1.5 shadow-sm active:scale-95"
+                className="px-4 py-2 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark inline-flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-60"
               >
                 <Plus size={15} /> Add Category
               </button>
@@ -1266,29 +1483,23 @@ export default function AdminVoicesPage() {
                       {cat.description || '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCategory({ ...cat });
-                          setShowCategoryModal(true);
-                        }}
-                        className="text-primary font-bold text-[13px] mr-3 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      {!cat.isDefault && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm(`Delete category "${cat.label}"?`)) {
-                              setCategories((prev) => prev.filter((c) => c.key !== cat.key));
-                              toast.success('Category deleted');
-                            }
-                          }}
-                          className="text-error font-semibold text-[13px] hover:underline"
-                        >
-                          Delete
-                        </button>
+                      {canWrite && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditCategory(cat)}
+                            className="text-primary font-bold text-[13px] mr-3 hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeCategory(cat)}
+                            className="text-error font-semibold text-[13px] hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -1299,134 +1510,7 @@ export default function AdminVoicesPage() {
         )}
       </AdminEntityTabPanel>
 
-      {/* Edit / Add Category Modal */}
-      {showCategoryModal && editingCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-divider p-6 w-full max-w-md space-y-4">
-            <div className="flex items-center justify-between border-b border-divider pb-3">
-              <h4 className="text-[16px] font-bold text-text">
-                {editingCategory.key && categories.some((c) => c.key === editingCategory.key && !c.isDefault)
-                  ? 'Edit Editorial Category'
-                  : 'New Editorial Category'}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setShowCategoryModal(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text hover:bg-neutral-100"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[12px] font-bold text-text">Category Display Name</label>
-                <input
-                  type="text"
-                  value={editingCategory.label}
-                  placeholder="e.g. Mixologist Spotlight"
-                  onChange={(e) => {
-                    const label = e.target.value;
-                    const key = editingCategory.isDefault
-                      ? editingCategory.key
-                      : slugify(label);
-                    const badge = label.toUpperCase();
-                    setEditingCategory({
-                      ...editingCategory,
-                      label,
-                      key: editingCategory.isDefault ? editingCategory.key : key,
-                      badge: editingCategory.badge || badge,
-                    });
-                  }}
-                  className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-bold text-text">Key / Slug</label>
-                <input
-                  type="text"
-                  disabled={editingCategory.isDefault}
-                  value={editingCategory.key}
-                  placeholder="e.g. mixologist"
-                  onChange={(e) =>
-                    setEditingCategory({
-                      ...editingCategory,
-                      key: slugify(e.target.value),
-                    })
-                  }
-                  className="w-full font-mono text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 disabled:bg-neutral-100"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-bold text-text">Badge Label</label>
-                <input
-                  type="text"
-                  value={editingCategory.badge}
-                  placeholder="e.g. MIXOLOGIST SPOTLIGHT"
-                  onChange={(e) =>
-                    setEditingCategory({
-                      ...editingCategory,
-                      badge: e.target.value.toUpperCase(),
-                    })
-                  }
-                  className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 uppercase"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-bold text-text">Description</label>
-                <textarea
-                  rows={2}
-                  value={editingCategory.description || ''}
-                  placeholder="Short explanation of this recognition"
-                  onChange={(e) =>
-                    setEditingCategory({
-                      ...editingCategory,
-                      description: e.target.value,
-                    })
-                  }
-                  className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-divider">
-              <button
-                type="button"
-                onClick={() => setShowCategoryModal(false)}
-                className="px-4 py-2 rounded-xl text-[13px] font-semibold text-text-muted hover:bg-neutral-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!editingCategory.label.trim() || !editingCategory.key.trim()) {
-                    toast.error('Name and key are required');
-                    return;
-                  }
-                  setCategories((prev) => {
-                    const idx = prev.findIndex((c) => c.key === editingCategory.key);
-                    if (idx >= 0) {
-                      const updated = [...prev];
-                      updated[idx] = editingCategory;
-                      return updated;
-                    }
-                    return [...prev, editingCategory];
-                  });
-                  toast.success('Editorial category saved');
-                  setShowCategoryModal(false);
-                }}
-                className="px-5 py-2 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark shadow-sm"
-              >
-                Save Category
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {categoryModal}
     </div>
   );
 }

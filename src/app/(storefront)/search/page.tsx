@@ -12,6 +12,7 @@ import { VendorProductCard } from '@/components/features/vendor/VendorProductCar
 import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import { cn } from '@/lib/utils';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 interface SearchBrand {
     id: string;
@@ -33,6 +34,7 @@ function SearchPageContent() {
     const [tab, setTab] = useState<'all' | 'vendors' | 'products'>('all');
     const [sort, setSort] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance');
     const [servicingIds, setServicingIds] = useState<Set<string> | null>(null);
+    const [searching, setSearching] = useState(Boolean(initialQuery.trim()));
 
     const pincode = useDeliveryPincode();
 
@@ -58,12 +60,18 @@ function SearchPageContent() {
 
     useEffect(() => {
         if (!query.trim()) {
-            Promise.resolve().then(() => setResults({ products: [], vendors: [], categories: [], brands: [] }));
+            Promise.resolve().then(() => {
+                setResults({ products: [], vendors: [], categories: [], brands: [] });
+                setSearching(false);
+            });
             return;
         }
 
         let cancelled = false;
         let retried = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) setSearching(true);
+        });
 
         const run = () => {
             dal.search.query(query).then((data) => {
@@ -85,6 +93,7 @@ function SearchPageContent() {
                     categories: data.categories,
                     brands: data.brands as SearchBrand[],
                 });
+                setSearching(false);
             }).catch(() => {
                 if (cancelled) return;
                 if (!retried) {
@@ -93,6 +102,7 @@ function SearchPageContent() {
                     return;
                 }
                 setResults({ products: [], vendors: [], categories: [], brands: [] });
+                setSearching(false);
             });
         };
         run();
@@ -184,6 +194,10 @@ function SearchPageContent() {
                         <p className="text-[16px] font-bold text-gray-700">Search for products or vendors</p>
                         <p className="text-[13px] text-gray-400 mt-1">Try &quot;cheese&quot;, &quot;dairy&quot;, or &quot;Sharad&quot;</p>
                     </div>
+                ) : searching ? (
+                    <div className="text-center py-16">
+                        <p className="text-[16px] font-bold text-gray-700">Searching for &quot;{query}&quot;</p>
+                    </div>
                 ) : !hasResults ? (
                     <div className="text-center py-16">
                         <p className="text-[48px] mb-3">😕</p>
@@ -227,9 +241,7 @@ function SearchPageContent() {
                                         const categoryMatch = vendor.categories.find(c => slugify(c) === slugify(query));
                                         // Unified Vendor Store URL: ?cat=<slug> deep-links into the
                                         // sub-category sidebar (no separate /category/<vendor>/<cat> page).
-                                        const vendorPath = categoryMatch
-                                            ? `/vendor/${vendor.id}?cat=${slugify(categoryMatch)}`
-                                            : `/vendor/${vendor.id}`;
+                                        const vendorPath = vendorPublicPath(vendor, categoryMatch ? { cat: slugify(categoryMatch) } : undefined);
                                             
                                         return (
                                             <Link
@@ -246,10 +258,12 @@ function SearchPageContent() {
                                                         {vendor.categories.join(', ')}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1.5">
+                                                        {Number(vendor.rating) > 0 && (
                                                         <div className="flex items-center gap-0.5 text-[10px] font-bold text-success">
                                                             <Star size={10} fill="currentColor" />
-                                                            {vendor.rating}
+                                                            {Number(vendor.rating).toFixed(1)}
                                                         </div>
+                                                        )}
                                                         <div className="flex items-center gap-0.5 text-[10px] font-semibold text-blue-600">
                                                             <Clock size={10} />
                                                             {vendor.deliveryTime}

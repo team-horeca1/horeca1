@@ -11,6 +11,8 @@ export type VoicesTeaser = VoiceStoryCardData & {
 };
 
 export function VoicesSection({ stories }: { stories: VoicesTeaser[] }) {
+  if (stories.length === 0) return null;
+
   return (
     <section className="w-full py-6 bg-white overflow-hidden">
       <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
@@ -24,24 +26,16 @@ export function VoicesSection({ stories }: { stories: VoicesTeaser[] }) {
         />
 
         {/* Stories Grid / Responsive Mobile Carousel */}
-        {stories.length > 0 ? (
-          <div className="flex lg:grid lg:grid-cols-4 overflow-x-auto lg:overflow-visible gap-4 md:gap-5 pb-2 pt-0.5 -mx-[var(--container-padding)] px-[var(--container-padding)] scroll-pl-[var(--container-padding)] sm:mx-0 sm:px-0 sm:scroll-pl-0 no-scrollbar snap-x snap-mandatory">
-            {stories.map((s) => (
-              <div 
-                key={s.id} 
-                className="min-w-[280px] max-w-[310px] sm:min-w-[300px] lg:min-w-0 lg:max-w-none shrink-0 lg:shrink snap-start flex"
-              >
-                <VoiceStoryCard story={s} variant="teaser" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-neutral-200 p-8 text-center bg-[#FAF8F5]">
-            <p className="text-[14px] text-neutral-500 font-medium">
-              Featured editorial stories will appear here once published.
-            </p>
-          </div>
-        )}
+        <div className="flex lg:grid lg:grid-cols-4 overflow-x-auto lg:overflow-visible gap-4 md:gap-5 pb-2 pt-0.5 -mx-[var(--container-padding)] px-[var(--container-padding)] scroll-pl-[var(--container-padding)] sm:mx-0 sm:px-0 sm:scroll-pl-0 no-scrollbar snap-x snap-mandatory">
+          {stories.map((s) => (
+            <div
+              key={s.id}
+              className="min-w-[280px] max-w-[310px] sm:min-w-[300px] lg:min-w-0 lg:max-w-none shrink-0 lg:shrink snap-start flex"
+            >
+              <VoiceStoryCard story={s} variant="teaser" />
+            </div>
+          ))}
+        </div>
 
         {/* Subtle Bottom Link */}
         <div className="mt-2.5 flex items-center justify-end">

@@ -1,3 +1,7 @@
+import { brandPublicPath, productPublicPath, vendorPublicPath } from '@/lib/publicSlug';
+
+const OG_CARD_VERSION = '7';
+
 export type ShareKind =
   | 'product'
   | 'deal'
@@ -47,7 +51,9 @@ export function vendorProductHref(vendorId: string, productId: string): string {
 
 export function productShareContent(opts: {
   id: string;
+  slug?: string | null;
   vendorId: string;
+  vendorSlug?: string | null;
   title: string;
   vendorName?: string | null;
   image?: string | null;
@@ -64,9 +70,14 @@ export function productShareContent(opts: {
     text: vendor
       ? `Check out ${opts.title} from ${vendor} on Horeca1.`
       : `Check out ${opts.title} on Horeca1.`,
-    path: vendorProductHref(opts.vendorId, opts.id),
+    path: productPublicPath({
+      id: opts.id,
+      slug: opts.slug,
+      vendorId: opts.vendorId,
+      vendorSlug: opts.vendorSlug,
+    }),
     image: opts.image,
-    ogPath: `/api/og/product/${opts.id}?format=portrait${v}`,
+    ogPath: `/api/og/product/${opts.id}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
     downloadName: `horeca1-product-${opts.id}.png`,
     subtitle: [vendor, opts.pack].filter(Boolean).join(' · ') || null,
     priceLabel: opts.priceLabel,
@@ -75,6 +86,7 @@ export function productShareContent(opts: {
 
 export function vendorShareContent(opts: {
   id: string;
+  slug?: string | null;
   name: string;
   image?: string | null;
   updatedAt?: string | number | Date | null;
@@ -85,9 +97,9 @@ export function vendorShareContent(opts: {
     id: opts.id,
     title: opts.name,
     text: `Check out ${opts.name} on Horeca1.`,
-    path: `/vendor/${opts.id}`,
+    path: vendorPublicPath({ id: opts.id, slug: opts.slug }),
     image: opts.image,
-    ogPath: `/api/og/vendor/${opts.id}?format=portrait${v}`,
+    ogPath: `/api/og/vendor/${opts.slug || opts.id}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
     downloadName: `horeca1-vendor-${opts.id}.png`,
     subtitle: 'Supplier store',
   };
@@ -105,9 +117,9 @@ export function brandShareContent(opts: {
     id: opts.slug,
     title: opts.name,
     text: `Find ${opts.name} on Horeca1.`,
-    path: `/brand/${opts.slug}`,
+    path: brandPublicPath(opts.slug),
     image: opts.image,
-    ogPath: `/api/og/brand/${encodeURIComponent(opts.slug)}?format=portrait${v}`,
+    ogPath: `/api/og/brand/${encodeURIComponent(opts.slug)}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
     downloadName: `horeca1-brand-${opts.slug}.png`,
     subtitle: 'Brand store',
   };
@@ -132,7 +144,7 @@ export function collectionShareContent(opts: {
     text: `Browse ${opts.name} on Horeca1.`,
     path: `/collections/${opts.slug}`,
     image: opts.image,
-    ogPath: `/api/og/collection/${encodeURIComponent(opts.slug)}?format=portrait${v}`,
+    ogPath: `/api/og/collection/${encodeURIComponent(opts.slug)}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
     downloadName: `horeca1-collection-${opts.slug}.png`,
     subtitle: count,
   };
@@ -155,9 +167,9 @@ export function dealShareContent(opts: {
     text: vendor
       ? `${opts.title} from ${vendor} on Horeca1.`
       : `${opts.title} on Horeca1.`,
-    path: `/vendor/${opts.vendorId}`,
+    path: vendorPublicPath({ id: opts.vendorId }),
     image: opts.image,
-    ogPath: `/api/og/deal/${opts.id}?format=portrait`,
+    ogPath: `/api/og/deal/${opts.id}?format=portrait&cv=${OG_CARD_VERSION}`,
     downloadName: `horeca1-deal-${opts.id}.png`,
     subtitle: vendor || 'Store offer',
     priceLabel: opts.priceLabel,
@@ -181,9 +193,10 @@ export function articleShareContent(opts: {
     text: `🌟 *${opts.name}*${titleLine ? ` (${titleLine})` : ''}\n"${opts.quote}"\n\n📖 Read the full story on Horeca1 Voices:`,
     path: `/voices/${opts.slug}`,
     image: opts.photoUrl,
-    ogPath: `/api/og/voices/${encodeURIComponent(opts.slug)}?format=portrait`,
+    ogPath: `/api/og/voices/${encodeURIComponent(opts.slug)}?format=portrait&cv=${OG_CARD_VERSION}`,
     downloadName: `horeca1-voices-${opts.slug}.png`,
     subtitle: titleLine || 'Horeca1 Voices',
-    preRenderedImageUrl: opts.preRenderedImageUrl,
+    // Prefer live OG route (cached) so redesigns are never stuck on stale ImageKit PNGs.
+    preRenderedImageUrl: null,
   };
 }

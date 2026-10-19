@@ -12,6 +12,7 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { assertLeafCategory, createMasterProductWithSku, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { totalStockQty } from '@/lib/inventoryHelpers';
 
 const createSchema = z.object({
   sku: z.string().max(40).optional(),
@@ -78,7 +79,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
               vendorSku: true,
               hsn: true,
               metadata: true,
-              vendor: { select: { id: true, businessName: true, vendorCode: true } }
+              vendor: { select: { id: true, businessName: true, displayName: true, vendorCode: true } }
             },
             take: 5,
             orderBy: { updatedAt: 'desc' },
@@ -102,7 +103,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
               vendorSku: true,
               hsn: true,
               metadata: true,
-              vendor: { select: { id: true, businessName: true, vendorCode: true } }
+              vendor: { select: { id: true, businessName: true, displayName: true, vendorCode: true } }
             },
             take: 5,
             orderBy: { updatedAt: 'desc' },
@@ -113,6 +114,42 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
     const hasMore = !pageParam && rows.length > limit;
     if (hasMore) rows.pop();
+
+    const masterIds = rows.map((m) => m.id);
+    const priceRows = masterIds.length === 0 ? [] : await prisma.product.findMany({
+      where: {
+        masterProductId: { in: masterIds },
+        vendorId: { not: null },
+        archivedAt: null,
+        NOT: { slug: { startsWith: '_deleted_' } },
+      },
+      select: {
+        masterProductId: true,
+        basePrice: true,
+        taxPercent: true,
+        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
+      },
+    });
+    const priceRanges = new Map<string, { bases: number[]; grosses: number[] }>();
+    const stockByMaster = new Map<string, number[]>();
+    for (const row of priceRows) {
+      if (!row.masterProductId) continue;
+      const qtys = stockByMaster.get(row.masterProductId) ?? [];
+      qtys.push(totalStockQty(row.inventories));
+      stockByMaster.set(row.masterProductId, qtys);
+      const base = Number(row.basePrice);
+      if (!Number.isFinite(base)) continue;
+      const tax = Number(row.taxPercent);
+      const gross = base * (1 + (Number.isFinite(tax) ? tax : 0) / 100);
+      const bucket = priceRanges.get(row.masterProductId) ?? { bases: [], grosses: [] };
+      bucket.bases.push(base);
+      bucket.grosses.push(gross);
+      priceRanges.set(row.masterProductId, bucket);
+    }
+    const span = (values: number[]): { min: number | null; max: number | null } => {
+      if (values.length === 0) return { min: null, max: null };
+      return { min: Math.min(...values), max: Math.max(...values) };
+    };
 
     return NextResponse.json({
       success: true,
@@ -128,6 +165,9 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
             vendorId: metadata.vendorId || (vendorProducts.find(vp => (vp.metadata as any)?.vendorId)?.metadata as any)?.vendorId || vendorProducts.find(vp => vp.vendor?.vendorCode)?.vendor?.vendorCode || null,
           };
 
+          const baseSpan = span(priceRanges.get(m.id)?.bases ?? []);
+          const grossSpan = span(priceRanges.get(m.id)?.grosses ?? []);
+          const stockSpan = span(stockByMaster.get(m.id) ?? []);
           return {
             ...rest,
             imageUrl,
@@ -135,6 +175,12 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
             hsn: vendorProducts[0]?.hsn || null,
             vendor: vendorProducts[0]?.vendor || null,
             metadata: finalMetadata,
+            basePriceMin: baseSpan.min,
+            basePriceMax: baseSpan.max,
+            grossPriceMin: grossSpan.min,
+            grossPriceMax: grossSpan.max,
+            stockMin: stockSpan.min,
+            stockMax: stockSpan.max,
           };
         }),
         nextCursor: hasMore && !pageParam ? rows[rows.length - 1]?.id : null,

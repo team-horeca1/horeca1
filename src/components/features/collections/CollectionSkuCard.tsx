@@ -117,7 +117,7 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
     <article
       className={cn(
         'flex flex-col bg-white rounded-2xl border border-[#E9E3DD] overflow-hidden transition-[box-shadow,border-color] duration-200 ease-out',
-        hasOffers ? 'hover:shadow-[0_8px_24px_-12px_rgba(45,9,18,0.18)] hover:border-[#D9D0C8]' : 'opacity-70',
+        hasOffers ? 'hover:shadow-[0_8px_24px_-12px_rgba(45,9,18,0.18)] hover:border-primary' : 'opacity-70',
       )}
     >
       <div className="relative aspect-square bg-white">
@@ -156,7 +156,9 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
             <ShareButton
               content={productShareContent({
                 id: defaultOffer.id,
+                slug: defaultOffer.slug,
                 vendorId: defaultOffer.vendorId,
+                vendorSlug: defaultOffer.vendorSlug,
                 title: item.master.name,
                 vendorName: defaultOffer.vendorName,
                 image: img,

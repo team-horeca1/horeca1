@@ -1,6 +1,7 @@
 export const VOICE_STORY_PROJECTION = `{
   _id,
   category,
+  categoryBadge,
   name,
   "slug": slug.current,
   role,
@@ -28,6 +29,15 @@ export const relatedVoicesQuery = `*[_type == "voiceStory" && published == true 
 export const adminVoicesQuery = `*[_type == "voiceStory"] | order(publishedAt desc, _updatedAt desc) ${VOICE_STORY_PROJECTION}`
 
 export const adminVoiceByIdQuery = `*[_type == "voiceStory" && _id == $id][0] ${VOICE_STORY_PROJECTION}`
+
+export const editorialCategoriesQuery = `*[_type == "editorialCategory" && defined(key)] {
+  _id,
+  key,
+  label,
+  badge,
+  description,
+  "isDefault": isDefault == true
+}`
 
 export const adminNominationsQuery = `*[_type == "voiceNomination"] | order(_createdAt desc) {
   _id,

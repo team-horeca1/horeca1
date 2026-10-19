@@ -65,7 +65,7 @@ const CATEGORIES: Category[] = [
 ];
 
 const ProductCard = ({ product }: { product: Product }) => (
-    <div className="bg-white border border-gray-200 rounded-[16px] p-3 md:p-5 flex flex-col relative group transition-all duration-300 hover:shadow-md h-full">
+    <div className="bg-white border border-[#CDC4BA] rounded-[16px] p-3 md:p-5 flex flex-col relative group transition-all duration-300 hover:shadow-md hover:border-primary h-full">
         {/* Share Button — custom SVG */}
         <button className="absolute right-3 top-3 z-10 text-gray-400 hover:opacity-70 transition-opacity">
             <Image src="/images/share.svg" alt="share" width={14} height={15} />

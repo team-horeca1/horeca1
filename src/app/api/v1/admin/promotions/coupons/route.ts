@@ -25,7 +25,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         ...(scope === 'vendor' ? { vendorId: { not: null } } : {}),
       },
       include: {
-        vendor: { select: { id: true, businessName: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true } },
         _count: { select: { redemptions: { where: { status: 'active' } } } },
       },
       orderBy: { createdAt: 'desc' },

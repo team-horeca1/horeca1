@@ -17,6 +17,17 @@ import { totalStockQty } from '@/lib/inventoryHelpers';
 import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { resolveUniqueProductSlug } from '@/lib/productSlug';
+import { storeDisplayName } from '@/lib/storeDisplayName';
+
+function summedStock(inventories: { qtyAvailable: number; qtyReserved?: number | null }[]) {
+  let qtyAvailable = 0;
+  let qtyReserved = 0;
+  for (const row of inventories) {
+    qtyAvailable += Number(row.qtyAvailable) || 0;
+    qtyReserved += Number(row.qtyReserved) || 0;
+  }
+  return { qtyAvailable, qtyReserved, inventory: { qtyAvailable, qtyReserved } };
+}
 
 // Validation schema for admin product creation
 // vendorId is optional — admin can create catalog products without a vendor
@@ -114,9 +125,9 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        vendor: { select: { id: true, businessName: true, vendorCode: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, vendorCode: true } },
         category: { select: { id: true, name: true, parentId: true } },
-        inventories: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
         masterProduct: { select: { sku: true, name: true } },
       },
@@ -136,13 +147,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       const hasMore = page.length > limit;
       if (hasMore) page.pop();
 
-      const products = page.map((p) => ({
-        ...p,
-        vendorCount: p.vendor ? 1 : 0,
-        vendors: p.vendor ? [p.vendor.businessName] : [],
-        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: totalStockQty(p.inventories) }],
-        totalStock: totalStockQty(p.inventories),
-      }));
+      const products = page.map((p) => {
+        const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        const stock = summedStock(p.inventories);
+        return {
+          ...p,
+          vendorCount: p.vendor ? 1 : 0,
+          vendors: vName ? [vName] : [],
+          vendorStock: [{ vendor: vName, qty: totalStockQty(p.inventories) }],
+          totalStock: totalStockQty(p.inventories),
+          qtyAvailable: stock.qtyAvailable,
+          qtyReserved: stock.qtyReserved,
+          inventory: stock.inventory,
+        };
+      });
 
       const draftCount = allProducts.length;
 
@@ -183,13 +201,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       const hasMore = page.length > limit;
       if (hasMore) page.pop();
 
-      const products = page.map((p) => ({
-        ...p,
-        vendorCount: 1,
-        vendors: p.vendor ? [p.vendor.businessName] : [],
-        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: totalStockQty(p.inventories) }],
-        totalStock: totalStockQty(p.inventories),
-      }));
+      const products = page.map((p) => {
+        const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        const stock = summedStock(p.inventories);
+        return {
+          ...p,
+          vendorCount: 1,
+          vendors: vName ? [vName] : [],
+          vendorStock: [{ vendor: vName, qty: totalStockQty(p.inventories) }],
+          totalStock: totalStockQty(p.inventories),
+          qtyAvailable: stock.qtyAvailable,
+          qtyReserved: stock.qtyReserved,
+          inventory: stock.inventory,
+        };
+      });
 
       return NextResponse.json({
         success: true,
@@ -230,13 +255,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       const hasMore = page.length > limit;
       if (hasMore) page.pop();
 
-      const products = page.map(p => ({
-        ...p,
-        vendorCount: 1,
-        vendors: p.vendor ? [p.vendor.businessName] : [],
-        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: totalStockQty(p.inventories) }],
-        totalStock: totalStockQty(p.inventories),
-      }));
+      const products = page.map(p => {
+        const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        const stock = summedStock(p.inventories);
+        return {
+          ...p,
+          vendorCount: 1,
+          vendors: vName ? [vName] : [],
+          vendorStock: [{ vendor: vName, qty: totalStockQty(p.inventories) }],
+          totalStock: totalStockQty(p.inventories),
+          qtyAvailable: stock.qtyAvailable,
+          qtyReserved: stock.qtyReserved,
+          inventory: stock.inventory,
+        };
+      });
 
       const nextCursor = hasMore ? products[products.length - 1].id : null;
       const totalCount = allProducts.length;
@@ -285,18 +317,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         if (!existing.product.imageUrl && p.imageUrl) {
           existing.product = { ...existing.product, imageUrl: p.imageUrl };
         }
-        if (p.vendor && !existing.vendors.includes(p.vendor.businessName)) {
+        const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        if (p.vendor && !existing.vendors.includes(vName)) {
           existing.vendorCount++;
-          existing.vendors.push(p.vendor.businessName);
-          existing.vendorStock.push({ vendor: p.vendor.businessName, qty });
+          existing.vendors.push(vName);
+          existing.vendorStock.push({ vendor: vName, qty });
           existing.totalStock += qty;
         }
       } else {
+        const vName = p.vendor ? storeDisplayName(p.vendor) : '';
         catalogMap.set(key, {
           product: p,
           vendorCount: p.vendor ? 1 : 0,
-          vendors: p.vendor ? [p.vendor.businessName] : [],
-          vendorStock: p.vendor ? [{ vendor: p.vendor.businessName, qty }] : [],
+          vendors: vName ? [vName] : [],
+          vendorStock: p.vendor ? [{ vendor: vName, qty }] : [],
           totalStock: qty,
         });
       }

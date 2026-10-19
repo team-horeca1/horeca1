@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
@@ -15,10 +16,13 @@ export function NearbyVendors() {
     const [canScrollRight, setCanScrollRight] = useState(true);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [servicingIds, setServicingIds] = useState<Set<string> | null>(null);
+    const [areaResolved, setAreaResolved] = useState(false);
     const [loading, setLoading] = useState(true);
+    const { status: sessionStatus } = useSession();
     const { selectedAddress } = useAddress();
-    const { currentOutlet } = useBusinessAccountSwitcher();
+    const { currentOutlet, loading: accountsLoading } = useBusinessAccountSwitcher();
     const pincode = currentOutlet?.pincode ?? selectedAddress?.pincode;
+    const areaPincode = sessionStatus === 'authenticated' && pincode && /^\d{6}$/.test(pincode) ? pincode : undefined;
 
     useEffect(() => {
         let isCancelled = false;
@@ -44,25 +48,35 @@ export function NearbyVendors() {
     // Pincode serviceability gate — fetch vendor ids that service the user's pincode.
     // If pincode is unknown, render the full list (no gate).
     useEffect(() => {
-        if (!pincode || !/^\d{6}$/.test(pincode)) {
-            queueMicrotask(() => setServicingIds(null));
-            return;
-        }
+        if (sessionStatus === 'authenticated' && accountsLoading) return;
         let cancelled = false;
+        if (!areaPincode) {
+            queueMicrotask(() => {
+                if (cancelled) return;
+                setServicingIds(null);
+                setAreaResolved(true);
+            });
+            return () => { cancelled = true; };
+        }
+        queueMicrotask(() => {
+            if (!cancelled) setAreaResolved(false);
+        });
         dal.vendors
-            .checkServiceability(pincode)
+            .checkServiceability(areaPincode)
             .then((res) => {
                 if (cancelled) return;
                 setServicingIds(new Set(res.vendorIds ?? []));
+                setAreaResolved(true);
             })
             .catch(() => {
                 if (cancelled) return;
                 setServicingIds(null); // fall back to unfiltered on error
+                setAreaResolved(true);
             });
         return () => {
             cancelled = true;
         };
-    }, [pincode]);
+    }, [areaPincode, sessionStatus, accountsLoading]);
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -84,7 +98,12 @@ export function NearbyVendors() {
 
     if (!loading && vendors.length === 0) return null;
 
-    const filteredVendors = servicingIds ? vendors.filter((v) => servicingIds.has(v.id)) : vendors;
+    const areaPending = sessionStatus === 'authenticated' && (accountsLoading || !areaResolved);
+    const filteredVendors = areaPending
+        ? []
+        : servicingIds
+            ? vendors.filter((v) => servicingIds.has(v.id))
+            : vendors;
     const displayVendors = filteredVendors.slice(0, 10);
 
     return (
@@ -93,7 +112,7 @@ export function NearbyVendors() {
                 <div className="px-4 md:px-[var(--container-padding)]">
                     <SectionHeader
                         title="Popular Suppliers Near You"
-                        subtitle={pincode ? `Verified suppliers delivering to ${pincode}` : 'Explore verified hospitality suppliers'}
+                        subtitle={areaPincode ? `Verified suppliers delivering to ${areaPincode}` : 'Explore verified hospitality suppliers'}
                         actionLabel="View all →"
                         actionHref="/vendors"
                     />
@@ -117,7 +136,9 @@ export function NearbyVendors() {
                         className="overflow-x-auto no-scrollbar scroll-smooth w-full"
                     >
                         <div className="flex gap-3.5 md:gap-5 py-3 px-4 md:px-[var(--container-padding)] w-max">
-                            {displayVendors.map((vendor, index) => (
+                            {!areaPending && displayVendors.length === 0 && areaPincode ? (
+                                <p className="text-sm text-text-secondary py-6">No suppliers deliver to {areaPincode} yet.</p>
+                            ) : displayVendors.map((vendor, index) => (
                                 <VendorCard key={vendor.id} vendor={vendor} index={index} />
                             ))}
                         </div>

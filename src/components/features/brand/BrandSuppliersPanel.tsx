@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Bell, ChevronDown, CreditCard, MapPin, Star, Store, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 export interface BrandSupplier {
   id: string;
@@ -35,7 +36,7 @@ export interface BrandSupplierSku {
 type SortKey = 'recommended' | 'price' | 'rating' | 'credit';
 
 function vendorHref(vendor: BrandSupplier, sku?: BrandSupplierSku | null, brandSlug?: string): string {
-  const base = `/vendor/${vendor.slug || vendor.id}`;
+  const base = vendorPublicPath({ id: vendor.id, slug: vendor.slug });
   if (sku) {
     const dist = sku.distributors.find((d) => d.vendorId === vendor.id);
     if (dist?.distributorProductId) return `${base}?product=${dist.distributorProductId}`;

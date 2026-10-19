@@ -297,6 +297,7 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     }),
     vendorLogo: (vendor.logoUrl as string) || '',
     vendorSlug: typeof vendor.slug === 'string' ? vendor.slug : undefined,
+    slug: typeof p.slug === 'string' ? p.slug : undefined,
     vendorRating: Number(vendor.rating) || 0,
     vendorMinOrderValue: Number(vendor.minOrderValue) || 0,
     categoryId,
@@ -473,9 +474,11 @@ export const dal = {
           defaultOffer: Record<string, unknown>;
           offers: Record<string, unknown>[];
         }>;
+        noVendorsForPincode?: boolean;
       }>(`/api/v1/categories/${categoryId}/products${qs}`);
 
       return {
+        noVendorsForPincode: Boolean(data.noVendorsForPincode),
         items: (data.items ?? []).map((item) => {
           const defaultOffer = toVendorProduct(item.defaultOffer);
           // Prefer master identity on the card when available
