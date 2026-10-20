@@ -5,15 +5,37 @@ import { Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+type PublishSummary = {
+  priced?: number;
+  base?: number;
+  removed?: number;
+  restored?: number;
+  customersAffected?: number;
+  rollbackOf?: string;
+};
+
 type PublishRow = {
   id: string;
   kind: string;
-  summary: string | null;
+  summary: PublishSummary | string | null;
   cellCount: number;
   createdAt: string;
   actor: { id: string; name: string } | null;
   rollbackOfId: string | null;
 };
+
+function formatSummary(summary: PublishRow['summary']): string | null {
+  if (!summary) return null;
+  if (typeof summary === 'string') return summary;
+  const parts: string[] = [];
+  if (typeof summary.priced === 'number' && summary.priced > 0) parts.push(`${summary.priced} priced`);
+  if (typeof summary.removed === 'number' && summary.removed > 0) parts.push(`${summary.removed} removed`);
+  if (typeof summary.restored === 'number' && summary.restored > 0) parts.push(`${summary.restored} restored`);
+  if (typeof summary.customersAffected === 'number' && summary.customersAffected > 0) {
+    parts.push(`${summary.customersAffected} customers affected`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
 
 interface Props {
   onRollbackDone?: () => void;
@@ -101,7 +123,9 @@ export function PublishHistoryTab({ onRollbackDone }: Props) {
               {r.actor?.name && ` · ${r.actor.name}`}
               <span className="tabular-nums"> · {r.cellCount} cells</span>
             </div>
-            {r.summary && <p className="text-[12px] text-[#181725] mt-1">{r.summary}</p>}
+            {formatSummary(r.summary) && (
+              <p className="text-[12px] text-[#181725] mt-1">{formatSummary(r.summary)}</p>
+            )}
           </div>
           <button
             type="button"
