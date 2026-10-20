@@ -17,6 +17,7 @@ import {
     WEIGHT_UNIT_OPTIONS,
     DIMENSION_UNIT_OPTIONS,
 } from '@/lib/productUnits';
+import { shelfLifeToForm, shelfLifeFromForm, vegToForm, vegFromForm, normalizeNaText } from '@/lib/productNa';
 
 const inputCls = productFormInputCls;
 const selectCls = productFormSelectCls;
@@ -46,7 +47,7 @@ export interface ApprovalProductFormData {
     aliasNames: string[];
     fssaiRef: string;
     barcode: string;
-    vegNonVeg: '' | 'veg' | 'nonveg' | 'egg';
+    vegNonVeg: '' | 'veg' | 'nonveg' | 'egg' | 'na';
     storageType: string;
     shelfLifeDays: string;
     countryOfOrigin: string;
@@ -116,7 +117,7 @@ function strList(value: unknown): string[] {
 }
 
 function pickVeg(value: unknown): ApprovalProductFormData['vegNonVeg'] {
-    return value === 'veg' || value === 'nonveg' || value === 'egg' ? value : '';
+    return vegToForm(typeof value === 'string' ? value : null, { nullAsNa: true });
 }
 
 export interface ApprovalProductSeedSource {
@@ -214,7 +215,7 @@ export function seedApprovalProductForm(source: ApprovalProductSeedSource): Appr
         barcode: str(source.barcode),
         vegNonVeg: veg,
         storageType: str(source.storageType),
-        shelfLifeDays: str(source.shelfLifeDays),
+        shelfLifeDays: source.shelfLifeDays != null && source.shelfLifeDays !== '' ? shelfLifeToForm(Number(source.shelfLifeDays)) : '',
         countryOfOrigin: str(source.countryOfOrigin),
         packageWeight: str(packaging.packageWeight),
         packageLength: str(packaging.packageLength),
@@ -286,12 +287,11 @@ export function buildVendorProductPatch(form: ApprovalProductFormData): Record<s
     payload.images = form.images.filter(Boolean);
     if (form.fssaiRef.trim()) payload.fssaiRef = form.fssaiRef.trim();
     payload.aliasNames = form.aliasNames;
-    if (form.vegNonVeg) payload.vegNonVeg = form.vegNonVeg;
-    if (form.storageType) payload.storageType = form.storageType;
-    if (form.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(form.shelfLifeDays))) {
-        payload.shelfLifeDays = parseInt(form.shelfLifeDays, 10);
-    }
-    if (form.countryOfOrigin.trim()) payload.countryOfOrigin = form.countryOfOrigin.trim();
+    if (form.vegNonVeg) payload.vegNonVeg = vegFromForm(form.vegNonVeg);
+    if (form.storageType) payload.storageType = normalizeNaText(form.storageType);
+    const shelfFromForm = shelfLifeFromForm(form.shelfLifeDays);
+    if (shelfFromForm !== undefined) payload.shelfLifeDays = shelfFromForm;
+    if (form.countryOfOrigin.trim()) payload.countryOfOrigin = normalizeNaText(form.countryOfOrigin);
     const slabs = form.priceSlabs
         .filter((s) => s.minQty && s.price)
         .map((s) => ({ minQty: Number(s.minQty), price: Number(s.price) }));
@@ -462,7 +462,7 @@ export function ApprovalProductEditForm({
                             type="text"
                             value={form.countryOfOrigin}
                             onChange={(e) => update('countryOfOrigin', e.target.value)}
-                            placeholder="e.g. India"
+                            placeholder="e.g. India or NA"
                             className={cn(inputCls, errors.countryOfOrigin && 'border-[#E74C3C]')}
                         />
                         {errors.countryOfOrigin && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{errors.countryOfOrigin}</p>}
@@ -478,6 +478,7 @@ export function ApprovalProductEditForm({
                             <option value="veg">Veg</option>
                             <option value="nonveg">Non-Veg</option>
                             <option value="egg">Egg</option>
+                            <option value="na">NA</option>
                         </select>
                         {errors.vegNonVeg && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{errors.vegNonVeg}</p>}
                     </div>
@@ -494,17 +495,18 @@ export function ApprovalProductEditForm({
                             <option value="frozen">Frozen</option>
                             <option value="dry">Dry Storage</option>
                             <option value="cool">Cool / Dark</option>
+                            <option value="NA">NA</option>
                         </select>
                         {errors.storageType && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{errors.storageType}</p>}
                     </div>
                     <div id="ff-shelfLifeDays">
                         <FieldLabel required>Shelf Life (days)</FieldLabel>
                         <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
                             value={form.shelfLifeDays}
                             onChange={(e) => update('shelfLifeDays', e.target.value)}
-                            placeholder="e.g. 365"
+                            placeholder="e.g. 365 or NA"
                             className={cn(inputCls, errors.shelfLifeDays && 'border-[#E74C3C]')}
                         />
                         {errors.shelfLifeDays && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{errors.shelfLifeDays}</p>}

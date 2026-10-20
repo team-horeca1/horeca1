@@ -270,7 +270,7 @@ export default function VendorBulkGrid({
     { key: 'ean', label: 'EAN', width: 'w-[110px]', type: 'text' },
     { key: 'isbn', label: 'ISBN', width: 'w-[110px]', type: 'text' },
     { key: 'countryOfOrigin', label: 'Country of Origin', width: 'w-[140px]', type: 'text' },
-    { key: 'vegNonVeg', label: 'Veg / Non-Veg', width: 'w-[120px]', type: 'select', options: ['', 'veg', 'nonveg', 'egg'] },
+    { key: 'vegNonVeg', label: 'Veg / Non-Veg', width: 'w-[120px]', type: 'select', options: ['', 'veg', 'nonveg', 'egg', 'NA'] },
     { key: 'storageType', label: 'Storage type', width: 'w-[120px]', type: 'text' },
     { key: 'substituteMapping', label: 'Substitute Mapping', width: 'w-[150px]', type: 'text' },
   ], [brandNames, categoryNames, subCategoryNames, readOnlyCommission]);
@@ -387,7 +387,7 @@ export default function VendorBulkGrid({
     if (field === 'packSize') return p.packSize ?? '';
     if (field === 'description') return p.description ?? '';
     if (field === 'imageUrl') return p.imageUrl ?? '';
-    if (field === 'vegNonVeg') return p.vegNonVeg ?? '';
+    if (field === 'vegNonVeg') return p.vegNonVeg ?? 'NA';
     if (field === 'storageType') return p.storageType ?? '';
     if (field === 'countryOfOrigin') return p.countryOfOrigin ?? '';
     if (field === 'stockOnHand') return p.inventory?.qtyAvailable ?? '';
@@ -534,7 +534,7 @@ export default function VendorBulkGrid({
       if (e.packSize !== undefined) body.packSize = e.packSize;
       if (e.description !== undefined) body.description = e.description;
       if (e.imageUrl !== undefined) body.imageUrl = e.imageUrl;
-      if (e.vegNonVeg !== undefined) body.vegNonVeg = e.vegNonVeg || null;
+      if (e.vegNonVeg !== undefined) body.vegNonVeg = e.vegNonVeg && String(e.vegNonVeg).toLowerCase() !== 'na' ? e.vegNonVeg : null;
       if (e.storageType !== undefined) body.storageType = e.storageType;
       if (e.countryOfOrigin !== undefined) body.countryOfOrigin = e.countryOfOrigin;
       if (e.aliasName !== undefined) body.aliasNames = e.aliasName ? [String(e.aliasName)] : [];

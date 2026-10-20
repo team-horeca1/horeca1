@@ -20,7 +20,7 @@ import {
 } from '@/lib/productUnits';
 import { toast } from 'sonner';
 
-export type BrandVegNonVeg = '' | 'veg' | 'nonveg' | 'egg';
+export type BrandVegNonVeg = '' | 'veg' | 'nonveg' | 'egg' | 'na';
 
 export interface BrandProductFormData {
   name: string;
@@ -451,6 +451,7 @@ export default function BrandProductForm({
                       <option value="veg">Veg</option>
                       <option value="nonveg">Non-Veg</option>
                       <option value="egg">Egg</option>
+                      <option value="na">NA</option>
                     </select>
                   </div>
                   <div>
@@ -466,17 +467,18 @@ export default function BrandProductForm({
                       <option value="frozen">Frozen</option>
                       <option value="dry">Dry Storage</option>
                       <option value="cool">Cool / Dark</option>
+                      <option value="NA">NA</option>
                     </select>
                   </div>
                   <div>
                     <FieldLabel>Shelf life (days)</FieldLabel>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
                       value={form.shelfLifeDays}
                       onChange={(e) => setField('shelfLifeDays', e.target.value)}
                       className={productFormInputCls}
-                      placeholder="e.g. 180"
+                      placeholder="e.g. 180 or NA"
                     />
                   </div>
                   <div>
@@ -486,7 +488,7 @@ export default function BrandProductForm({
                       value={form.countryOfOrigin}
                       onChange={(e) => setField('countryOfOrigin', e.target.value)}
                       className={productFormInputCls}
-                      placeholder="e.g. India"
+                      placeholder="e.g. India or NA"
                     />
                   </div>
                   <div className="sm:col-span-2">

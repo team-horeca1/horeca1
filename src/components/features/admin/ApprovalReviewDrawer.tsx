@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { DEFAULT_GST_SLABS } from '@/lib/constants/gstSlabs';
 import { validateProductEssentials, focusFirstProductFormError } from '@/components/features/shared/productFormValidation';
+import { shelfLifeDisplay, vegDisplay } from '@/lib/productNa';
 import {
     ApprovalProductEditForm,
     EMPTY_APPROVAL_PRODUCT_FORM,
@@ -1176,9 +1177,9 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                 </ReviewSection>
 
                                 <ReviewSection title="Specs">
-                                    <DetailRow label="Veg / Non-Veg" value={vendorProduct.vegNonVeg} />
+                                    <DetailRow label="Veg / Non-Veg" value={vegDisplay(vendorProduct.vegNonVeg)} />
                                     <DetailRow label="Storage" value={vendorProduct.storageType} />
-                                    <DetailRow label="Shelf Life (days)" value={vendorProduct.shelfLifeDays != null ? String(vendorProduct.shelfLifeDays) : ''} />
+                                    <DetailRow label="Shelf Life (days)" value={vendorProduct.shelfLifeDays != null ? shelfLifeDisplay(vendorProduct.shelfLifeDays) : 'NA'} />
                                     <DetailRow label="Pack Size" value={vendorProduct.packSize} />
                                     <DetailRow label="Unit" value={vendorProduct.unit} />
                                 </ReviewSection>

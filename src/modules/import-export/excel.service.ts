@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
+import { isNaInput, normalizeNaText, NA_TEXT } from '@/lib/productNa';
 
 // Product import supports two header families:
 //   • Legacy 6to9 sheet (Product Name, Category, Taxable Rate, Bulk Rates …)
@@ -56,6 +57,7 @@ function stringifyIdValue(val: unknown): string | undefined {
 
 export function normalizeVegNonVeg(raw: unknown): string | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined;
+  if (isNaInput(raw)) return 'na';
   const s = String(raw).trim().toLowerCase();
   if (s === 'veg' || s === 'vegetarian') return 'veg';
   if (s === 'nonveg' || s === 'non-veg' || s === 'non veg') return 'nonveg';
@@ -172,6 +174,10 @@ function cleanRow(raw: Record<string, any>): Record<string, unknown> {
       v = stringifyIdValue(v);
     } else if (k === 'Veg / Non-Veg') {
       v = normalizeVegNonVeg(v) ?? (typeof v === 'string' ? v.trim() : v);
+    } else if ((k === 'Shelf Life (days)' || k === 'Shelf Life') && isNaInput(v)) {
+      v = 0;
+    } else if ((k === 'Country of Origin' || k === 'Storage type') && typeof v === 'string' && v.trim()) {
+      v = normalizeNaText(v);
     } else if (numericKeys.includes(k) && typeof v === 'string') {
       const stripped = v.replace(/[₹$,%]/g, '').trim();
       if (stripped === '') {
@@ -597,7 +603,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
       aliasName: r['Alias Name'],
       upc: r['UPC'],
       vegNonVeg: normalizeVegNonVeg(r['Veg / Non-Veg']),
-      storageType: r['Storage type'],
+      storageType: r['Storage type'] ? normalizeNaText(r['Storage type']) : undefined,
       moq: r['MOQ'],
       packSize: r['Pack Size']?.trim() || undefined,
       description: r['Description'] || r['Item Description'] || undefined,
@@ -621,8 +627,14 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
         if (!v) return undefined;
         return v === 'active' || v === 'yes' || v === 'true';
       })(),
-      shelfLifeDays: r['Shelf Life (days)'] ?? r['Shelf Life'] ?? undefined,
-      countryOfOrigin: r['Country of Origin'] || undefined,
+      shelfLifeDays: (() => {
+        const raw = r['Shelf Life (days)'] ?? r['Shelf Life'];
+        if (raw === undefined || raw === null) return undefined;
+        if (isNaInput(raw)) return 0;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : undefined;
+      })(),
+      countryOfOrigin: r['Country of Origin'] ? normalizeNaText(r['Country of Origin']) : undefined,
       tags: r['Tags'] ? String(r['Tags']).split(/[,;]/).map((t) => t.trim()).filter(Boolean) : undefined,
       fssaiRef: (r['FSSAI Reference'] || r['FSSAI Ref'] || r['FSSAI'] || '').trim() || undefined,
       bulkSlabs,
@@ -825,12 +837,12 @@ const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'Bulk Qty 3 - Taxable Rate / Pc': 'Optional slab 3 taxable rate',
   'MOQ': 'Minimum order quantity',
   'Stock On Hand': 'Available stock qty',
-  'Veg / Non-Veg': 'veg, nonveg, or egg',
-  'Storage type': 'Ambient / Chilled / Frozen',
+  'Veg / Non-Veg': 'veg, nonveg, egg, or NA',
+  'Storage type': 'Ambient / Chilled / Frozen or NA',
   'Pack Size': 'e.g. 1 Kg, 500 ml',
   'MRP': 'MRP / strikethrough price (optional)',
-  'Shelf Life (days)': 'Integer days',
-  'Country of Origin': 'e.g. India',
+  'Shelf Life (days)': 'Integer days, or NA',
+  'Country of Origin': 'e.g. India, or NA',
   'FSSAI Reference': 'FSSAI license / product ref',
   'Tags': 'Comma-separated',
   'Credit Eligible': 'Yes / No',
@@ -889,11 +901,11 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Image Name': p.imageName || '',
     'Alias Name': p.aliasName || '',
     'UPC': p.barcode || '',
-    'Veg / Non-Veg': p.vegNonVeg || '',
-    'Storage type': p.storageType || '',
+    'Veg / Non-Veg': p.vegNonVeg || NA_TEXT,
+    'Storage type': p.storageType ? normalizeNaText(p.storageType) : NA_TEXT,
     'Pack Size': p.packSize || '',
-    'Shelf Life (days)': p.shelfLifeDays ?? '',
-    'Country of Origin': p.countryOfOrigin || '',
+    'Shelf Life (days)': p.shelfLifeDays == null ? NA_TEXT : p.shelfLifeDays === 0 ? NA_TEXT : p.shelfLifeDays,
+    'Country of Origin': p.countryOfOrigin ? normalizeNaText(p.countryOfOrigin) : NA_TEXT,
     'FSSAI Reference': p.fssaiRef || '',
     'Tags': p.tags?.length ? p.tags.join(', ') : '',
     'Credit Eligible': p.creditEligible == null ? '' : p.creditEligible ? 'Yes' : 'No',

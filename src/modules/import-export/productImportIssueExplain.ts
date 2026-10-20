@@ -121,7 +121,7 @@ const RULES: Rule[] = [
       severity: 'error',
       title: 'Invalid attribute',
       reason: m,
-      solution: 'Veg / Non-Veg must be veg, nonveg, or egg. Storage type examples: Ambient, Chilled, Frozen.',
+      solution: 'Veg / Non-Veg must be veg, nonveg, egg, or NA. Storage type examples: Ambient, Chilled, Frozen, or NA. Shelf Life and Country of Origin also accept NA.',
     }),
   },
   {
