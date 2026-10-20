@@ -156,29 +156,54 @@ export function PricingWorkspace() {
     e.target.value = '';
     if (!file || !importListId) return;
 
+    // Minimal RFC-4180 line parser: handles quoted fields containing commas
+    const parseCsvLine = (line: string): string[] => {
+      const out: string[] = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (ch === '"') inQuotes = false;
+          else cur += ch;
+        } else if (ch === '"') inQuotes = true;
+        else if (ch === ',') { out.push(cur.trim()); cur = ''; }
+        else cur += ch;
+      }
+      out.push(cur.trim());
+      return out;
+    };
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = String(ev.target?.result ?? '');
-      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       if (lines.length < 2) {
         toast.error('CSV must include a header row plus at least one product row');
         return;
       }
-      const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
-      const skuIdx = headers.findIndex((h) => h.toLowerCase() === 'sku');
-      const priceIdx = headers.findIndex((h) => h.toLowerCase().includes('new price') || h.toLowerCase() === 'price');
-      if (skuIdx === -1 || priceIdx === -1) {
-        toast.error('Your CSV needs "SKU" and "New Price" columns — download the template to see the exact format');
+      const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+      const skuIdx = headers.findIndex((h) => h === 'sku');
+      const productIdx = headers.findIndex((h) => h === 'product' || h === 'product name');
+      const priceIdx = headers.findIndex((h) => h.includes('new price') || h === 'price');
+      if ((skuIdx === -1 && productIdx === -1) || priceIdx === -1) {
+        toast.error('Your CSV needs a "SKU" (or "Product") column and a "New Price" column — download the template to see the exact format');
         return;
       }
       const entries: Array<{ productId: string; price: number }> = [];
       let unmatched = 0;
       for (let i = 1; i < lines.length; i++) {
-        const parts = lines[i].split(',').map((p) => p.trim().replace(/^"|"$/g, ''));
-        const sku = parts[skuIdx];
-        const price = parseFloat(parts[priceIdx]);
-        if (!sku || Number.isNaN(price)) { unmatched++; continue; }
-        const row = rows.find((r) => r.sku === sku);
+        const parts = parseCsvLine(lines[i]);
+        const sku = skuIdx >= 0 ? (parts[skuIdx] ?? '') : '';
+        const productName = productIdx >= 0 ? (parts[productIdx] ?? '') : '';
+        const price = parseFloat(parts[priceIdx] ?? '');
+        if (Number.isNaN(price) || (!sku && !productName)) { unmatched++; continue; }
+        // Match by SKU first (case-insensitive); products without a SKU
+        // (common for fresh/vendor SKUs) fall back to exact Product name.
+        const row =
+          (sku ? rows.find((r) => r.sku?.toLowerCase() === sku.toLowerCase()) : undefined) ??
+          (productName ? rows.find((r) => r.name.toLowerCase() === productName.toLowerCase()) : undefined);
         if (!row) { unmatched++; continue; }
         entries.push({ productId: row.id, price });
       }
@@ -424,7 +449,7 @@ export function PricingWorkspace() {
             {importPreview && (
               <div className="p-3 rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] text-[13px]">
                 <p className="font-semibold text-[#181725]">{importPreview.fileName}</p>
-                <p className="tabular-nums mt-1"><span className="text-green-700 font-bold">{importPreview.matched} prices ready</span>{importPreview.unmatched > 0 && <span className="text-amber-700"> · {importPreview.unmatched} rows skipped (SKU not found or price blank)</span>}</p>
+                <p className="tabular-nums mt-1"><span className="text-green-700 font-bold">{importPreview.matched} prices ready</span>{importPreview.unmatched > 0 && <span className="text-amber-700"> · {importPreview.unmatched} rows skipped (product not matched by SKU/Product name, or price blank)</span>}</p>
               </div>
             )}
             <div className="flex gap-2">

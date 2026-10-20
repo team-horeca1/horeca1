@@ -15,6 +15,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { normalizeCreditStatus } from '@/modules/pricing/pricing.service';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
@@ -58,13 +59,11 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const customers = new Map<string, { userId: string; label: string; creditStatus: string | null; pincodes: string[]; cities: string[]; tags: string[] }>();
     const accountIds = new Set<string>();
 
+    // Use the resolver's canonical normalisation so the panel, assignment
+    // matrix and price resolver all agree (e.g. ACTIVE+SANCTIONED -> "active",
+    // never a raw workflow label like "sanctioned").
     const creditMap = new Map(
-      creditAccounts.map((c) => [
-        c.userId,
-        c.status === 'BLACKLISTED' || c.status === 'BLOCKED'
-          ? c.status.toLowerCase()
-          : c.workflowStatus.toLowerCase(),
-      ]),
+      creditAccounts.map((c) => [c.userId, normalizeCreditStatus(c.status, c.workflowStatus)]),
     );
 
     for (const o of orderBuyers) {

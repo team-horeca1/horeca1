@@ -827,10 +827,6 @@ export function PriceGrid({
                     <option value="none">Exact (paise)</option><option value="1">Nearest ₹1</option><option value="5">Nearest ₹5</option><option value="10">Nearest ₹10</option>
                   </select>
                 </label>
-                <div className="flex gap-2" role="group" aria-label="Apply scope">
-                  <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>All products</button>
-                  <button type="button" disabled={!selectedProductIds || selectedProductIds.size === 0} onClick={() => setBulkScope('selected')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold disabled:opacity-40', bulkScope === 'selected' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>Only ticked rows ({selectedProductIds?.size ?? 0})</button>
-                </div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -838,6 +834,14 @@ export function PriceGrid({
                 <input aria-label="Formula" value={formulaText} onChange={(e) => setFormulaText(e.target.value)} className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-mono text-[13px]" />
               </div>
             )}
+            <div>
+              <p className="text-[12px] font-semibold text-[#181725] mb-1.5">Apply to</p>
+              <div className="flex gap-2" role="group" aria-label="Apply scope">
+                <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>All products</button>
+                <button type="button" disabled={!selectedProductIds || selectedProductIds.size === 0} onClick={() => setBulkScope('selected')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold disabled:opacity-40', bulkScope === 'selected' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>Only ticked rows ({selectedProductIds?.size ?? 0})</button>
+              </div>
+              {bulkScope === 'selected' && <p className="text-[11px] text-amber-700 mt-1.5">Only the ticked product rows will change — untick them on the grid for all products.</p>}
+            </div>
             {bulkPreviewRows.length > 0 && (
               <div className="rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] p-3">
                 <p className="text-[11px] font-bold text-[#181725] mb-1.5">Preview (first {bulkPreviewRows.length})</p>
