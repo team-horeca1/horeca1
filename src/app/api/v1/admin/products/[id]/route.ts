@@ -51,7 +51,7 @@ const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
   fssaiRef: z.string().max(50).optional(),
   aliasNames: z.array(z.string()).optional(),
-  vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).optional(),
+  vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).nullable().optional(),
   storageType: z.string().max(50).optional(),
   shelfLifeDays: z.number().int().min(0).optional(),
   countryOfOrigin: z.string().max(100).optional(),

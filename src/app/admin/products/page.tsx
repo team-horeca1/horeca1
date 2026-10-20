@@ -53,6 +53,7 @@ import {
     focusFirstProductFormError,
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
+import { shelfLifeToForm, shelfLifeFromForm, vegToForm, vegFromForm, normalizeNaText } from '@/lib/productNa';
 import {
     AdminRegistryFilterBar,
     registryFilterPillClass,
@@ -186,7 +187,7 @@ interface ProductFormData {
     images: string[]; // additional images, NOT including imageUrl
     fssaiRef: string;
     aliasNames: string[];
-    vegNonVeg: '' | 'veg' | 'nonveg' | 'egg';
+    vegNonVeg: '' | 'veg' | 'nonveg' | 'egg' | 'na';
     storageType: string;
     shelfLifeDays: string;
     countryOfOrigin: string;
@@ -1284,7 +1285,7 @@ export default function ProductsPage() {
                 const aliasNames = Array.isArray(listing?.aliasNames)
                     ? listing.aliasNames
                     : (Array.isArray(p.aliasNames) ? p.aliasNames : []);
-                const veg = (listing?.vegNonVeg as '' | 'veg' | 'nonveg' | 'egg') || '';
+                const veg = vegToForm(listing?.vegNonVeg, { nullAsNa: true });
                 const seed: MasterCommerceSeed = {
                     hsn: listing?.hsn ?? '',
                     basePrice: listing?.basePrice != null ? String(listing.basePrice) : '',
@@ -1296,7 +1297,7 @@ export default function ProductsPage() {
                     description: listing?.description ?? '',
                     countryOfOrigin: listing?.countryOfOrigin ?? '',
                     storageType: listing?.storageType ?? '',
-                    shelfLifeDays: listing?.shelfLifeDays != null ? String(listing.shelfLifeDays) : '',
+                    shelfLifeDays: listing?.shelfLifeDays != null ? shelfLifeToForm(Number(listing.shelfLifeDays)) : '',
                     vegNonVeg: veg,
                     fssaiRef: listing?.fssaiRef ?? '',
                     unit,
@@ -1400,9 +1401,9 @@ export default function ProductsPage() {
                 images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
                 fssaiRef: p.fssaiRef || '',
                 aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
-                vegNonVeg: (p.vegNonVeg as '' | 'veg' | 'nonveg' | 'egg') || '',
+                vegNonVeg: vegToForm(p.vegNonVeg, { nullAsNa: true }),
                 storageType: p.storageType || '',
-                shelfLifeDays: p.shelfLifeDays != null ? String(p.shelfLifeDays) : '',
+                shelfLifeDays: p.shelfLifeDays != null ? shelfLifeToForm(Number(p.shelfLifeDays)) : '',
                 countryOfOrigin: p.countryOfOrigin || '',
                 substituteIds: Array.isArray(p.substituteIds) ? p.substituteIds : [],
                 isFeatured: !!p.isFeatured,
@@ -1598,12 +1599,11 @@ export default function ProductsPage() {
         if (additionalImages.length > 0) payload.images = additionalImages;
         if (formData.fssaiRef.trim()) payload.fssaiRef = formData.fssaiRef.trim();
         if (formData.aliasNames.length > 0) payload.aliasNames = formData.aliasNames;
-        if (formData.vegNonVeg) payload.vegNonVeg = formData.vegNonVeg;
-        if (formData.storageType) payload.storageType = formData.storageType;
-        if (formData.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(formData.shelfLifeDays))) {
-            payload.shelfLifeDays = parseInt(formData.shelfLifeDays, 10);
-        }
-        if (formData.countryOfOrigin.trim()) payload.countryOfOrigin = formData.countryOfOrigin.trim();
+        if (formData.vegNonVeg) payload.vegNonVeg = vegFromForm(formData.vegNonVeg);
+        if (formData.storageType) payload.storageType = normalizeNaText(formData.storageType);
+        const shelfFromForm = shelfLifeFromForm(formData.shelfLifeDays);
+        if (shelfFromForm !== undefined) payload.shelfLifeDays = shelfFromForm;
+        if (formData.countryOfOrigin.trim()) payload.countryOfOrigin = normalizeNaText(formData.countryOfOrigin);
         if (formData.substituteIds.length > 0) {
             payload.substituteIds = formData.substituteIds;
         } else if (editingProduct) {
@@ -1795,15 +1795,15 @@ export default function ProductsPage() {
                     if (dirty('barcode', formData.barcode)) masterPayload.barcode = formData.barcode.trim() || null;
                     if (dirty('description', formData.description)) masterPayload.description = formData.description.trim() || null;
                     if (dirty('countryOfOrigin', formData.countryOfOrigin)) {
-                        masterPayload.countryOfOrigin = formData.countryOfOrigin.trim() || null;
+                        masterPayload.countryOfOrigin = formData.countryOfOrigin.trim() ? normalizeNaText(formData.countryOfOrigin) : null;
                     }
                     if (dirty('storageType', formData.storageType)) {
-                        masterPayload.storageType = formData.storageType.trim() || null;
+                        masterPayload.storageType = formData.storageType.trim() ? normalizeNaText(formData.storageType) : null;
                     }
                     if (dirty('shelfLifeDays', formData.shelfLifeDays)) {
-                        masterPayload.shelfLifeDays = formData.shelfLifeDays === '' ? null : Number(formData.shelfLifeDays);
+                        masterPayload.shelfLifeDays = formData.shelfLifeDays === '' ? null : (shelfLifeFromForm(formData.shelfLifeDays) ?? null);
                     }
-                    if (dirty('vegNonVeg', formData.vegNonVeg)) masterPayload.vegNonVeg = formData.vegNonVeg || null;
+                    if (dirty('vegNonVeg', formData.vegNonVeg)) masterPayload.vegNonVeg = vegFromForm(formData.vegNonVeg) ?? null;
                     if (dirty('fssaiRef', formData.fssaiRef)) masterPayload.fssaiRef = formData.fssaiRef.trim() || null;
                     if (dirty('unit', formData.unit)) masterPayload.unit = formData.unit;
                     if (dirty('isFeatured', formData.isFeatured)) masterPayload.isFeatured = formData.isFeatured;
@@ -2932,7 +2932,7 @@ export default function ProductsPage() {
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                         <div id="ff-countryOfOrigin">
                                             <FieldLabel required>Country of Origin</FieldLabel>
-                                            <input type="text" value={formData.countryOfOrigin} onChange={e => updateField('countryOfOrigin', e.target.value)} placeholder="e.g. India" className={cn(inputCls, formErrors.countryOfOrigin && 'border-[#E74C3C]')} />
+                                            <input type="text" value={formData.countryOfOrigin} onChange={e => updateField('countryOfOrigin', e.target.value)} placeholder="e.g. India or NA" className={cn(inputCls, formErrors.countryOfOrigin && 'border-[#E74C3C]')} />
                                             {formErrors.countryOfOrigin && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.countryOfOrigin}</p>}
                                         </div>
                                         <div id="ff-vegNonVeg">
@@ -2942,6 +2942,7 @@ export default function ProductsPage() {
                                                 <option value="veg">Veg</option>
                                                 <option value="nonveg">Non-Veg</option>
                                                 <option value="egg">Egg</option>
+                                                <option value="na">NA</option>
                                             </select>
                                             {formErrors.vegNonVeg && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.vegNonVeg}</p>}
                                         </div>
@@ -2954,12 +2955,13 @@ export default function ProductsPage() {
                                                 <option value="frozen">Frozen</option>
                                                 <option value="dry">Dry Storage</option>
                                                 <option value="cool">Cool / Dark</option>
+                                                <option value="NA">NA</option>
                                             </select>
                                             {formErrors.storageType && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.storageType}</p>}
                                         </div>
                                         <div id="ff-shelfLifeDays">
                                             <FieldLabel required>Shelf Life (days)</FieldLabel>
-                                            <input type="number" min="0" value={formData.shelfLifeDays} onChange={e => updateField('shelfLifeDays', e.target.value)} placeholder="e.g. 365" className={cn(inputCls, formErrors.shelfLifeDays && 'border-[#E74C3C]')} />
+                                            <input type="text" inputMode="numeric" value={formData.shelfLifeDays} onChange={e => updateField('shelfLifeDays', e.target.value)} placeholder="e.g. 365 or NA" className={cn(inputCls, formErrors.shelfLifeDays && 'border-[#E74C3C]')} />
                                             {formErrors.shelfLifeDays && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.shelfLifeDays}</p>}
                                         </div>
                                         <div id="ff-minOrderQty">

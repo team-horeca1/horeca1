@@ -1,4 +1,5 @@
 import { validateMasterSku } from '@/lib/sku';
+import { isNaInput } from '@/lib/productNa';
 
 /** Fields validated in essentials — order matches scroll-to-error on the form. */
 export const PRODUCT_REQUIRED_FIELD_ORDER = [
@@ -106,8 +107,12 @@ export function validateProductEssentials(
   req(errors, 'vegNonVeg', form.vegNonVeg, 'Veg / non-veg is required');
   req(errors, 'storageType', form.storageType, 'Storage type is required');
 
-  if (!form.shelfLifeDays?.trim() || Number.isNaN(Number(form.shelfLifeDays)) || Number(form.shelfLifeDays) < 0) {
-    errors.shelfLifeDays = 'Shelf life (days) is required';
+  if (
+    !form.shelfLifeDays?.trim() ||
+    (!isNaInput(form.shelfLifeDays) &&
+      (Number.isNaN(Number(form.shelfLifeDays)) || Number(form.shelfLifeDays) < 0))
+  ) {
+    errors.shelfLifeDays = 'Shelf life (days) is required (enter a number or NA)';
   }
 
   if (!form.minOrderQty?.trim() || Number.isNaN(Number(form.minOrderQty)) || Number(form.minOrderQty) < 1) {

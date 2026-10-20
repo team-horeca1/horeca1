@@ -1529,7 +1529,7 @@ export class CatalogService {
     aliasNames?: string[];
     shelfLifeDays?: number;
     countryOfOrigin?: string;
-    vegNonVeg?: 'veg' | 'nonveg' | 'egg';
+    vegNonVeg?: 'veg' | 'nonveg' | 'egg' | null;
     storageType?: string;
     basePrice: number;
     originalPrice?: number;

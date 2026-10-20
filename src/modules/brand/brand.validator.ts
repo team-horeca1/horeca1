@@ -33,7 +33,7 @@ export const createBrandProductSchema = z.object({
   hsn: z.string().max(50).optional(),
   barcode: z.string().max(100).optional(),
   ean: z.string().max(50).optional(),
-  vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).optional(),
+  vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).nullable().optional(),
   storageType: z.string().max(50).optional(),
   shelfLifeDays: z.number().int().min(0).max(3650).optional(),
   countryOfOrigin: z.string().max(100).optional(),

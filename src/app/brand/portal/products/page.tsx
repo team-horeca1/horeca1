@@ -10,6 +10,7 @@ import { validatePackUnitFields } from '@/lib/packSizeValidation';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 import BrandProductImportModal from '@/components/features/brand/BrandProductImportModal';
+import { shelfLifeToForm, shelfLifeFromForm, vegToForm, vegFromForm, normalizeNaText } from '@/lib/productNa';
 import BrandProductForm, {
     EMPTY_BRAND_PRODUCT_FORM,
     type BrandProductFormData,
@@ -73,9 +74,9 @@ function productToForm(p: MasterProduct): BrandProductFormData {
         hsn: p.hsn ?? '',
         barcode: p.barcode ?? '',
         ean: p.ean ?? '',
-        vegNonVeg: (p.vegNonVeg || '') as BrandVegNonVeg,
+        vegNonVeg: vegToForm(p.vegNonVeg, { nullAsNa: true }) as BrandVegNonVeg,
         storageType: p.storageType ?? '',
-        shelfLifeDays: p.shelfLifeDays != null ? String(p.shelfLifeDays) : '',
+        shelfLifeDays: shelfLifeToForm(p.shelfLifeDays ?? null),
         countryOfOrigin: p.countryOfOrigin ?? '',
         fssaiRef: p.fssaiRef ?? '',
         netWeight: p.netWeight != null ? String(p.netWeight) : '',
@@ -98,12 +99,11 @@ function detailFieldsPayload(form: BrandProductFormData): Record<string, unknown
     if (form.hsn.trim()) payload.hsn = form.hsn.trim();
     if (form.barcode.trim()) payload.barcode = form.barcode.trim();
     if (form.ean.trim()) payload.ean = form.ean.trim();
-    if (form.vegNonVeg) payload.vegNonVeg = form.vegNonVeg;
-    if (form.storageType.trim()) payload.storageType = form.storageType.trim();
-    if (form.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(form.shelfLifeDays))) {
-        payload.shelfLifeDays = parseInt(form.shelfLifeDays, 10);
-    }
-    if (form.countryOfOrigin.trim()) payload.countryOfOrigin = form.countryOfOrigin.trim();
+    if (form.vegNonVeg) payload.vegNonVeg = vegFromForm(form.vegNonVeg);
+    if (form.storageType.trim()) payload.storageType = normalizeNaText(form.storageType);
+    const shelfFromForm = shelfLifeFromForm(form.shelfLifeDays);
+    if (shelfFromForm !== undefined) payload.shelfLifeDays = shelfFromForm;
+    if (form.countryOfOrigin.trim()) payload.countryOfOrigin = normalizeNaText(form.countryOfOrigin);
     if (form.fssaiRef.trim()) payload.fssaiRef = form.fssaiRef.trim();
     if (form.netWeight.trim() !== '' && !Number.isNaN(Number(form.netWeight))) {
         payload.netWeight = Number(form.netWeight);

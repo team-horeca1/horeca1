@@ -34,6 +34,7 @@ import {
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
 import { brandOverrideDeviations } from '@/lib/brandOverrideFields';
+import { shelfLifeToForm, shelfLifeFromForm, vegToForm, vegFromForm, normalizeNaText } from '@/lib/productNa';
 import { DEFAULT_GST_SLABS, gstSlabSelectOptions } from '@/lib/constants/gstSlabs';
 import {
     ProductCreatePreviewPanel,
@@ -167,7 +168,7 @@ interface ProductForm {
     images: string[];
     tags: string[];
     aliasNames: string[];
-    vegNonVeg: '' | 'veg' | 'nonveg' | 'egg';
+    vegNonVeg: '' | 'veg' | 'nonveg' | 'egg' | 'na';
     storageType: string;
     shelfLifeDays: string;
     countryOfOrigin: string;
@@ -374,14 +375,10 @@ function applyBrandMasterOverride(
     const masterFssaiRef = brandScalarToFormString(bmp.fssaiRef);
     const masterStorageType = brandScalarToFormString(bmp.storageType);
     const masterCountryOfOrigin = brandScalarToFormString(bmp.countryOfOrigin);
-    const masterShelfLifeDays =
-        bmp.shelfLifeDays != null && Number.isFinite(Number(bmp.shelfLifeDays))
-            ? String(bmp.shelfLifeDays)
-            : '';
-    const masterVegNonVeg =
-        bmp.vegNonVeg === 'veg' || bmp.vegNonVeg === 'nonveg' || bmp.vegNonVeg === 'egg'
-            ? bmp.vegNonVeg
-            : '';
+    const masterShelfLifeDays = shelfLifeToForm(
+        bmp.shelfLifeDays != null && Number.isFinite(Number(bmp.shelfLifeDays)) ? Number(bmp.shelfLifeDays) : null,
+    );
+    const masterVegNonVeg = vegToForm(bmp.vegNonVeg);
     const masterTags = brandStringList(bmp.tags);
     const masterAliasNames = brandStringList(bmp.aliasNames);
     const masterPackageWeight = brandScalarToFormString(bmp.packageWeight);
@@ -446,8 +443,8 @@ function sameImageList(a: string[], b: string[]): boolean {
 function logisticsFieldsFromListProduct(product: VendorProduct) {
     return {
         countryOfOrigin: product.countryOfOrigin ?? '',
-        shelfLifeDays: product.shelfLifeDays != null ? String(product.shelfLifeDays) : '',
-        vegNonVeg: (product.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
+        shelfLifeDays: shelfLifeToForm(product.shelfLifeDays ?? null),
+        vegNonVeg: vegToForm(product.vegNonVeg, { nullAsNa: true }) as '' | 'veg' | 'nonveg' | 'egg' | 'na',
         storageType: product.storageType || '',
         minOrderQty: product.minOrderQty != null ? String(product.minOrderQty) : '1',
         vendorSku: product.vendorSku?.trim() ?? '',
@@ -1234,10 +1231,7 @@ export default function VendorProductsPage() {
                     : bmp.categoryRel?.id
                         ? [bmp.categoryRel.id]
                         : [];
-        const vegNonVeg =
-            bmp.vegNonVeg === 'veg' || bmp.vegNonVeg === 'nonveg' || bmp.vegNonVeg === 'egg'
-                ? bmp.vegNonVeg
-                : '';
+        const vegNonVeg = vegToForm(bmp.vegNonVeg);
 
         setForm(prev => ({
             ...prev,
@@ -1260,7 +1254,7 @@ export default function VendorProductsPage() {
             storageType: brandScalarToFormString(bmp.storageType) || prev.storageType,
             shelfLifeDays:
                 bmp.shelfLifeDays != null && Number.isFinite(Number(bmp.shelfLifeDays))
-                    ? String(bmp.shelfLifeDays)
+                    ? shelfLifeToForm(Number(bmp.shelfLifeDays))
                     : prev.shelfLifeDays,
             countryOfOrigin: brandScalarToFormString(bmp.countryOfOrigin) || prev.countryOfOrigin,
             tags: (() => {
@@ -1441,12 +1435,10 @@ export default function VendorProductsPage() {
             minOrderQty: form.minOrderQty ? parseInt(form.minOrderQty, 10) : 1,
             tags: form.tags.length > 0 ? form.tags : undefined,
             aliasNames: form.aliasNames.length > 0 ? form.aliasNames : undefined,
-            shelfLifeDays: form.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(form.shelfLifeDays))
-                ? parseInt(form.shelfLifeDays, 10)
-                : undefined,
-            countryOfOrigin: form.countryOfOrigin.trim() || undefined,
-            vegNonVeg: form.vegNonVeg || undefined,
-            storageType: form.storageType || undefined,
+            shelfLifeDays: shelfLifeFromForm(form.shelfLifeDays),
+            countryOfOrigin: form.countryOfOrigin.trim() ? normalizeNaText(form.countryOfOrigin) : undefined,
+            vegNonVeg: vegFromForm(form.vegNonVeg),
+            storageType: form.storageType ? normalizeNaText(form.storageType) : undefined,
             images: form.images.filter(Boolean).length > 0 ? form.images.filter(Boolean) : undefined,
             metadata,
         };
@@ -1916,11 +1908,11 @@ export default function VendorProductsPage() {
                     images: Array.isArray(p.images) ? p.images : [],
                     tags: Array.isArray(p.tags) ? p.tags : [],
                     aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
-                    vegNonVeg: (p.vegNonVeg || listLogistics.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
+                    vegNonVeg: (p.vegNonVeg ? vegToForm(p.vegNonVeg) : listLogistics.vegNonVeg) as '' | 'veg' | 'nonveg' | 'egg' | 'na',
                     storageType: p.storageType || listLogistics.storageType || '',
                     shelfLifeDays:
                         p.shelfLifeDays != null
-                            ? String(p.shelfLifeDays)
+                            ? shelfLifeToForm(Number(p.shelfLifeDays))
                             : listLogistics.shelfLifeDays,
                     countryOfOrigin: p.countryOfOrigin || listLogistics.countryOfOrigin || '',
                     taxPercent: p.taxPercent != null ? String(p.taxPercent) : '0',
@@ -3376,15 +3368,16 @@ export default function VendorProductsPage() {
                                             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                                 <div id="ff-countryOfOrigin">
                                                     <FieldLabel required>Country of Origin</FieldLabel>
-                                                    <input type="text" value={form.countryOfOrigin} onChange={e => updateField('countryOfOrigin', e.target.value)} className={cn(inputCls, fieldErrors.countryOfOrigin && 'border-[#E74C3C]')} />
+                                                    <input type="text" placeholder="e.g. India or NA" value={form.countryOfOrigin} onChange={e => updateField('countryOfOrigin', e.target.value)} className={cn(inputCls, fieldErrors.countryOfOrigin && 'border-[#E74C3C]')} />
                                                 </div>
                                                 <div id="ff-vegNonVeg">
                                                     <FieldLabel required>Veg / Non-Veg</FieldLabel>
-                                                    <select value={form.vegNonVeg} onChange={e => updateField('vegNonVeg', e.target.value as '' | 'veg' | 'nonveg' | 'egg')} className={cn(selectCls, fieldErrors.vegNonVeg && 'border-[#E74C3C]')}>
+                                                    <select value={form.vegNonVeg} onChange={e => updateField('vegNonVeg', e.target.value as '' | 'veg' | 'nonveg' | 'egg' | 'na')} className={cn(selectCls, fieldErrors.vegNonVeg && 'border-[#E74C3C]')}>
                                                         <option value="">Select…</option>
                                                         <option value="veg">Veg</option>
                                                         <option value="nonveg">Non-Veg</option>
                                                         <option value="egg">Egg</option>
+                                                        <option value="na">NA</option>
                                                     </select>
                                                 </div>
                                                 <div id="ff-storageType">
@@ -3396,11 +3389,12 @@ export default function VendorProductsPage() {
                                                         <option value="frozen">Frozen</option>
                                                         <option value="dry">Dry Storage</option>
                                                         <option value="cool">Cool / Dark</option>
+                                                        <option value="NA">NA</option>
                                                     </select>
                                                 </div>
                                                 <div id="ff-shelfLifeDays">
                                                     <FieldLabel required>Shelf Life (days)</FieldLabel>
-                                                    <input type="number" min="0" value={form.shelfLifeDays} onChange={e => updateField('shelfLifeDays', e.target.value)} className={cn(inputCls, fieldErrors.shelfLifeDays && 'border-[#E74C3C]')} />
+                                                    <input type="text" inputMode="numeric" placeholder="e.g. 365 or NA" value={form.shelfLifeDays} onChange={e => updateField('shelfLifeDays', e.target.value)} className={cn(inputCls, fieldErrors.shelfLifeDays && 'border-[#E74C3C]')} />
                                                 </div>
                                                 <div id="ff-minOrderQty">
                                                     <FieldLabel required>MOQ</FieldLabel>

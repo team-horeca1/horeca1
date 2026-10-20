@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { BrandMasterSubmitInput } from '@/modules/brand/brand.validator';
+import { isNaInput, normalizeNaText, NA_TEXT } from '@/lib/productNa';
 
 export interface BrandImportRow {
   row: number;
@@ -16,7 +17,7 @@ export interface BrandImportRow {
   hsn?: string;
   barcode?: string;
   ean?: string;
-  vegNonVeg?: 'veg' | 'nonveg' | 'egg';
+  vegNonVeg?: 'veg' | 'nonveg' | 'egg' | null;
   storageType?: string;
   shelfLifeDays?: number;
   countryOfOrigin?: string;
@@ -105,7 +106,8 @@ const STORAGE_ALIASES: Record<string, string> = {
   cooldark: 'cool',
 };
 
-function parseVegNonVeg(raw: unknown): 'veg' | 'nonveg' | 'egg' | undefined {
+function parseVegNonVeg(raw: unknown): 'veg' | 'nonveg' | 'egg' | null | undefined {
+  if (isNaInput(raw)) return null;
   const s = cellStr(raw)?.toLowerCase().replace(/[\s_-]+/g, '');
   if (!s) return undefined;
   if (s === 'veg' || s === 'vegetarian') return 'veg';
@@ -117,6 +119,7 @@ function parseVegNonVeg(raw: unknown): 'veg' | 'nonveg' | 'egg' | undefined {
 function parseStorageType(raw: unknown): string | undefined {
   const s = cellStr(raw);
   if (!s) return undefined;
+  if (isNaInput(s)) return NA_TEXT;
   const key = s.toLowerCase().replace(/[\s/_-]+/g, '');
   return STORAGE_ALIASES[key] ?? s;
 }
@@ -124,9 +127,10 @@ function parseStorageType(raw: unknown): string | undefined {
 function parseShelfLifeDays(raw: unknown): { value?: number; error?: string } {
   const s = cellStr(raw);
   if (!s) return {};
+  if (isNaInput(s)) return { value: 0 };
   const n = Number.parseInt(s, 10);
   if (!Number.isFinite(n) || n < 0 || n > 3650) {
-    return { error: 'Shelf Life Days must be a whole number from 0 to 3650' };
+    return { error: 'Shelf Life Days must be a whole number from 0 to 3650, or NA' };
   }
   return { value: n };
 }
@@ -219,7 +223,10 @@ export function parseBrandCatalogImport(buffer: Buffer): {
       vegNonVeg: parseVegNonVeg(pickCell(r, 'Veg / Non-Veg', 'Veg/Non-Veg')),
       storageType: parseStorageType(pickCell(r, 'Storage type', 'Storage Type')),
       shelfLifeDays: shelfLife.value,
-      countryOfOrigin: cellStr(pickCell(r, 'Country of Origin')),
+      countryOfOrigin: (() => {
+        const v = cellStr(pickCell(r, 'Country of Origin'));
+        return v ? normalizeNaText(v) : undefined;
+      })(),
       fssaiRef: cellStr(pickCell(r, 'FSSAI', 'FSSAI Ref', 'FSSAI Reference')),
       description: cellStr(pickCell(r, 'Description', 'Item Description')),
       tags: cellList(pickCell(r, 'Tags')),
@@ -251,7 +258,7 @@ export function brandImportProductFields(row: BrandImportRow): {
   hsn?: string;
   barcode?: string;
   ean?: string;
-  vegNonVeg?: 'veg' | 'nonveg' | 'egg';
+  vegNonVeg?: 'veg' | 'nonveg' | 'egg' | null;
   storageType?: string;
   shelfLifeDays?: number;
   countryOfOrigin?: string;
@@ -343,10 +350,10 @@ export function generateBrandCatalogTemplate(): Buffer {
     'Sub-Category': 'Choose One',
     'Pack Size': 'e.g. 1 ltr',
     'Unit Name': 'e.g. Bottle',
-    'Veg / Non-Veg': 'veg, nonveg, or egg',
-    'Storage type': 'ambient, refrigerated, frozen, dry, or cool',
-    'Shelf Life Days': 'e.g. 365',
-    'Country of Origin': 'India',
+    'Veg / Non-Veg': 'veg, nonveg, egg, or NA',
+    'Storage type': 'ambient, refrigerated, frozen, dry, cool, or NA',
+    'Shelf Life Days': 'e.g. 365, or NA',
+    'Country of Origin': 'India, or NA',
     FSSAI: 'Optional',
     Description: 'Optional product description',
     Tags: 'Comma-separated',
@@ -445,10 +452,10 @@ export function exportBrandCatalogToXlsx(products: BrandExportRow[]): Buffer {
     p.subCategory,
     p.packSize ?? '',
     p.unit ?? '',
-    p.vegNonVeg ?? '',
-    p.storageType ?? '',
-    p.shelfLifeDays ?? '',
-    p.countryOfOrigin ?? '',
+    p.vegNonVeg ?? NA_TEXT,
+    p.storageType ? normalizeNaText(p.storageType) : NA_TEXT,
+    p.shelfLifeDays == null ? NA_TEXT : p.shelfLifeDays === 0 ? NA_TEXT : p.shelfLifeDays,
+    p.countryOfOrigin ? normalizeNaText(p.countryOfOrigin) : NA_TEXT,
     p.fssaiRef ?? '',
     p.description ?? '',
     p.tags?.length ? p.tags.join(', ') : '',

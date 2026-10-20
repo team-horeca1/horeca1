@@ -299,7 +299,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
       { key: 'imageUrl', label: 'Image URL', width: 'w-[200px]', type: 'text' },
       { key: 'aliasName', label: 'Alias Name', width: 'w-[150px]', type: 'text' },
       { key: 'upc', label: 'UPC', width: 'w-[120px]', type: 'text' },
-      { key: 'vegNonVeg', label: 'Veg / Non-Veg', width: 'w-[120px]', type: 'select', options: ['', 'veg', 'nonveg', 'egg'] },
+      { key: 'vegNonVeg', label: 'Veg / Non-Veg', width: 'w-[120px]', type: 'select', options: ['', 'veg', 'nonveg', 'egg', 'NA'] },
       { key: 'storageType', label: 'Storage type', width: 'w-[120px]', type: 'text' },
       { key: 'moq', label: 'MOQ', width: 'w-[90px]', type: 'number' },
       { key: 'account', label: 'Account', width: 'w-[140px]', type: 'text' },
@@ -369,7 +369,10 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
       if (edited !== undefined) return edited.join(', ');
       return item.additionalSubCategories?.join(', ') ?? '';
     }
-    if (field === 'vegNonVeg') return item.vegNonVeg ?? '';
+    if (field === 'vegNonVeg') {
+      const v = item.vegNonVeg ?? '';
+      return v === 'na' || v.toLowerCase() === 'n/a' || v.toLowerCase() === 'not applicable' ? 'NA' : v;
+    }
     if (field === 'storageType') return item.storageType ?? '';
     if (field === 'moq') return item.moq ?? 1;
     if (field === 'aliasName') return item.aliasName ?? '';

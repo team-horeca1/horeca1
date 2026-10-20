@@ -1,5 +1,6 @@
 import { resolveImportImageUrl } from '@/modules/import-export/excel.service';
 import type { ParsedProductRow } from '@/modules/import-export/excel.service';
+import { isNaInput } from '@/lib/productNa';
 
 /** Reject parent-only category assignments (Zoho requires a leaf sub-category). */
 export function validateImportCategoryColumns(row: {
@@ -60,5 +61,7 @@ export function mergeMetadata(base: unknown, incoming: Record<string, any>): Rec
 export function normalizedVegForDb(veg?: string | null): 'veg' | 'nonveg' | 'egg' | null | undefined {
   if (!veg) return undefined;
   if (veg === 'veg' || veg === 'nonveg' || veg === 'egg') return veg;
+  // "NA" (any spelling) is stored as null so an update row clears the old value.
+  if (isNaInput(veg)) return null;
   return undefined;
 }
