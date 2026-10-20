@@ -18,15 +18,10 @@ ALTER TABLE "price_list_assignments"
 CREATE INDEX IF NOT EXISTS "price_list_assignments_credit_status_idx"
   ON "price_list_assignments"("credit_status");
 
--- Backfill: segment values like "credit:active" → credit_status
-UPDATE "price_list_assignments"
-SET
-  "type" = 'credit_status'::"price_list_assignment_type",
-  "credit_status" = lower(substring("segment" from 8)),
-  "segment" = NULL
-WHERE "type" = 'segment'
-  AND "segment" IS NOT NULL
-  AND "segment" ILIKE 'credit:%';
+-- NOTE: backfill using 'credit_status' lives in the next migration
+-- (20261019140100). Postgres forbids using a newly added enum value
+-- in the same transaction that adds it, and Prisma wraps each
+-- migration in a transaction — so ADD VALUE must commit first.
 
 -- Publish kind enum + append-only publish table
 DO $$ BEGIN
@@ -36,7 +31,7 @@ EXCEPTION
 END $$;
 
 CREATE TABLE IF NOT EXISTS "price_list_publishes" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "id" UUID NOT NULL,
     "vendor_id" UUID NOT NULL,
     "actor_id" UUID,
     "kind" "price_list_publish_kind" NOT NULL DEFAULT 'publish',

@@ -9,6 +9,7 @@
 // parses an XLSX/CSV client-side and submits to the new endpoint.
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Save, Loader2, Search, Plus, Trash2, Tag, Users, Package,
@@ -64,6 +65,7 @@ interface ApiAssignment {
   pincode: string | null;
   area: string | null;
   segment: string | null;
+  creditStatus?: string | null;
   brandName: string | null;
   user: { id: string; fullName: string; email: string | null } | null;
   businessAccount: { id: string; legalName: string; displayName: string | null } | null;
@@ -96,6 +98,7 @@ interface AssignmentDraft {
   pincode?: string;
   area?: string;
   segment?: string;
+  creditStatus?: string;
   /** Free-text label rendered in the chip; computed locally when we add. */
   label: string;
 }
@@ -467,7 +470,7 @@ export default function PriceListDetailPage() {
             <h1 className="text-[22px] font-bold text-[#181725]">{name || priceList.name}</h1>
             <p className="text-[12px] text-[#7C7C7C]">
               Advanced settings — discount / scheme types, outlet &amp; brand targets. Day-to-day prices live in{' '}
-              <a href="/vendor/price-lists" className="text-primary font-semibold hover:underline">Pricing</a>.
+              <Link href="/vendor/price-lists" className="text-primary font-semibold hover:underline">Pricing</Link>.
               All prices are ex-GST; GST is added at checkout.
             </p>
           </div>
@@ -1081,6 +1084,7 @@ const ASSIGN_STYLE: Record<AssignmentType, { bg: string; text: string }> = {
   segment:  { bg: 'bg-pink-50',    text: 'text-pink-700' },
   brand:    { bg: 'bg-indigo-50',  text: 'text-indigo-700' },
   group:    { bg: 'bg-teal-50',    text: 'text-teal-700' },
+  credit_status: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
 };
 
 function assignmentChipLabel(a: ApiAssignment): string {
@@ -1092,6 +1096,7 @@ function assignmentChipLabel(a: ApiAssignment): string {
     case 'segment':  return a.segment ?? '?';
     case 'brand':    return a.brand?.name ?? a.brandName ?? '?';
     case 'group':    return a.group?.name ?? a.groupId ?? '?';
+    case 'credit_status': return a.creditStatus ?? 'credit';
   }
 }
 
@@ -1124,6 +1129,7 @@ function buildAssignmentDraft(
       const g = opts.groupOpts.find((x) => x.id === v);
       return { type, groupId: v, label: g?.name ?? v };
     }
+    case 'credit_status': return { type, creditStatus: v.toLowerCase(), label: v };
   }
 }
 
