@@ -964,6 +964,18 @@ export default function VendorCustomersPage() {
                     ₹{c.totalSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </td>
                   <td className="px-6 py-3 text-left align-middle" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                    {c.mappingId && (
+                      <button
+                        type="button"
+                        aria-label="View price history"
+                        title="View price history"
+                        onClick={(e) => { e.stopPropagation(); setHistoryCustomer(c); }}
+                        className="min-h-9 min-w-9 px-2 rounded-[8px] border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] flex items-center justify-center"
+                      >
+                        <History size={14} />
+                      </button>
+                    )}
                     <AdminRegistryRowActions
                       detailsHref={`/vendor/customers/${c.userId}`}
                       onDetailsClick={(e) => e.stopPropagation()}
@@ -983,6 +995,7 @@ export default function VendorCustomersPage() {
                         });
                       } : undefined}
                     />
+                    </div>
                   </td>
                 </tr>
               );
