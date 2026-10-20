@@ -96,8 +96,8 @@ const updateSchema = z.object({
   originalPrice: z.number().nullable().optional(),
   minOrderQty: z.number().optional(),
   creditEligible: z.boolean().optional().transform(() => true),
-  vegNonVeg: z.string().optional(),
-  storageType: z.string().optional(),
+  vegNonVeg: z.string().nullable().optional(),
+  storageType: z.string().nullable().optional(),
   packSize: z.string().max(100).nullable().optional(),
   countryOfOrigin: z.string().max(100).nullable().optional(),
   shelfLifeDays: z.number().int().nullable().optional(),
@@ -223,7 +223,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       if (minOrderQty !== undefined) vendorUpdate.minOrderQty = minOrderQty;
       if (creditEligible !== undefined) vendorUpdate.creditEligible = true;
       if (vegNonVeg !== undefined) {
-        vendorUpdate.vegNonVeg = ['veg', 'nonveg', 'egg'].includes(vegNonVeg) ? (vegNonVeg as 'veg' | 'nonveg' | 'egg') : null;
+        vendorUpdate.vegNonVeg = vegNonVeg && ['veg', 'nonveg', 'egg'].includes(vegNonVeg) ? (vegNonVeg as 'veg' | 'nonveg' | 'egg') : null;
       }
       if (storageType !== undefined) vendorUpdate.storageType = storageType;
       if (countryOfOrigin !== undefined) vendorUpdate.countryOfOrigin = countryOfOrigin;

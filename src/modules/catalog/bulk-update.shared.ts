@@ -58,7 +58,7 @@ export const setSchemaBase = z.object({
   shelfLifeDays:   z.number().int().min(0).max(3650).nullable().optional(),
   description:     z.string().max(2000).nullable().optional(),
   brand:           z.string().max(150).optional(),
-  countryOfOrigin: z.string().max(100).optional(),
+  countryOfOrigin: z.string().max(100).nullable().optional(),
   name:            z.string().min(1).max(255).optional(),
   sku:             z.string().max(100).nullable().optional(),
   hsn:             z.string().max(50).nullable().optional(),
