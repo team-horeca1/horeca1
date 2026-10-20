@@ -10,6 +10,10 @@ import {
   Pencil,
   Copy,
   PowerOff,
+  EyeOff,
+  Eye,
+  Percent,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -18,7 +22,6 @@ import type { DraftCell, PriceListCol, ProductRow } from '../types';
 import {
   cellKey,
   effective,
-  fallbackPrice,
   inr,
   isDirty,
   isExcluded,
@@ -86,7 +89,30 @@ export function PriceGrid({
   const [colBusy, setColBusy] = useState<string | null>(null);
   const [formulaCol, setFormulaCol] = useState<string | null>(null);
   const [formulaText, setFormulaText] = useState('');
+  const [formulaMode, setFormulaMode] = useState<'simple' | 'advanced'>('simple');
+  const [bulkSource, setBulkSource] = useState<string>('BASE');
+  const [bulkOp, setBulkOp] = useState<'discountPct' | 'markupPct' | 'minusFlat' | 'plusFlat' | 'copy'>('discountPct');
+  const [bulkValue, setBulkValue] = useState('3');
+  const [bulkRounding, setBulkRounding] = useState<'none' | '1' | '5' | '10'>('none');
+  const [bulkScope, setBulkScope] = useState<'all' | 'selected'>('all');
+  const [floorEdit, setFloorEdit] = useState<{ id: string; value: string } | null>(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  // Close column menu on Escape / scroll / resize so it never sticks or clips
+  useEffect(() => {
+    if (!colMenu) return;
+    const close = () => setColMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [colMenu]);
 
   useEffect(() => {
     if (editing) setTimeout(() => editRef.current?.select(), 0);
@@ -172,12 +198,57 @@ export function PriceGrid({
     });
   };
 
+  const buildSimpleFormulaText = (): string | null => {
+    const v = bulkValue.trim();
+    const num = Number(v);
+    if (v === '' || !Number.isFinite(num) || num < 0) return null;
+    const src = bulkSource === 'BASE' ? 'BASE' : cols.find((c) => c.id === bulkSource)?.name ?? 'BASE';
+    const srcKey = src === 'BASE' ? 'BASE' : src.replace(/\s+/g, '');
+    if (bulkOp === 'copy') return `=${srcKey}*1`;
+    if (bulkOp === 'discountPct') return `=${srcKey}-${num}%`;
+    if (bulkOp === 'markupPct') return `=${srcKey}+${num}%`;
+    if (bulkOp === 'minusFlat') return `=${srcKey}-${num}`;
+    return `=${srcKey}+${num}`;
+  };
+
+  const applyRounding = (n: number): number => {
+    if (bulkRounding === 'none') return Math.round(n * 100) / 100;
+    const step = Number(bulkRounding);
+    return Math.round(n / step) * step;
+  };
+
+  const bulkPreviewRows = useMemo(() => {
+    if (!formulaCol) return [] as Array<{ name: string; from: number; to: number }>;
+    const targetCol = cols.find((c) => c.id === formulaCol);
+    if (!targetCol) return [];
+    const text = formulaMode === 'simple' ? buildSimpleFormulaText() : formulaText;
+    const parsed = text ? parseFormula(text) : null;
+    if (!parsed) return [];
+    const listByKey = new Map(cols.map((c) => [normalizeListKey(c.name), c]));
+    const scopeRows = bulkScope === 'selected' && selectedProductIds && selectedProductIds.size > 0
+      ? rows.filter((r) => selectedProductIds.has(r.id))
+      : rows;
+    return scopeRows.slice(0, 3).map((row) => {
+      let sourcePrice = row.basePrice;
+      if (parsed.source !== 'BASE') {
+        const srcCol = listByKey.get(parsed.source);
+        if (srcCol) sourcePrice = effective(row, srcCol, dirty);
+      }
+      let to = sourcePrice;
+      try { to = applyRounding(applyFormula(sourcePrice, parsed)); } catch { /* keep */ }
+      return { name: row.name, from: effective(row, targetCol, dirty), to };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formulaCol, formulaMode, bulkSource, bulkOp, bulkValue, bulkRounding, bulkScope, formulaText, cols, rows, dirty, selectedProductIds]);
+
   const applyFormulaToColumn = () => {
     const colId = formulaCol;
     if (!colId) return;
     const targetCol = cols.find((c) => c.id === colId);
     if (!targetCol) return;
-    const parsed = parseFormula(formulaText);
+    const text = formulaMode === 'simple' ? buildSimpleFormulaText() : formulaText;
+    if (!text) { toast.error('Enter a valid amount'); return; }
+    const parsed = parseFormula(text);
     if (!parsed) {
       toast.error('Invalid formula. Try =BASE-3%');
       return;
@@ -187,10 +258,10 @@ export function PriceGrid({
     let updated = 0;
     let skipped = 0;
 
-    const targetRows =
-      selectedProductIds && selectedProductIds.size > 0
-        ? rows.filter((r) => selectedProductIds.has(r.id))
-        : rows;
+    const useSelected = bulkScope === 'selected' && selectedProductIds && selectedProductIds.size > 0;
+    const targetRows = useSelected
+      ? rows.filter((r) => selectedProductIds.has(r.id))
+      : rows;
 
     for (const row of targetRows) {
       if (cellLocked(row, targetCol, dirty)) {
@@ -207,7 +278,7 @@ export function PriceGrid({
         sourcePrice = effective(row, srcCol, dirty);
       }
       try {
-        const out = applyFormula(sourcePrice, parsed);
+        const out = applyRounding(applyFormula(sourcePrice, parsed));
         if (out > 0) {
           mergeCellFields(row.id, targetCol.id, { price: out, isExcluded: false });
           updated++;
@@ -219,7 +290,25 @@ export function PriceGrid({
 
     setFormulaCol(null);
     setFormulaText('');
-    toast.success(`Formula applied to ${updated} cells${skipped ? ` (${skipped} skipped)` : ''}`);
+    toast.success(`Prices updated for ${updated} product${updated === 1 ? '' : 's'}${skipped ? ` (${skipped} locked, skipped)` : ''} — review & publish to go live`);
+  };
+
+  const saveFloor = async () => {
+    if (!floorEdit) return;
+    const val = floorEdit.value.trim() === '' ? null : Number(floorEdit.value);
+    if (val !== null && (!Number.isFinite(val) || val < 0 || val > 100)) { toast.error('Floor must be 0–100%'); return; }
+    setColBusy(floorEdit.id);
+    try {
+      const res = await fetch(`/api/v1/vendor/price-lists/${floorEdit.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ floorPercentOfBase: val }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed');
+      toast.success(val === null ? 'Price floor removed' : `Prices in this list will not go below ${val}% of Base`);
+      setFloorEdit(null);
+      onListsChanged?.();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); } finally { setColBusy(null); }
   };
 
   const renameList = async () => {
@@ -268,7 +357,7 @@ export function PriceGrid({
   };
 
   const deactivateList = async (id: string) => {
-    if (!confirm('Deactivate this price list? It will hide from the workspace.')) return;
+    setConfirmDeactivate(null);
     setColBusy(id);
     setColMenu(null);
     try {
@@ -348,45 +437,48 @@ export function PriceGrid({
 
   return (
     <div className="space-y-2">
-      {selectionCount > 1 && (
-        <div className="flex flex-wrap items-center gap-2 p-2 rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] text-[12px]">
-          <span className="font-semibold text-[#181725] tabular-nums">{selectionCount} cells</span>
-          <button
-            type="button"
-            className="h-8 px-3 rounded-lg border border-[#E9E3DD] bg-white font-medium"
-            onClick={() =>
-              applyToSelection((r, c) => {
-                if (!cellLocked(r, c, dirty)) setCellFields(r.id, c.id, null);
-              })
-            }
-          >
-            Use Base
+      {selectionCount >= 1 && active && rows[active.r] && cols[active.c] && (
+        <div className="sticky top-[132px] z-30 flex flex-wrap items-center gap-2 p-2.5 rounded-[12px] bg-white border border-primary/25 shadow-sm text-[12px]" role="toolbar" aria-label="Selected price actions">
+          <span className="font-bold text-[#181725] tabular-nums">
+            {selectionCount === 1
+              ? `${rows[active.r].name} · ${cols[active.c].name}: ${inr(effective(rows[active.r], cols[active.c], dirty))}`
+              : `${selectionCount} prices selected`}
+          </span>
+          <span className="text-[#7C7C7C] hidden md:inline">Choose what to do:</span>
+          {selectionCount === 1 && (
+            <button type="button" className="h-9 px-3 rounded-[10px] bg-primary text-white font-semibold flex items-center gap-1.5" onClick={() => startEdit(active.r, active.c)}>
+              <Pencil size={13} /> Edit price
+            </button>
+          )}
+          <button type="button" className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1" onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) { const p = effective(r, c, dirty); mergeCellFields(r.id, c.id, { price: Math.round(p * 0.95 * 100) / 100, isExcluded: false }); } })}>
+            <Percent size={13} /> −5%
+          </button>
+          <button type="button" className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1" onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) { const p = effective(r, c, dirty); mergeCellFields(r.id, c.id, { price: Math.round(p * 1.05 * 100) / 100, isExcluded: false }); } })}>
+            <Percent size={13} /> +5%
           </button>
           <button
             type="button"
-            className="h-8 px-3 rounded-lg border border-[#E9E3DD] bg-white font-medium"
-            onClick={() =>
-              applyToSelection((r, c) => {
-                if (!cellLocked(r, c, dirty)) {
-                  const ex = isExcluded(r, c, dirty);
-                  mergeCellFields(r.id, c.id, { isExcluded: !ex });
-                }
-              })
-            }
+            className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
+            onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) setCellFields(r.id, c.id, null); })}
           >
-            Remove / Put back
+            <RotateCcw size={13} /> Use Base price
           </button>
           <button
             type="button"
-            className="h-8 px-3 rounded-lg border border-[#E9E3DD] bg-white font-medium"
-            onClick={() =>
-              applyToSelection((r, c) => {
-                const locked = cellLocked(r, c, dirty);
-                mergeCellFields(r.id, c.id, { isLocked: !locked });
-              })
-            }
+            className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
+            onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) mergeCellFields(r.id, c.id, { isExcluded: !isExcluded(r, c, dirty) }); })}
           >
-            Lock toggle
+            <EyeOff size={13} /> Hide / Restore product
+          </button>
+          <button
+            type="button"
+            className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
+            onClick={() => applyToSelection((r, c) => mergeCellFields(r.id, c.id, { isLocked: !cellLocked(r, c, dirty) }))}
+          >
+            <Lock size={13} /> Lock / Unlock
+          </button>
+          <button type="button" className="h-9 px-2 text-[#7C7C7C] font-medium ml-auto" onClick={() => { setActive(null); setAnchor(null); }}>
+            Clear
           </button>
         </div>
       )}
@@ -415,15 +507,21 @@ export function PriceGrid({
                         {col.name}
                       </div>
                       <div className="text-[10px] text-[#7C7C7C] tabular-nums">
-                        {col.counts?.priced ?? 0} priced · {col.counts?.excluded ?? 0} removed
+                        {col.counts?.priced ?? 0} custom · {col.counts?.excluded ?? 0} hidden
                       </div>
                     </div>
                     <button
                       type="button"
                       className="p-1 rounded hover:bg-white shrink-0"
+                      aria-label={`More actions for ${col.name}`}
+                      aria-haspopup="menu"
                       onClick={(e) => {
                         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                        setColMenu({ id: col.id, x: rect.left, y: rect.bottom + 4 });
+                        const menuW = 208;
+                        const menuH = 300;
+                        const x = Math.max(12, Math.min(rect.right - menuW, window.innerWidth - menuW - 12));
+                        const y = Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - menuH - 12));
+                        setColMenu({ id: col.id, x, y });
                       }}
                     >
                       {colBusy === col.id ? (
@@ -439,9 +537,14 @@ export function PriceGrid({
                     onClick={() => {
                       setFormulaCol(col.id);
                       setFormulaText('=BASE-3%');
+                      setFormulaMode('simple');
+                      setBulkSource('BASE');
+                      setBulkOp('discountPct');
+                      setBulkValue('3');
+                      setBulkScope(selectedProductIds && selectedProductIds.size > 0 ? 'selected' : 'all');
                     }}
                   >
-                    <FunctionSquare size={11} /> Formula
+                    <FunctionSquare size={11} /> Bulk adjust
                   </button>
                 </th>
               ))}
@@ -522,17 +625,33 @@ export function PriceGrid({
                             }}
                             className="w-full h-9 px-2 text-right outline-none bg-white border-2 border-primary"
                           />
+                        ) : excluded ? (
+                          <div className="px-2 py-2 flex items-center justify-end gap-1.5 min-h-[36px]">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold normal-case"><EyeOff size={10} /> Hidden</span>
+                            {isActiveCell && (
+                              <button type="button" aria-label="Restore product" className="text-primary" onClick={(e) => { e.stopPropagation(); mergeCellFields(row.id, col.id, { isExcluded: false }); }}><Eye size={13} /></button>
+                            )}
+                          </div>
                         ) : (
                           <div
                             className={cn(
-                              'px-2 py-2 flex items-center justify-end gap-1 min-h-[36px]',
-                              excluded && 'line-through text-[#7C7C7C]',
-                              baseFb && !excluded && 'text-[#7C7C7C]',
-                              !baseFb && !excluded && 'text-[#181725] font-medium',
+                              'px-2 py-2 flex items-center justify-end gap-1.5 min-h-[36px] group/cell',
+                              baseFb && 'text-[#7C7C7C]',
+                              !baseFb && 'text-[#181725] font-semibold',
+                              dirtyCell && 'border-l-2 border-l-primary bg-[#F8E8EC]/40',
                             )}
                           >
-                            {locked && <Lock size={11} className="text-[#7C7C7C] shrink-0" />}
-                            {inr(price)}
+                            {locked && <span title="Locked — bulk adjust will skip this price"><Lock size={11} className="text-[#7C7C7C] shrink-0" /></span>}
+                            <span>{inr(price)}</span>
+                            {!baseFb && row.basePrice > 0 && (
+                              <span className={cn('text-[9px] font-bold px-1 py-px rounded-full', price < row.basePrice ? 'bg-green-50 text-green-700' : price > row.basePrice ? 'bg-amber-50 text-amber-700' : 'bg-[#FAF7F2] text-[#7C7C7C]')}>
+                                {price === row.basePrice ? 'Base' : `${price < row.basePrice ? '−' : '+'}${Math.abs(Math.round((price / row.basePrice - 1) * 100))}%`}
+                              </span>
+                            )}
+                            {baseFb && <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">Base</span>}
+                            {isActiveCell && !locked && (
+                              <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -561,7 +680,9 @@ export function PriceGrid({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setColMenu(null)} />
           <div
-            className="fixed z-50 bg-white border border-[#E9E3DD] rounded-[12px] shadow-lg py-1 min-w-[160px] text-[13px]"
+            role="menu"
+            aria-label="Price list actions"
+            className="fixed z-50 bg-white border border-[#E9E3DD] rounded-[12px] shadow-xl py-1 w-[208px] max-w-[calc(100vw-24px)] text-[13px]"
             style={{ left: colMenu.x, top: colMenu.y }}
           >
             <button
@@ -585,6 +706,17 @@ export function PriceGrid({
             >
               <Copy size={14} /> Clone
             </button>
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2"
+              onClick={() => {
+                const c = cols.find((x) => x.id === colMenu.id);
+                setFloorEdit({ id: colMenu.id, value: c?.floorPercentOfBase != null ? String(c.floorPercentOfBase) : '' });
+                setColMenu(null);
+              }}
+            >
+              <Percent size={14} /> Price floor guard
+            </button>
             <Link
               href={`/vendor/price-lists/${colMenu.id}`}
               className="w-full px-3 py-2 hover:bg-[#FAF7F2] flex items-center gap-2"
@@ -592,13 +724,23 @@ export function PriceGrid({
             >
               Advanced editor →
             </Link>
-            <button
-              type="button"
-              className="w-full px-3 py-2 text-left hover:bg-red-50 text-red-700 flex items-center gap-2"
-              onClick={() => void deactivateList(colMenu.id)}
-            >
-              <PowerOff size={14} /> Deactivate
-            </button>
+            {confirmDeactivate === colMenu.id ? (
+              <div className="px-3 py-2 bg-red-50">
+                <p className="text-[12px] text-red-800 font-medium">Hide this list from the workspace?</p>
+                <div className="flex gap-2 mt-2">
+                  <button type="button" className="h-8 px-3 rounded-lg bg-red-600 text-white font-semibold" onClick={() => void deactivateList(colMenu.id)}>Yes, deactivate</button>
+                  <button type="button" className="h-8 px-3 rounded-lg border bg-white font-semibold" onClick={() => setConfirmDeactivate(null)}>Keep</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="w-full px-3 py-2 text-left hover:bg-red-50 text-red-700 flex items-center gap-2"
+                onClick={() => setConfirmDeactivate(colMenu.id)}
+              >
+                <PowerOff size={14} /> Deactivate
+              </button>
+            )}
           </div>
         </>
       )}
@@ -629,31 +771,85 @@ export function PriceGrid({
         </div>
       )}
 
+      {floorEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setFloorEdit(null)} />
+          <div className="relative bg-white rounded-[12px] p-5 w-full max-w-sm space-y-3">
+            <h3 className="font-bold text-[#181725]">Price floor guard</h3>
+            <p className="text-[12px] text-[#7C7C7C]">Safety net: publishing is blocked if any price in this list falls below this % of the Base price. Leave blank for no floor.</p>
+            <label className="block text-[12px] font-semibold text-[#181725]">Minimum % of Base
+              <input type="number" min={0} max={100} value={floorEdit.value} onChange={(e) => setFloorEdit({ ...floorEdit, value: e.target.value })} placeholder="e.g. 70" className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] tabular-nums" />
+            </label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setFloorEdit(null)} className="flex-1 h-11 border rounded-[12px] font-semibold">Cancel</button>
+              <button type="button" onClick={() => void saveFloor()} className="flex-1 h-11 bg-primary text-white rounded-[12px] font-semibold">Save floor</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {formulaCol && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setFormulaCol(null)} />
-          <div className="relative bg-white rounded-[12px] p-5 w-full max-w-md space-y-3">
-            <h3 className="font-bold text-[#181725]">Column formula</h3>
-            <p className="text-[12px] text-[#7C7C7C]">
-              Applies to {selectedProductIds && selectedProductIds.size > 0 ? 'selected rows' : 'all visible rows'}.
-              Example: =BASE-3%
-            </p>
-            <input
-              value={formulaText}
-              onChange={(e) => setFormulaText(e.target.value)}
-              className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-mono text-[13px]"
-            />
+          <div className="relative bg-white rounded-[16px] p-5 w-full max-w-md space-y-4 max-h-[90vh] overflow-auto">
+            <div>
+              <h3 className="font-bold text-[#181725] text-[16px]">Bulk adjust prices</h3>
+              <p className="text-[12px] text-[#7C7C7C] mt-0.5">Set prices for <strong className="text-[#181725]">{cols.find((c) => c.id === formulaCol)?.name}</strong> in one go. Nothing goes live until you Review &amp; publish.</p>
+            </div>
+            <div className="flex gap-1 p-1 bg-[#FAF7F2] border border-[#E9E3DD] rounded-[12px]">
+              <button type="button" onClick={() => setFormulaMode('simple')} className={cn('flex-1 h-9 rounded-[10px] text-[12px] font-bold', formulaMode === 'simple' ? 'bg-primary text-white' : 'text-[#7C7C7C]')}>Easy adjust</button>
+              <button type="button" onClick={() => setFormulaMode('advanced')} className={cn('flex-1 h-9 rounded-[10px] text-[12px] font-bold', formulaMode === 'advanced' ? 'bg-primary text-white' : 'text-[#7C7C7C]')}>Formula (advanced)</button>
+            </div>
+            {formulaMode === 'simple' ? (
+              <div className="space-y-3">
+                <label className="block text-[12px] font-semibold text-[#181725]">Start from
+                  <select value={bulkSource} onChange={(e) => setBulkSource(e.target.value)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
+                    <option value="BASE">Base price</option>
+                    {cols.filter((c) => c.id !== formulaCol).map((c) => <option key={c.id} value={c.id}>{c.name} prices</option>)}
+                  </select>
+                </label>
+                <label className="block text-[12px] font-semibold text-[#181725]">Then
+                  <select value={bulkOp} onChange={(e) => setBulkOp(e.target.value as typeof bulkOp)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
+                    <option value="discountPct">Give discount (%)</option>
+                    <option value="markupPct">Add markup (%)</option>
+                    <option value="minusFlat">Reduce by flat ₹</option>
+                    <option value="plusFlat">Increase by flat ₹</option>
+                    <option value="copy">Copy exactly (no change)</option>
+                  </select>
+                </label>
+                {bulkOp !== 'copy' && (
+                  <label className="block text-[12px] font-semibold text-[#181725]">{bulkOp === 'discountPct' || bulkOp === 'markupPct' ? 'Percent (%)' : 'Amount (₹)'}
+                    <input type="number" min={0} value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] tabular-nums font-normal" />
+                  </label>
+                )}
+                <label className="block text-[12px] font-semibold text-[#181725]">Round final price to
+                  <select value={bulkRounding} onChange={(e) => setBulkRounding(e.target.value as typeof bulkRounding)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
+                    <option value="none">Exact (paise)</option><option value="1">Nearest ₹1</option><option value="5">Nearest ₹5</option><option value="10">Nearest ₹10</option>
+                  </select>
+                </label>
+                <div className="flex gap-2" role="group" aria-label="Apply scope">
+                  <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>All products</button>
+                  <button type="button" disabled={!selectedProductIds || selectedProductIds.size === 0} onClick={() => setBulkScope('selected')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold disabled:opacity-40', bulkScope === 'selected' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>Only ticked rows ({selectedProductIds?.size ?? 0})</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[12px] text-[#7C7C7C]">Type a formula. Examples: <code className="font-mono">=BASE-3%</code> (3% off Base), <code className="font-mono">=BASE+10</code> (₹10 more), or use another list name instead of BASE.</p>
+                <input aria-label="Formula" value={formulaText} onChange={(e) => setFormulaText(e.target.value)} className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-mono text-[13px]" />
+              </div>
+            )}
+            {bulkPreviewRows.length > 0 && (
+              <div className="rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] p-3">
+                <p className="text-[11px] font-bold text-[#181725] mb-1.5">Preview (first {bulkPreviewRows.length})</p>
+                {bulkPreviewRows.map((p) => (
+                  <div key={p.name} className="flex justify-between text-[12px] py-0.5"><span className="truncate mr-3">{p.name}</span><span className="tabular-nums font-semibold">{inr(p.from)} → {inr(p.to)}</span></div>
+                ))}
+                <p className="text-[11px] text-[#7C7C7C] mt-1.5">Locked prices are skipped automatically.</p>
+              </div>
+            )}
             <div className="flex gap-2">
-              <button type="button" onClick={() => setFormulaCol(null)} className="flex-1 h-10 border rounded-[12px]">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={applyFormulaToColumn}
-                className="flex-1 h-10 bg-primary text-white rounded-[12px] font-semibold"
-              >
-                Apply
-              </button>
+              <button type="button" onClick={() => setFormulaCol(null)} className="flex-1 h-11 border rounded-[12px] font-semibold">Cancel</button>
+              <button type="button" onClick={applyFormulaToColumn} className="flex-1 h-11 bg-primary text-white rounded-[12px] font-semibold">Apply to draft</button>
             </div>
           </div>
         </div>

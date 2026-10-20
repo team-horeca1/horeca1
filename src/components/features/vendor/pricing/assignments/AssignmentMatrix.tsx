@@ -332,32 +332,53 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     );
   }
 
+  const effectiveByUser = new Map(effective.map((e) => [e.userId, e]));
+  const typeCounts = (type: string) => type === 'all' ? targetRows.length : targetRows.filter((r) => r.type === type).length;
+  // Counts before type filtering (search still applies via targetRows base is already filtered) — use pill active state only
+  const filterPills: Array<{ id: string; label: string }> = [
+    { id: 'all', label: 'All' },
+    { id: 'customer', label: 'Customers' },
+    { id: 'group', label: 'Customer groups' },
+    { id: 'credit_status', label: 'Credit status' },
+    { id: 'pincode', label: 'Pincodes' },
+    { id: 'area', label: 'Areas' },
+    { id: 'segment', label: 'Segments' },
+  ];
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 min-h-[480px]">
+    <div className="space-y-3">
+      <div className="p-3.5 rounded-[12px] bg-[#F8E8EC]/60 border border-primary/20 text-[12px]">
+        <p className="font-bold text-[#181725]">Who wins if a customer matches several rules?</p>
+        <p className="text-[#181725]/80 mt-1 flex flex-wrap items-center gap-1">
+          {['Specific outlet', 'Named customer', 'Customer group', 'Credit status', 'Segment / tag', 'Pincode', 'Area / city', 'Base price'].map((s, i, arr) => (
+            <span key={s} className="inline-flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full bg-white border border-[#E9E3DD] font-semibold">{s}</span>
+              {i < arr.length - 1 && <span className="text-primary font-bold">›</span>}
+            </span>
+          ))}
+        </p>
+        <p className="text-[#7C7C7C] mt-1.5">Top beats bottom. Tick a box to give that price list to a customer or group of customers — we will warn you if someone would move lists.</p>
+      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 min-h-[480px]">
       <div className="rounded-[12px] border border-[#E9E3DD] bg-white overflow-hidden flex flex-col">
-        <div className="p-3 border-b border-[#E9E3DD] flex flex-wrap gap-2 items-center">
-          <div className="relative flex-1 min-w-[180px]">
+        <div className="p-3 border-b border-[#E9E3DD] space-y-2.5">
+          <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search targets…"
+              placeholder="Search customers, pincodes, areas…"
+              aria-label="Search targets"
               className="w-full h-10 pl-9 pr-3 rounded-[12px] border border-[#E9E3DD] text-[13px] outline-none focus:border-primary"
             />
           </div>
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="h-10 px-3 rounded-[12px] border border-[#E9E3DD] text-[13px] bg-white"
-          >
-            <option value="all">All types</option>
-            <option value="customer">Customers</option>
-            <option value="pincode">Pincodes</option>
-            <option value="area">Areas</option>
-            <option value="segment">Segments</option>
-            <option value="group">Groups</option>
-            <option value="credit_status">Credit status</option>
-          </select>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter target type">
+            {filterPills.map((p) => (
+              <button key={p.id} type="button" onClick={() => setFilterType(p.id)} className={cn('h-8 px-3 rounded-full text-[12px] font-semibold border', filterType === p.id ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725] hover:bg-[#FAF7F2]')}>
+                {p.label}{filterType === p.id && typeCounts(p.id) > 0 ? ` (${typeCounts(p.id)})` : ''}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="overflow-auto flex-1">
@@ -392,7 +413,15 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
                     }}
                   >
                     <div className="font-medium text-[#181725] truncate max-w-[220px]">{row.name}</div>
-                    <div className="text-[10px] text-[#7C7C7C]">{row.displayType}</div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] px-1.5 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C] font-semibold">{row.displayType}</span>
+                      {row.type === 'customer' && effectiveByUser.get(row.value) && (
+                        <span className="text-[10px] px-1.5 py-px rounded-full bg-[#F8E8EC] text-primary font-bold" title={effectiveByUser.get(row.value)!.effective.via}>
+                          Gets: {effectiveByUser.get(row.value)!.effective.priceListName}
+                        </span>
+                      )}
+                      {row.type === 'customer' && <span className="text-[10px] text-primary font-semibold">View details →</span>}
+                    </div>
                   </td>
                   {displayLists.map((col) => {
                     const cellKey = `${row.id}:${col.id}`;
@@ -442,6 +471,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         onSkip={() => void applyConflict('skip')}
         onReplace={() => void applyConflict('replace')}
       />
+    </div>
     </div>
   );
 }

@@ -3,17 +3,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Search,
-  Loader2,
   Upload,
   Download,
   HelpCircle,
   Plus,
   AlertTriangle,
   RotateCcw,
+  X,
+  FileDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { PriceListCol, ProductRow } from './types';
+import { effective, type PriceListCol, type ProductRow } from './types';
 import { useDraft } from './grid/useDraft';
 import { PriceGrid } from './grid/PriceGrid';
 import { ReviewPublishDrawer } from './ReviewPublishDrawer';
@@ -46,6 +47,13 @@ export function PricingWorkspace() {
 
   const importRef = useRef<HTMLInputElement>(null);
   const [importListId, setImportListId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<{
+    entries: Array<{ productId: string; price: number }>;
+    matched: number;
+    unmatched: number;
+    fileName: string;
+  } | null>(null);
 
   const {
     dirty,
@@ -58,6 +66,13 @@ export function PricingWorkspace() {
     restoreDraft,
     discardRestore,
   } = useDraft('me', baseVersion);
+
+  useEffect(() => {
+    if (changeCount === 0) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [changeCount]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -113,8 +128,27 @@ export function PricingWorkspace() {
       toast.error('Create a price list first');
       return;
     }
-    setImportListId(cols[0]?.id ?? null);
-    importRef.current?.click();
+    // Preserve the vendor's chosen list — never silently reset to the first list
+    setImportListId((prev) => prev && cols.some((c) => c.id === prev) ? prev : cols[0]?.id ?? null);
+    setImportPreview(null);
+    setImportOpen(true);
+  };
+
+  const downloadImportTemplate = () => {
+    const col = cols.find((c) => c.id === importListId) ?? cols[0];
+    if (!col) return;
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = [
+      ['SKU', 'Product', 'Base Price', 'New Price'].join(','),
+      ...rows.map((r) => [esc(r.sku ?? ''), esc(r.name), String(r.basePrice), String(effective(r, col, dirty))].join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `price-import-template-${col.name.replace(/\s+/g, '-').toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,30 +161,40 @@ export function PricingWorkspace() {
       const text = String(ev.target?.result ?? '');
       const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
       if (lines.length < 2) {
-        toast.error('CSV must include header + rows');
+        toast.error('CSV must include a header row plus at least one product row');
         return;
       }
       const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
       const skuIdx = headers.findIndex((h) => h.toLowerCase() === 'sku');
       const priceIdx = headers.findIndex((h) => h.toLowerCase().includes('new price') || h.toLowerCase() === 'price');
       if (skuIdx === -1 || priceIdx === -1) {
-        toast.error('CSV needs SKU and New Price columns');
+        toast.error('Your CSV needs "SKU" and "New Price" columns — download the template to see the exact format');
         return;
       }
-      let count = 0;
+      const entries: Array<{ productId: string; price: number }> = [];
+      let unmatched = 0;
       for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(',').map((p) => p.trim().replace(/^"|"$/g, ''));
         const sku = parts[skuIdx];
         const price = parseFloat(parts[priceIdx]);
-        if (!sku || Number.isNaN(price)) continue;
+        if (!sku || Number.isNaN(price)) { unmatched++; continue; }
         const row = rows.find((r) => r.sku === sku);
-        if (!row) continue;
-        setCell(`${row.id}:${importListId}`, { price, isExcluded: false });
-        count++;
+        if (!row) { unmatched++; continue; }
+        entries.push({ productId: row.id, price });
       }
-      toast.success(`Imported ${count} prices into draft`);
+      setImportPreview({ entries, matched: entries.length, unmatched, fileName: file.name });
     };
     reader.readAsText(file);
+  };
+
+  const applyImportPreview = () => {
+    if (!importPreview || !importListId) return;
+    for (const entry of importPreview.entries) {
+      setCell(`${entry.productId}:${importListId}`, { price: entry.price, isExcluded: false });
+    }
+    toast.success(`${importPreview.matched} prices added to your draft — Review & publish to go live`);
+    setImportOpen(false);
+    setImportPreview(null);
   };
 
   const openWhyPrice = () => {
@@ -231,19 +275,6 @@ export function PricingWorkspace() {
           </div>
         </div>
 
-        {cols.length > 0 && (
-          <select
-            value={importListId ?? cols[0]?.id}
-            onChange={(e) => setImportListId(e.target.value)}
-            className="h-9 px-2 text-[12px] rounded-[12px] border border-[#E9E3DD] bg-white max-w-xs"
-            aria-label="Import target list"
-          >
-            {cols.map((c) => (
-              <option key={c.id} value={c.id}>Import into: {c.name}</option>
-            ))}
-          </select>
-        )}
-        <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
       </div>
 
       {restorePrompt && (
@@ -300,6 +331,11 @@ export function PricingWorkspace() {
 
       {tab === 'prices' && (
         <>
+          <div className="flex flex-wrap gap-2 text-[12px]">
+            {['1. Click any price to edit it (or tick rows, then Bulk adjust)', '2. Prices in grey use the Base price — bold prices are custom for that list', '3. When ready, use Review & publish — nothing is live until then'].map((s) => (
+              <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-[#E9E3DD] text-[#181725] font-medium">{s}</span>
+            ))}
+          </div>
           <div className="relative max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
             <input
@@ -353,6 +389,52 @@ export function PricingWorkspace() {
 
       {tab === 'history' && <PublishHistoryTab onRollbackDone={() => void loadWorkspace(true)} />}
 
+      {importOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setImportOpen(false)} aria-hidden />
+          <div className="relative bg-white rounded-[16px] shadow-xl w-full max-w-md p-6 space-y-4" role="dialog" aria-label="Import prices from CSV">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-[17px] font-bold text-[#181725]">Import prices from a file</h2>
+                <p className="text-[12px] text-[#7C7C7C] mt-0.5">Prices land in your draft first — nothing goes live until you Review &amp; publish.</p>
+              </div>
+              <button type="button" onClick={() => setImportOpen(false)} className="p-1.5 rounded-lg hover:bg-[#FAF7F2]" aria-label="Close import"><X size={18} /></button>
+            </div>
+            <ol className="space-y-3 text-[13px]">
+              <li>
+                <span className="font-bold text-[#181725]">1. Which price list should these prices go into?</span>
+                <select aria-label="Import target list" value={importListId ?? ''} onChange={(e) => { setImportListId(e.target.value); setImportPreview(null); }} className="mt-1.5 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white">
+                  {cols.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </li>
+              <li>
+                <span className="font-bold text-[#181725]">2. Download the ready-made sheet, edit “New Price”, save as CSV</span>
+                <button type="button" onClick={downloadImportTemplate} className="mt-1.5 w-full h-11 rounded-[12px] border border-primary text-primary font-semibold flex items-center justify-center gap-2 hover:bg-[#F8E8EC]">
+                  <FileDown size={16} /> Download template for this list
+                </button>
+              </li>
+              <li>
+                <span className="font-bold text-[#181725]">3. Upload your filled sheet</span>
+                <button type="button" onClick={() => importRef.current?.click()} className="mt-1.5 w-full h-11 rounded-[12px] border border-[#E9E3DD] bg-white font-semibold flex items-center justify-center gap-2">
+                  <Upload size={16} /> Choose CSV file
+                </button>
+                <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+              </li>
+            </ol>
+            {importPreview && (
+              <div className="p-3 rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] text-[13px]">
+                <p className="font-semibold text-[#181725]">{importPreview.fileName}</p>
+                <p className="tabular-nums mt-1"><span className="text-green-700 font-bold">{importPreview.matched} prices ready</span>{importPreview.unmatched > 0 && <span className="text-amber-700"> · {importPreview.unmatched} rows skipped (SKU not found or price blank)</span>}</p>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setImportOpen(false)} className="flex-1 h-11 rounded-[12px] border border-[#E9E3DD] font-semibold">Cancel</button>
+              <button type="button" disabled={!importPreview || importPreview.matched === 0} onClick={applyImportPreview} className="flex-1 h-11 rounded-[12px] bg-primary text-white font-semibold disabled:opacity-50">Add to draft</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ReviewPublishDrawer
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
@@ -374,6 +456,9 @@ export function PricingWorkspace() {
         customerId={explainCustomerId}
         productId={explainProductId}
         productLabel={rows.find((r) => r.id === explainProductId)?.name}
+        products={rows}
+        onCustomerChange={setExplainCustomerId}
+        onProductChange={setExplainProductId}
       />
     </div>
   );

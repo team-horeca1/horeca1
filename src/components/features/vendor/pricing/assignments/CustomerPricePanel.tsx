@@ -28,7 +28,7 @@ export function CustomerPricePanel({ customer, effective, onExplain }: Props) {
   if (!customer) {
     return (
       <div className="h-full flex items-center justify-center p-6 text-[13px] text-[#7C7C7C] text-center">
-        Select a customer row to see their effective list and tags.
+        Click any customer on the left to see which price list they actually get, why, and to test a product price for them.
       </div>
     );
   }
@@ -93,7 +93,7 @@ export function CustomerPricePanel({ customer, effective, onExplain }: Props) {
             'hover:bg-[#F8E8EC]',
           )}
         >
-          Why this price? (pick a product on Prices tab)
+          Why this price? Test a product for this customer
         </button>
       )}
     </div>

@@ -499,6 +499,24 @@ export async function listPublishes(vendorId: string, cursor?: string, limit = 3
   });
   const hasMore = rows.length > limit;
   if (hasMore) rows.pop();
+
+  // Enrich stored cell changes with human-readable product / list names for the History UI
+  type RawChange = { priceListId: string; productId: string; before: CellState | null; after: CellState | null };
+  const rawById = new Map<string, RawChange[]>();
+  const productIds = new Set<string>();
+  const listIds = new Set<string>();
+  for (const r of rows) {
+    const changes = (Array.isArray(r.changes) ? r.changes : []) as RawChange[];
+    rawById.set(r.id, changes);
+    for (const ch of changes) { productIds.add(ch.productId); listIds.add(ch.priceListId); }
+  }
+  const [products, lists] = await Promise.all([
+    productIds.size ? prisma.product.findMany({ where: { id: { in: [...productIds] } }, select: { id: true, name: true, sku: true } }) : Promise.resolve([]),
+    listIds.size ? prisma.priceList.findMany({ where: { id: { in: [...listIds] } }, select: { id: true, name: true } }) : Promise.resolve([]),
+  ]);
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const listById = new Map(lists.map((l) => [l.id, l]));
+
   return {
     publishes: rows.map((r) => ({
       id: r.id,
@@ -511,6 +529,17 @@ export async function listPublishes(vendorId: string, cursor?: string, limit = 3
       actor: r.actor
         ? { id: r.actor.id, name: r.actor.fullName || r.actor.email || 'Vendor' }
         : null,
+      changes: (rawById.get(r.id) ?? []).slice(0, 200).map((ch) => ({
+        productId: ch.productId,
+        priceListId: ch.priceListId,
+        productName: productById.get(ch.productId)?.name ?? 'Product',
+        sku: productById.get(ch.productId)?.sku ?? null,
+        listName: listById.get(ch.priceListId)?.name ?? 'Price list',
+        beforePrice: ch.before?.customPrice ?? null,
+        afterPrice: ch.after?.customPrice ?? null,
+        beforeExcluded: !!ch.before?.isExcluded,
+        afterExcluded: !!ch.after?.isExcluded,
+      })),
     })),
     nextCursor: hasMore ? rows[rows.length - 1]?.id : null,
   };

@@ -43,6 +43,153 @@ function targetKey(t: AssignmentTarget): string {
   }
 }
 
+type UniverseCustomer = {
+  userId: string;
+  label: string;
+  tags: string[];
+  creditStatus: string | null;
+  accountIds: Set<string>;
+  outletIds: Set<string>;
+  pincodes: Set<string>;
+  cities: Set<string>;
+  states: Set<string>;
+  groupIds: Set<string>;
+};
+
+const userLabel = (u: { fullName: string | null; businessName: string | null; email: string | null }, id: string) =>
+  u.businessName ?? u.fullName ?? u.email ?? id;
+
+/**
+ * Every customer this vendor actually trades with — CRM rows UNION order
+ * buyers UNION credit-wallet holders. pricing-targets uses the same union;
+ * assignments must too, otherwise order-only buyers (no CRM row) preview as
+ * "0 affected" and show "Base catalogue" even when directly assigned.
+ */
+async function loadCustomerUniverse(vendorId: string): Promise<UniverseCustomer[]> {
+  const [crm, orders, wallets] = await Promise.all([
+    prisma.vendorCustomer.findMany({
+      where: { vendorId },
+      select: {
+        userId: true, tags: true,
+        user: { select: { id: true, fullName: true, businessName: true, email: true, userRoles: { select: { businessAccountId: true } } } },
+      },
+    }),
+    prisma.order.findMany({
+      where: { vendorId },
+      distinct: ['userId'],
+      select: { userId: true, businessAccountId: true, user: { select: { id: true, fullName: true, businessName: true, email: true } } },
+    }),
+    prisma.creditWallet.findMany({ where: { vendorId }, select: { userId: true, status: true, workflowStatus: true } }),
+  ]);
+
+  const byId = new Map<string, UniverseCustomer & { creditRaw?: { status: string; workflowStatus: string } }>();
+  const ensure = (userId: string, label: string): UniverseCustomer & { creditRaw?: { status: string; workflowStatus: string } } => {
+    let c = byId.get(userId);
+    if (!c) {
+      c = { userId, label, tags: [], creditStatus: null, accountIds: new Set(), outletIds: new Set(), pincodes: new Set(), cities: new Set(), states: new Set(), groupIds: new Set() };
+      byId.set(userId, c);
+    }
+    return c;
+  };
+
+  for (const c of crm) {
+    const cust = ensure(c.userId, userLabel(c.user, c.userId));
+    cust.tags = Array.from(new Set([...cust.tags, ...(c.tags ?? [])]));
+    for (const r of c.user.userRoles) cust.accountIds.add(r.businessAccountId);
+  }
+  for (const o of orders) {
+    const cust = ensure(o.userId, userLabel(o.user, o.userId));
+    if (o.businessAccountId) cust.accountIds.add(o.businessAccountId);
+  }
+  const walletUserIds = wallets.map((w) => w.userId).filter((id) => !byId.has(id));
+  if (walletUserIds.length > 0) {
+    const users = await prisma.user.findMany({ where: { id: { in: walletUserIds } }, select: { id: true, fullName: true, businessName: true, email: true } });
+    for (const u of users) ensure(u.id, userLabel(u, u.id));
+  }
+  for (const w of wallets) {
+    const cust = byId.get(w.userId);
+    if (cust) cust.creditStatus = normalizeCreditStatus(w.status, w.workflowStatus);
+  }
+
+  const accountIds = [...new Set([...byId.values()].flatMap((c) => [...c.accountIds]))];
+  if (accountIds.length > 0) {
+    const [outlets, roles, memberships] = await Promise.all([
+      prisma.outlet.findMany({ where: { businessAccountId: { in: accountIds }, isActive: true }, select: { id: true, businessAccountId: true, pincode: true, city: true, state: true } }),
+      prisma.userRole.findMany({ where: { businessAccountId: { in: accountIds } }, select: { userId: true, businessAccountId: true } }),
+      prisma.customerGroupMember.findMany({ where: { group: { vendorId }, OR: [{ userId: { in: [...byId.keys()] } }, { businessAccountId: { in: accountIds } }] }, select: { userId: true, businessAccountId: true, groupId: true } }),
+    ]);
+    const accountToUsers = new Map<string, string[]>();
+    for (const r of roles) {
+      const arr = accountToUsers.get(r.businessAccountId) ?? [];
+      arr.push(r.userId);
+      accountToUsers.set(r.businessAccountId, arr);
+    }
+    // Also link accounts discovered via orders/CRM even if userRole rows differ
+    for (const c of byId.values()) for (const acc of c.accountIds) {
+      const arr = accountToUsers.get(acc) ?? [];
+      if (!arr.includes(c.userId)) arr.push(c.userId);
+      accountToUsers.set(acc, arr);
+    }
+    for (const o of outlets) {
+      for (const uid of accountToUsers.get(o.businessAccountId) ?? []) {
+        const cust = byId.get(uid);
+        if (!cust) continue;
+        cust.outletIds.add(o.id);
+        if (o.pincode) cust.pincodes.add(o.pincode);
+        if (o.city) cust.cities.add(o.city);
+        if (o.state) cust.states.add(o.state);
+      }
+    }
+    for (const m of memberships) {
+      const targets = new Set<string>();
+      if (m.userId) targets.add(m.userId);
+      if (m.businessAccountId) for (const uid of accountToUsers.get(m.businessAccountId) ?? []) targets.add(uid);
+      for (const uid of targets) byId.get(uid)?.groupIds.add(m.groupId);
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+type AssignmentRow = {
+  type: string; userId: string | null; businessAccountId: string | null; outletId: string | null;
+  groupId: string | null; pincode: string | null; area: string | null; segment: string | null;
+  creditStatus: string | null; assignedAt: Date | null;
+  priceList: { id: string; name: string };
+};
+
+const VIA_LABELS: Record<string, string> = {
+  outlet: 'Outlet rule', customer: 'Direct customer rule', group: 'Customer group rule',
+  credit_status: 'Credit status rule', segment: 'Segment rule', pincode: 'Pincode rule', area: 'Area rule',
+};
+const LADDER_ORDER = ['outlet', 'customer', 'group', 'credit_status', 'segment', 'pincode', 'area'] as const;
+
+function assignmentMatchesCustomer(a: AssignmentRow, c: UniverseCustomer): boolean {
+  switch (a.type) {
+    case 'outlet': return !!a.outletId && c.outletIds.has(a.outletId);
+    case 'customer': return (!!a.userId && a.userId === c.userId) || (!!a.businessAccountId && c.accountIds.has(a.businessAccountId));
+    case 'group': return !!a.groupId && c.groupIds.has(a.groupId);
+    case 'credit_status': return !!a.creditStatus && !!c.creditStatus && a.creditStatus.toLowerCase() === c.creditStatus.toLowerCase();
+    case 'segment': return !!a.segment && c.tags.some((t) => t.toLowerCase() === a.segment!.toLowerCase());
+    case 'pincode': return !!a.pincode && c.pincodes.has(a.pincode);
+    case 'area': {
+      if (!a.area) return false;
+      const n = a.area.toLowerCase();
+      return [...c.cities, ...c.states].some((v) => v.toLowerCase() === n);
+    }
+    default: return false;
+  }
+}
+
+function computeEffective(c: UniverseCustomer, assignments: AssignmentRow[], excludeListId?: string) {
+  for (const type of LADDER_ORDER) {
+    const match = assignments.find((a) => a.type === type && a.priceList.id !== excludeListId && assignmentMatchesCustomer(a, c));
+    if (match) {
+      return { priceListId: match.priceList.id, priceListName: match.priceList.name, via: VIA_LABELS[type] ?? type, assignedAt: match.assignedAt?.toISOString() ?? null };
+    }
+  }
+  return { priceListId: null as string | null, priceListName: 'Base catalogue', via: 'No rule matched — Base price applies', assignedAt: null as string | null };
+}
+
 async function expandAffectedCustomers(
   vendorId: string,
   target: AssignmentTarget,
@@ -73,122 +220,29 @@ async function expandAffectedCustomers(
     }));
   }
 
-  // For pincode / area / segment / credit_status — expand via CRM + outlets
-  const crm = await prisma.vendorCustomer.findMany({
-    where: { vendorId },
-    select: {
-      userId: true,
-      tags: true,
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          businessName: true,
-          email: true,
-          userRoles: { select: { businessAccountId: true } },
-        },
-      },
-    },
-  });
+  // Pincode / area / segment / credit_status / outlet — expand via the full customer universe
+  const universe = await loadCustomerUniverse(vendorId);
+  const toRef = (c: UniverseCustomer) => ({ userId: c.userId, label: c.label });
 
   if (target.type === 'segment' && target.segment) {
     const needle = target.segment.toLowerCase();
-    return crm
-      .filter((c) => c.tags.some((t) => t.toLowerCase() === needle))
-      .map((c) => ({
-        userId: c.userId,
-        label: c.user.businessName ?? c.user.fullName ?? c.user.email ?? c.userId,
-      }));
+    return universe.filter((c) => c.tags.some((t) => t.toLowerCase() === needle)).map(toRef);
   }
-
   if (target.type === 'credit_status' && target.creditStatus) {
-    const wallets = await prisma.creditWallet.findMany({
-      where: { vendorId },
-      select: { userId: true, status: true, workflowStatus: true },
-    });
     const needle = target.creditStatus.toLowerCase();
-    const matched = new Set(
-      wallets
-        .filter((w) => normalizeCreditStatus(w.status, w.workflowStatus) === needle)
-        .map((w) => w.userId),
-    );
-    return crm
-      .filter((c) => matched.has(c.userId))
-      .map((c) => ({
-        userId: c.userId,
-        label: c.user.businessName ?? c.user.fullName ?? c.user.email ?? c.userId,
-      }));
+    return universe.filter((c) => c.creditStatus?.toLowerCase() === needle).map(toRef);
   }
-
-  if ((target.type === 'pincode' && target.pincode) || (target.type === 'area' && target.area)) {
-    const accountIds = new Set(
-      crm.flatMap((c) => c.user.userRoles.map((r) => r.businessAccountId)),
-    );
-    const outlets = accountIds.size
-      ? await prisma.outlet.findMany({
-          where: { businessAccountId: { in: [...accountIds] }, isActive: true },
-          select: { businessAccountId: true, pincode: true, city: true, state: true },
-        })
-      : [];
-    const matchingAccounts = new Set<string>();
-    for (const o of outlets) {
-      if (target.type === 'pincode' && o.pincode === target.pincode) {
-        matchingAccounts.add(o.businessAccountId);
-      }
-      if (target.type === 'area') {
-        const needle = (target.area ?? '').toLowerCase();
-        if (o.city?.toLowerCase() === needle || o.state?.toLowerCase() === needle) {
-          matchingAccounts.add(o.businessAccountId);
-        }
-      }
-    }
-    return crm
-      .filter((c) => c.user.userRoles.some((r) => matchingAccounts.has(r.businessAccountId)))
-      .map((c) => ({
-        userId: c.userId,
-        label: c.user.businessName ?? c.user.fullName ?? c.user.email ?? c.userId,
-      }));
+  if (target.type === 'pincode' && target.pincode) {
+    return universe.filter((c) => c.pincodes.has(target.pincode!)).map(toRef);
   }
-
+  if (target.type === 'area' && target.area) {
+    const needle = target.area.toLowerCase();
+    return universe.filter((c) => [...c.cities, ...c.states].some((v) => v.toLowerCase() === needle)).map(toRef);
+  }
   if (target.type === 'outlet' && target.outletId) {
-    const outlet = await prisma.outlet.findUnique({
-      where: { id: target.outletId },
-      select: { businessAccountId: true },
-    });
-    if (!outlet) return [];
-    return crm
-      .filter((c) => c.user.userRoles.some((r) => r.businessAccountId === outlet.businessAccountId))
-      .map((c) => ({
-        userId: c.userId,
-        label: c.user.businessName ?? c.user.fullName ?? c.user.email ?? c.userId,
-      }));
+    return universe.filter((c) => c.outletIds.has(target.outletId!)).map(toRef);
   }
-
   return [];
-}
-
-async function currentEffectiveListForCustomer(
-  vendorId: string,
-  userId: string,
-  excludeListId?: string,
-): Promise<{ priceListId: string; priceListName: string; via: string } | null> {
-  const assignments = await prisma.priceListAssignment.findMany({
-    where: {
-      priceList: { vendorId, isActive: true, ...(excludeListId ? { id: { not: excludeListId } } : {}) },
-      type: 'customer',
-      userId,
-    },
-    include: { priceList: { select: { id: true, name: true } } },
-    take: 1,
-  });
-  if (assignments[0]) {
-    return {
-      priceListId: assignments[0].priceList.id,
-      priceListName: assignments[0].priceList.name,
-      via: 'Direct customer assignment',
-    };
-  }
-  return null;
 }
 
 export async function previewAssignment(args: {
@@ -238,16 +292,28 @@ export async function previewAssignment(args: {
     via: string;
   }> = [];
 
-  for (const c of affected) {
-    const cur = await currentEffectiveListForCustomer(args.vendorId, c.userId, args.priceListId);
-    if (cur) {
-      conflicts.push({
-        userId: c.userId,
-        customerName: c.label,
-        existingPricelistId: cur.priceListId,
-        existingPricelist: cur.priceListName,
-        via: cur.via,
-      });
+  if (affected.length > 0) {
+    const [universe, allAssignments] = await Promise.all([
+      loadCustomerUniverse(args.vendorId),
+      prisma.priceListAssignment.findMany({
+        where: { priceList: { vendorId: args.vendorId, isActive: true } },
+        include: { priceList: { select: { id: true, name: true } } },
+      }),
+    ]);
+    const universeById = new Map(universe.map((u) => [u.userId, u]));
+    for (const c of affected) {
+      const cust = universeById.get(c.userId);
+      if (!cust) continue;
+      const eff = computeEffective(cust, allAssignments as AssignmentRow[], args.priceListId);
+      if (eff.priceListId) {
+        conflicts.push({
+          userId: c.userId,
+          customerName: c.label,
+          existingPricelistId: eff.priceListId,
+          existingPricelist: eff.priceListName,
+          via: eff.via,
+        });
+      }
     }
   }
 
@@ -373,48 +439,21 @@ export async function saveAssignments(args: {
 }
 
 export async function listEffectiveAssignments(vendorId: string) {
-  const [crm, directAssignments, creditWallets] = await Promise.all([
-    prisma.vendorCustomer.findMany({
-      where: { vendorId },
-      select: {
-        userId: true,
-        tags: true,
-        user: { select: { fullName: true, businessName: true, email: true } },
-      },
-    }),
+  const [universe, assignments] = await Promise.all([
+    loadCustomerUniverse(vendorId),
     prisma.priceListAssignment.findMany({
-      where: { priceList: { vendorId, isActive: true }, type: 'customer' },
+      where: { priceList: { vendorId, isActive: true } },
       include: { priceList: { select: { id: true, name: true } } },
-    }),
-    prisma.creditWallet.findMany({
-      where: { vendorId },
-      select: { userId: true, status: true, workflowStatus: true },
     }),
   ]);
 
-  const directByUser = new Map(
-    directAssignments
-      .filter((a) => a.userId)
-      .map((a) => [a.userId!, {
-        priceListId: a.priceList.id,
-        priceListName: a.priceList.name,
-        via: 'Direct customer',
-        assignedAt: a.assignedAt?.toISOString() ?? null,
-      }]),
-  );
-
-  const creditByUser = new Map(
-    creditWallets.map((w) => [w.userId, normalizeCreditStatus(w.status, w.workflowStatus)]),
-  );
-
-  return crm.map((c) => {
-    const direct = directByUser.get(c.userId);
-    return {
-      userId: c.userId,
-      label: c.user.businessName ?? c.user.fullName ?? c.user.email ?? c.userId,
-      tags: c.tags,
-      creditStatus: creditByUser.get(c.userId) ?? null,
-      effective: direct ?? { priceListId: null, priceListName: 'Base', via: 'Base catalogue', assignedAt: null },
-    };
-  });
+  return universe.map((c) => ({
+    userId: c.userId,
+    label: c.label,
+    tags: c.tags,
+    creditStatus: c.creditStatus,
+    pincodes: [...c.pincodes],
+    cities: [...c.cities],
+    effective: computeEffective(c, assignments as AssignmentRow[]),
+  }));
 }
