@@ -1251,6 +1251,8 @@ export default function ProductsPage() {
 
             if (isMaster) {
                 const listing = Array.isArray(p.vendorProducts) ? p.vendorProducts[0] as {
+                    imageUrl?: string | null;
+                    images?: string[] | null;
                     hsn?: string | null;
                     basePrice?: unknown;
                     originalPrice?: unknown;
@@ -1313,8 +1315,10 @@ export default function ProductsPage() {
                     sku: p.sku ?? '',
                     brand: p.brand ?? '',
                     categoryIds: masterCategoryIds,
-                    imageUrl: p.imageUrl ?? '',
-                    images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
+                    // Master rows often carry no image — fall back to the linked
+                    // listing's photo (same image the table thumbnail shows).
+                    imageUrl: p.imageUrl || listing?.imageUrl || product.imageUrl || '',
+                    images: (Array.isArray(p.images) && p.images.length ? p.images : (listing?.images ?? [])).filter(Boolean),
                     hsn: seed.hsn,
                     barcode: seed.barcode,
                     description: seed.description,

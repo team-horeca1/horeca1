@@ -32,9 +32,11 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         vendorProducts: {
           where: { slug: { not: { startsWith: '_deleted_' } } },
           orderBy: { updatedAt: 'desc' },
-          take: 1,
+          take: 5,
           select: {
             id: true,
+            imageUrl: true,
+            images: true,
             hsn: true,
             basePrice: true,
             originalPrice: true,
@@ -60,9 +62,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       },
     });
     if (!master) throw Errors.notFound('Master product not found');
+    // The master row often has no image of its own — the photo lives on a
+    // vendor listing. Mirror the list endpoint's fallback so Edit opens with
+    // the same image the products table shows (otherwise the form demands a
+    // re-upload and blocks Update with "Primary image is required").
+    const listingWithImage = master.vendorProducts.find((vp) => vp.imageUrl);
+    const listingWithImages = master.vendorProducts.find((vp) => vp.images?.length);
     return NextResponse.json({
       success: true,
-      data: { ...master, vendorCount: master._count.vendorProducts },
+      data: {
+        ...master,
+        imageUrl: master.imageUrl || listingWithImage?.imageUrl || null,
+        images: master.images?.length ? master.images : (listingWithImages?.images ?? []),
+        vendorCount: master._count.vendorProducts,
+      },
     });
   } catch (error) {
     return errorResponse(error);
