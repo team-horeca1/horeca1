@@ -2694,7 +2694,7 @@ export default function VendorProductsPage() {
                         className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
                     >
                         <IndianRupee size={13} className="text-primary" />
-                        Price Bulk Update
+                        Replace Prices
                     </button>
                     <button
                         onClick={() => setGridOpen(true)}
