@@ -118,8 +118,10 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         orderBy: { sortOrder: 'asc' },
       });
       categories = cats.map(c => ({
+        id: c.id,
         name: c.name,
         slug: c.slug,
+        parentId: c.parentId,
         parentName: c.parent?.name,
         imageUrl: c.imageUrl,
         sortOrder: c.sortOrder,
