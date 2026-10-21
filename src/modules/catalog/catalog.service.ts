@@ -27,7 +27,6 @@ import {
 } from '@/lib/product-edit-policy';
 import { auditProductDiff, logProductFieldChanges } from '@/lib/product-audit';
 import { PRODUCT_CREDIT_ELIGIBLE } from '@/lib/productCreditEligible';
-import { hasProductImage } from '@/lib/productImage';
 import { canTransitionApproval } from '@/modules/catalog/approval-state';
 import { transitionProductApproval } from '@/modules/catalog/approval-state.service';
 
@@ -1948,11 +1947,6 @@ export class CatalogService {
     // go through explicit POST /api/v1/vendor/brands/suggest ("Request brand").
     // Legacy text-only brands with no Brand row still do not block approval.
 
-    const goingLive = !isDraft && ((productData as { isActive?: boolean }).isActive ?? true);
-    if (goingLive && !hasProductImage(productData.imageUrl, productData.images)) {
-      throw Errors.badRequest('Add a product photo before this listing can go live.');
-    }
-
     const draftBasePrice =
       productData.basePrice != null && productData.basePrice > 0 ? productData.basePrice : 0.01;
 
@@ -2269,14 +2263,6 @@ export class CatalogService {
       data.isActive = false;
     } else if (data.listingStatus === 'submitted') {
       data.isActive = true;
-    }
-
-    const nextImage = data.imageUrl !== undefined ? data.imageUrl : product.imageUrl;
-    const nextImages = data.images !== undefined ? data.images : product.images;
-    const willBeActive = data.isActive === true || (data.isActive !== false && product.isActive && !isDraftSave);
-    const newlyLive = willBeActive && (!product.isActive || isPublishing);
-    if (newlyLive && !hasProductImage(nextImage, nextImages)) {
-      throw Errors.badRequest('Add a product photo before this listing can go live.');
     }
 
     if (product.approvalStatus === 'approved' && !isResubmit) {
