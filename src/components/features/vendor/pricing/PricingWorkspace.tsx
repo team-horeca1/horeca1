@@ -243,7 +243,7 @@ export function PricingWorkspace() {
     <div className="space-y-4 pb-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.75rem)] font-bold text-[#181725]">Pricing</h1>
+          <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.75rem)] font-bold text-[#181725]">Price List</h1>
           <p className="text-[13px] text-[#7C7C7C] mt-0.5">
             Manage lists, bulk edits, assignments, and publish with guardrails.
           </p>

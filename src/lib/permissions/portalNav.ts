@@ -135,7 +135,7 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     links: [
       { name: 'Products', icon: Package, href: '/vendor/products', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Brand Mappings', icon: GitMerge, href: '/vendor/brand-mappings', feature: 'brandMappings', requiredPerm: 'brandMappings.view' },
-      { name: 'Pricing', icon: Tag, href: '/vendor/price-lists', feature: 'priceLists', requiredPerm: 'priceLists.view' },
+      { name: 'Price List', icon: Tag, href: '/vendor/price-lists', feature: 'priceLists', requiredPerm: 'priceLists.view' },
       { name: 'Promotions', icon: Gift, href: '/vendor/promotions', feature: 'promotions', requiredPerm: 'promotions.view' },
     ],
   },

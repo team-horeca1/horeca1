@@ -470,7 +470,7 @@ export default function PriceListDetailPage() {
             <h1 className="text-[22px] font-bold text-[#181725]">{name || priceList.name}</h1>
             <p className="text-[12px] text-[#7C7C7C]">
               Advanced settings — discount / scheme types, outlet &amp; brand targets. Day-to-day prices live in{' '}
-              <Link href="/vendor/price-lists" className="text-primary font-semibold hover:underline">Pricing</Link>.
+              <Link href="/vendor/price-lists" className="text-primary font-semibold hover:underline">Price List</Link>.
               All prices are ex-GST; GST is added at checkout.
             </p>
           </div>
