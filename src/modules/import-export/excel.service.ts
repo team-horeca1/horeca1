@@ -948,7 +948,7 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
 }
 
 function applyTextFormatToIdColumns(ws: XLSX.WorkSheet, headers: string[]): void {
-  const idHeaders = new Set(['Vendor ID', 'Item ID', 'SKU', 'HSN', 'HSN Code', 'UPC', 'EAN', 'ISBN']);
+  const idHeaders = new Set(['Vendor ID', 'Item ID', 'SKU', 'HSN', 'HSN Code', 'UPC', 'EAN', 'ISBN', 'Category ID', 'Parent Category ID']);
   if (!ws['!ref']) return;
   const range = XLSX.utils.decode_range(ws['!ref']);
   for (let c = range.s.c; c <= range.e.c; c++) {
@@ -987,18 +987,10 @@ export function exportProductsToXlsx(
 
   // ── Categories sheet (if provided) ──
   if (categories && categories.length > 0) {
-    const catData = categories.map(c => ({
-      'Name': c.name,
-      'Slug': c.slug,
-      'Parent': c.parentName || '',
-      'Image URL': c.imageUrl || '',
-      'Sort Order': c.sortOrder,
-      'Active': c.isActive ? 'Yes' : 'No',
-      'Status': c.approvalStatus,
-      'Products': c.productCount ?? 0,
-    }));
+    const catData = categories.map(categoryRowToSheet);
     const cws = XLSX.utils.json_to_sheet(catData);
     cws['!cols'] = Object.keys(catData[0] || {}).map(h => ({ wch: Math.max(h.length + 2, 12) }));
+    applyTextFormatToIdColumns(cws, Object.keys(catData[0] || {}));
     XLSX.utils.book_append_sheet(wb, cws, 'Categories');
   }
 
@@ -1417,8 +1409,10 @@ export function generateCategoryImportTemplateCsv(): string {
 }
 
 export interface CategoryExportRow {
+  id: string;
   name: string;
   slug: string;
+  parentId?: string | null;
   parentName?: string | null;
   imageUrl?: string | null;
   sortOrder: number;
@@ -1427,36 +1421,36 @@ export interface CategoryExportRow {
   productCount?: number;
 }
 
-export function exportCategoriesToXlsx(categories: CategoryExportRow[]): Buffer {
-  const data = categories.map(c => ({
+/** Sheet row for a category / sub-category — shows its own ID and its parent's ID. */
+export function categoryRowToSheet(c: CategoryExportRow): Record<string, string | number> {
+  return {
+    'Category ID': c.id || '',
+    Type: c.parentId || c.parentName ? 'Sub-Category' : 'Category',
     Name: c.name,
     Slug: c.slug,
+    'Parent Category ID': c.parentId || '',
     Parent: c.parentName || '',
     'Image URL': c.imageUrl || '',
     'Sort Order': c.sortOrder,
     Active: c.isActive ? 'Yes' : 'No',
     Status: c.approvalStatus,
     Products: c.productCount ?? 0,
-  }));
+  };
+}
+
+export function exportCategoriesToXlsx(categories: CategoryExportRow[]): Buffer {
+  const data = categories.map(categoryRowToSheet);
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
   ws['!cols'] = Object.keys(data[0] || {}).map(key => ({ wch: Math.max(key.length + 2, 12) }));
+  applyTextFormatToIdColumns(ws, Object.keys(data[0] || {}));
   XLSX.utils.book_append_sheet(wb, ws, 'Categories');
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
 export function exportCategoriesToCsv(categories: CategoryExportRow[]): string {
-  const data = categories.map(c => ({
-    name: c.name,
-    slug: c.slug,
-    parentName: c.parentName || '',
-    imageUrl: c.imageUrl || '',
-    sortOrder: c.sortOrder,
-    isActive: c.isActive ? 'Yes' : 'No',
-    approvalStatus: c.approvalStatus,
-    productCount: c.productCount ?? 0,
-  }));
+  const data = categories.map(categoryRowToSheet);
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
