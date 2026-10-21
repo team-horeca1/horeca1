@@ -14,7 +14,6 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { CatalogService, assertLeafCategory, findOrCreateMaster } from '@/modules/catalog/catalog.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
-import { hasProductImage } from '@/lib/productImage';
 import { claimUniqueProductSlug } from '@/lib/productSlug';
 
 // Helper: extract the [id] segment from the URL
@@ -198,13 +197,6 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
           categoryId: activeCategoryId,
         });
       }
-    }
-
-    const becomingLive =
-      !isDraftSave &&
-      (isPublishing || (existing.isActive === false && updatePayload.isActive === true));
-    if (becomingLive && !hasProductImage(updatePayload.imageUrl ?? existing.imageUrl, updatePayload.images ?? existing.images)) {
-      throw Errors.badRequest('Add a product photo before this listing can go live.');
     }
 
     const product = await prisma.$transaction(async (tx) => {
