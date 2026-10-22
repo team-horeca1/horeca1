@@ -45,7 +45,6 @@ interface Props {
   onSelectedProductIdsChange?: (ids: Set<string>) => void;
   compareMode?: boolean;
   onAddToList?: (row: ProductRow, col: PriceListCol) => void;
-  onAddProducts?: () => void;
 }
 
 function cellLocked(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
@@ -86,7 +85,6 @@ export function PriceGrid({
   onSelectedProductIdsChange,
   compareMode,
   onAddToList,
-  onAddProducts,
 }: Props) {
   const [active, setActive] = useState<{ r: number; c: number } | null>(null);
   const [anchor, setAnchor] = useState<{ r: number; c: number } | null>(null);
@@ -607,12 +605,16 @@ export function PriceGrid({
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={3 + cols.length} className="p-12 text-center">
-                  <p className="text-[13px] font-bold text-[#AEAEAE]">No products in this list yet</p>
-                  <p className="text-[12px] text-[#AEAEAE] mt-1">Products you don’t add stay at Base price for these customers.</p>
-                  {onAddProducts && (
-                    <button type="button" onClick={onAddProducts} className="mt-3 h-10 px-4 rounded-[12px] bg-primary text-white font-semibold text-[13px] inline-flex items-center gap-1.5">
-                      <Plus size={14} /> Add products
-                    </button>
+                  <p className="text-[13px] font-bold text-[#AEAEAE]">No products to show</p>
+                  <p className="text-[12px] text-[#AEAEAE] mt-1">
+                    {compareMode
+                      ? 'No product is in any list yet. Open one list and press + Add on a product to put it in that list.'
+                      : 'Nothing here. Switch to “All products” above, or create the product first on the Products page.'}
+                  </p>
+                  {!compareMode && (
+                    <a href="/vendor/products?action=add" target="_blank" rel="noreferrer" className="inline-block mt-3 h-10 px-4 leading-10 rounded-[12px] bg-primary text-white font-semibold text-[13px]">
+                      Create a new product
+                    </a>
                   )}
                 </td>
               </tr>
@@ -706,10 +708,18 @@ export function PriceGrid({
                             className="w-full h-9 px-2 text-right outline-none bg-white border-2 border-primary"
                           />
                         ) : !member ? (
-                          <div className="px-2 py-2 flex items-center justify-end gap-1.5 min-h-[36px] text-[#AEAEAE]">
-                            <span className="text-[10px] font-semibold">Not in list</span>
+                          <div className="px-2 py-1.5 flex items-center justify-end gap-1.5 min-h-[36px]">
+                            <span className="text-[10px] font-semibold text-[#AEAEAE]">Not in list</span>
                             {onAddToList && (
-                              <button type="button" aria-label={`Add ${row.name} to ${col.name}`} title="Add to this list" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); onAddToList(row, col); }}><Plus size={13} /></button>
+                              <button
+                                type="button"
+                                aria-label={`Add ${row.name} to ${col.name}`}
+                                title={`Add ${row.name} to ${col.name}`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-white text-[11px] font-bold shrink-0 hover:bg-[#5A1926]"
+                                onClick={(e) => { e.stopPropagation(); onAddToList(row, col); }}
+                              >
+                                <Plus size={12} /> Add
+                              </button>
                             )}
                           </div>
                         ) : addedNew ? (
@@ -741,7 +751,18 @@ export function PriceGrid({
                             )}
                             {baseFb && <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">{col.discountPercent > 0 && price !== row.basePrice ? `List −${Number(col.discountPercent)}%` : 'Base'}</span>}
                             {isActiveCell && !locked && (
-                              <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
+                              <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} title="Edit price" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
+                            )}
+                            {!locked && Number(col.discountPercent) === 0 && (
+                              <button
+                                type="button"
+                                aria-label={`Remove ${row.name} from ${col.name}`}
+                                title={`Remove ${row.name} from ${col.name} (draft — publish to apply)`}
+                                className="w-5 h-5 rounded-full border border-[#E9E3DD] bg-white text-[#DC2626] text-[12px] font-bold leading-none flex items-center justify-center shrink-0 hover:bg-red-50"
+                                onClick={(e) => { e.stopPropagation(); setCellFields(row.id, col.id, null); toast.success(`${row.name} removed from ${col.name} (draft) — Review & publish to apply`); }}
+                              >
+                                ×
+                              </button>
                             )}
                           </div>
                         )}

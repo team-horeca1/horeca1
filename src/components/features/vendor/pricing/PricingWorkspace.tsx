@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { effective, type PriceListCol, type ProductRow } from './types';
+import { effective, isMember, type PriceListCol, type ProductRow } from './types';
 import { useDraft } from './grid/useDraft';
 import { PriceGrid } from './grid/PriceGrid';
 import { ReviewPublishDrawer } from './ReviewPublishDrawer';
@@ -22,7 +22,6 @@ import { PublishHistoryTab } from './PublishHistoryTab';
 import { WhyThisPriceDrawer } from './WhyThisPriceDrawer';
 import { NewPriceListModal } from './NewPriceListModal';
 import { AssignmentMatrix } from './assignments/AssignmentMatrix';
-import { AddProductsDialog } from './AddProductsDialog';
 
 type TabId = 'prices' | 'assignments' | 'history';
 
@@ -38,8 +37,8 @@ export function PricingWorkspace() {
 
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addedRows, setAddedRows] = useState<ProductRow[]>([]);
+  /** Single-list view: show every catalogue product (add/remove inline) or only members. */
+  const [showAll, setShowAll] = useState(true);
 
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -102,14 +101,12 @@ export function PricingWorkspace() {
         if (cursor) qs.set('cursor', cursor);
         qs.set('limit', '50');
         const actId = activeListRef.current;
-        const actCol = colsRef.current.find((c) => c.id === actId);
         if (compareRef.current) {
           qs.set('membersOnly', '1');
         } else if (actId) {
+          // Single list: load ALL products so add/remove happens inline in
+          // the grid (no separate Add-products dialog).
           qs.set('listId', actId);
-          if ((actCol?.kind ?? (actCol && actCol.discountPercent > 0 ? 'percent' : 'selected')) !== 'percent') {
-            qs.set('membersOnly', '1');
-          }
         }
 
         const res = await fetch(`/api/v1/vendor/price-lists/workspace?${qs}`);
@@ -147,7 +144,6 @@ export function PricingWorkspace() {
 
   const handlePublished = () => {
     clearDirty();
-    setAddedRows([]);
     void loadWorkspace(true);
   };
 
@@ -270,24 +266,12 @@ export function PricingWorkspace() {
 
   const activeCol = cols.find((c) => c.id === activeListId) ?? cols[0] ?? null;
   const displayCols = compare ? cols : activeCol ? [activeCol] : cols;
+  const activeIsPercent = !!activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) === 'percent';
   const displayRows = (() => {
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    for (const r of addedRows) if (!byId.has(r.id)) byId.set(r.id, r);
-    return [...byId.values()];
+    if (compare || !activeCol || showAll || activeIsPercent) return rows;
+    return rows.filter((r) => isMember(r, activeCol, dirty));
   })();
-
-  const handleAddProducts = (picked: ProductRow[]) => {
-    if (!activeCol) return;
-    setAddedRows((prev) => {
-      const byId = new Map(prev.map((r) => [r.id, r]));
-      for (const r of picked) if (!byId.has(r.id)) byId.set(r.id, r);
-      return [...byId.values()];
-    });
-    for (const r of picked) {
-      setCell(`${r.id}:${activeCol.id}`, { price: null, added: true, isExcluded: false });
-    }
-    toast.success(`${picked.length} product${picked.length === 1 ? '' : 's'} added — set a price for each, then Review & publish`);
-  };
+  const memberCount = activeCol ? rows.filter((r) => isMember(r, activeCol, dirty)).length : 0;
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'prices', label: 'Prices' },
@@ -313,9 +297,18 @@ export function PricingWorkspace() {
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {changeCount > 0 && (
-              <span className="text-[12px] font-semibold text-[#181725] tabular-nums">
-                {changeCount} unsaved
-              </span>
+              <>
+                <span className="text-[12px] font-semibold text-[#181725] tabular-nums">
+                  {changeCount} unsaved
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { clearDirty(); void loadWorkspace(true); toast.success('Changes discarded'); }}
+                  className="h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white font-semibold text-[13px]"
+                >
+                  Discard
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -436,30 +429,32 @@ export function PricingWorkspace() {
             >
               Compare lists
             </button>
-            {!compare && activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) !== 'percent' && (
-              <button type="button" onClick={() => setAddOpen(true)} className="h-9 px-3 rounded-full bg-primary text-white text-[12px] font-bold flex items-center gap-1.5">
-                <Plus size={14} /> Add products
-              </button>
+            {!compare && activeCol && !activeIsPercent && (
+              <span className="inline-flex rounded-full border border-[#E9E3DD] bg-white p-0.5" role="group" aria-label="Show products">
+                <button type="button" onClick={() => setShowAll(true)} className={cn('px-3 py-1.5 rounded-full text-[12px] font-bold', showAll ? 'bg-primary text-white' : 'text-[#181725]')}>
+                  All products ({rows.length})
+                </button>
+                <button type="button" onClick={() => setShowAll(false)} className={cn('px-3 py-1.5 rounded-full text-[12px] font-bold', !showAll ? 'bg-primary text-white' : 'text-[#181725]')}>
+                  In this list ({memberCount})
+                </button>
+              </span>
             )}
-            {!compare && activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) === 'percent' && (
-              <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]" title="A percent list automatically covers every product at its discount — no need to add products">
-                All products included automatically (−{Number(activeCol.discountPercent)}%)
+            {!compare && activeCol && activeIsPercent && (
+              <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]">
+                This list gives −{Number(activeCol.discountPercent)}% on every product automatically
               </span>
             )}
             {compare && (
               <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]">
-                Comparing lists — pick one list above to add products
+                Comparing lists side by side
               </span>
             )}
           </div>
-          <div className="flex flex-wrap gap-2 text-[12px]">
-            {(compare
-              ? ['Each column is one list — “Not in list” means that product keeps its Base price there', 'Tick any list on “Who gets which list” — a customer can be on several lists']
-              : ['1. Add products (button above) adds products from your catalogue to this list', '2. Edit a price: double-click it, or use the ⋮ menu on the product row (Edit price / Remove from list / Hide / Edit product details)', '3. Products not in this list stay at Base price', '4. When ready, use Review & publish — nothing is live until then']
-            ).map((s) => (
-              <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-[#E9E3DD] text-[#181725] font-medium">{s}</span>
-            ))}
-          </div>
+          <p className="text-[12px] text-[#667085]">
+            {compare
+              ? 'Each column is one list. “Not in list” = that product stays at Base price in that list.'
+              : 'In the list below: click a price to change it · press + Add to put a product in this list · ✕ removes it · ⋮ on a product = hide or edit the product itself. Nothing is live until Review & publish.'}
+          </p>
           <div className="relative max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
             <input
@@ -496,7 +491,6 @@ export function PricingWorkspace() {
               onSelectedProductIdsChange={setSelectedProductIds}
               compareMode={compare}
               onAddToList={(row, col) => setCell(`${row.id}:${col.id}`, { price: null, added: true, isExcluded: false })}
-              onAddProducts={!compare && activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) !== 'percent' ? () => setAddOpen(true) : undefined}
             />
           )}
         </>
@@ -562,14 +556,6 @@ export function PricingWorkspace() {
           </div>
         </div>
       )}
-
-      <AddProductsDialog
-        open={addOpen}
-        listId={activeCol?.id ?? null}
-        listName={activeCol?.name ?? ''}
-        onClose={() => setAddOpen(false)}
-        onAdd={handleAddProducts}
-      />
 
       <ReviewPublishDrawer
         open={reviewOpen}
