@@ -488,7 +488,7 @@ export function PriceGrid({
         <table className="border-collapse text-[12px] min-w-full">
           <thead className="sticky top-0 z-30 bg-[#FAF7F2]">
             <tr>
-              <th className="sticky left-0 z-40 bg-[#FAF7F2] p-2 border-b border-[#E9E3DD] text-left min-w-[180px]">
+              <th className="sticky left-0 z-40 bg-[#FAF7F2] p-2 border-b border-[#E9E3DD] text-left min-w-[300px] w-[300px]">
                 <label className="flex items-center gap-2 cursor-pointer">
                   {onSelectedProductIdsChange && rows.length > 0 && (
                     <input
@@ -510,10 +510,10 @@ export function PriceGrid({
                   <span>Product{selectedProductIds && selectedProductIds.size > 0 ? ` (${selectedProductIds.size} selected)` : ''}</span>
                 </label>
               </th>
-              <th className="sticky left-[180px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[88px]">
+              <th className="sticky left-[300px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[88px]">
                 SKU
               </th>
-              <th className="sticky left-[268px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[72px] text-right tabular-nums">
+              <th className="sticky left-[388px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[72px] text-right tabular-nums">
                 Base
               </th>
               {cols.map((col) => (
@@ -580,8 +580,8 @@ export function PriceGrid({
             ) : (
               rows.map((row, ri) => (
                 <tr key={row.id} className="hover:bg-[#FAF7F2]/50">
-                  <td className="sticky left-0 z-20 bg-white p-2 border-b border-[#E9E3DD] font-medium text-[#181725]">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <td className="sticky left-0 z-20 bg-white p-2 border-b border-[#E9E3DD] font-medium text-[#181725] min-w-[300px] w-[300px]">
+                    <label className="flex items-start gap-2 cursor-pointer">
                       {onSelectedProductIdsChange && (
                         <input
                           type="checkbox"
@@ -592,16 +592,16 @@ export function PriceGrid({
                             else next.delete(row.id);
                             onSelectedProductIdsChange(next);
                           }}
-                          className="shrink-0"
+                          className="shrink-0 mt-0.5"
                         />
                       )}
-                      <span className="truncate max-w-[160px]" title={row.name}>{row.name}</span>
+                      <span className="whitespace-normal break-words leading-snug" title={row.name}>{row.name}</span>
                     </label>
                   </td>
-                  <td className="sticky left-[180px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-[#7C7C7C]">
+                  <td className="sticky left-[300px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-[#7C7C7C]">
                     {row.sku || '—'}
                   </td>
-                  <td className="sticky left-[268px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-right tabular-nums text-[#7C7C7C]">
+                  <td className="sticky left-[388px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-right tabular-nums text-[#7C7C7C]">
                     {inr(row.basePrice)}
                   </td>
                   {cols.map((col, ci) => {
