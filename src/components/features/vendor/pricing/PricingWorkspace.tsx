@@ -22,6 +22,7 @@ import { PublishHistoryTab } from './PublishHistoryTab';
 import { WhyThisPriceDrawer } from './WhyThisPriceDrawer';
 import { NewPriceListModal } from './NewPriceListModal';
 import { AssignmentMatrix } from './assignments/AssignmentMatrix';
+import { AddProductsDialog } from './AddProductsDialog';
 
 type TabId = 'prices' | 'assignments' | 'history';
 
@@ -35,6 +36,11 @@ export function PricingWorkspace() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
+  const [activeListId, setActiveListId] = useState<string | null>(null);
+  const [compare, setCompare] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addedRows, setAddedRows] = useState<ProductRow[]>([]);
+
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
@@ -44,6 +50,13 @@ export function PricingWorkspace() {
   const [explainOpen, setExplainOpen] = useState(false);
   const [explainCustomerId, setExplainCustomerId] = useState<string | null>(null);
   const [explainProductId, setExplainProductId] = useState<string | null>(null);
+
+  const colsRef = useRef<PriceListCol[]>([]);
+  colsRef.current = cols;
+  const activeListRef = useRef<string | null>(null);
+  activeListRef.current = activeListId;
+  const compareRef = useRef(false);
+  compareRef.current = compare;
 
   const importRef = useRef<HTMLInputElement>(null);
   const [importListId, setImportListId] = useState<string | null>(null);
@@ -88,12 +101,24 @@ export function PricingWorkspace() {
         if (debounced) qs.set('search', debounced);
         if (cursor) qs.set('cursor', cursor);
         qs.set('limit', '50');
+        const actId = activeListRef.current;
+        const actCol = colsRef.current.find((c) => c.id === actId);
+        if (compareRef.current) {
+          qs.set('membersOnly', '1');
+        } else if (actId) {
+          qs.set('listId', actId);
+          if ((actCol?.kind ?? (actCol && actCol.discountPercent > 0 ? 'percent' : 'selected')) !== 'percent') {
+            qs.set('membersOnly', '1');
+          }
+        }
 
         const res = await fetch(`/api/v1/vendor/price-lists/workspace?${qs}`);
         const json = await res.json();
         if (!json.success) throw new Error(json.error?.message || 'Failed to load');
 
-        setCols(json.data.priceLists as PriceListCol[]);
+        const newCols = json.data.priceLists as PriceListCol[];
+        setCols(newCols);
+        if (!activeListRef.current && newCols.length > 0) setActiveListId(newCols[0].id);
         setBaseVersion(json.data.baseVersion ?? null);
         setRows((prev) => (reset ? json.data.products : [...prev, ...json.data.products]));
         setNextCursor(json.data.pagination?.nextCursor ?? null);
@@ -112,14 +137,24 @@ export function PricingWorkspace() {
     void loadWorkspace(true);
   }, [loadWorkspace]);
 
+  // Reload rows when switching list / compare mode (refs above keep loadWorkspace stable).
+  const firstLoadRef = useRef(true);
+  useEffect(() => {
+    if (firstLoadRef.current) { firstLoadRef.current = false; return; }
+    void loadWorkspace(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeListId, compare]);
+
   const handlePublished = () => {
     clearDirty();
+    setAddedRows([]);
     void loadWorkspace(true);
   };
 
   const exportMatrix = () => {
     const qs = new URLSearchParams();
     if (debounced) qs.set('search', debounced);
+    if (!compare && activeCol) qs.set('listId', activeCol.id);
     window.open(`/api/v1/vendor/price-lists/workspace/export?${qs}`, '_blank');
   };
 
@@ -231,6 +266,27 @@ export function PricingWorkspace() {
     setExplainProductId(firstProduct.id);
     setExplainCustomerId(null);
     setExplainOpen(true);
+  };
+
+  const activeCol = cols.find((c) => c.id === activeListId) ?? cols[0] ?? null;
+  const displayCols = compare ? cols : activeCol ? [activeCol] : cols;
+  const displayRows = (() => {
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const r of addedRows) if (!byId.has(r.id)) byId.set(r.id, r);
+    return [...byId.values()];
+  })();
+
+  const handleAddProducts = (picked: ProductRow[]) => {
+    if (!activeCol) return;
+    setAddedRows((prev) => {
+      const byId = new Map(prev.map((r) => [r.id, r]));
+      for (const r of picked) if (!byId.has(r.id)) byId.set(r.id, r);
+      return [...byId.values()];
+    });
+    for (const r of picked) {
+      setCell(`${r.id}:${activeCol.id}`, { price: null, added: true, isExcluded: false });
+    }
+    toast.success(`${picked.length} product${picked.length === 1 ? '' : 's'} added — set a price for each, then Review & publish`);
   };
 
   const tabs: { id: TabId; label: string }[] = [
@@ -356,8 +412,41 @@ export function PricingWorkspace() {
 
       {tab === 'prices' && (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            {!compare && cols.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setActiveListId(c.id)}
+                className={cn(
+                  'px-3 py-2 rounded-full border text-[12px] font-bold',
+                  activeCol?.id === c.id ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]',
+                )}
+              >
+                {c.name}
+                <span className={cn('ml-1.5 font-semibold', activeCol?.id === c.id ? 'text-white/80' : 'text-[#7C7C7C]')}>
+                  {(c.kind ?? (c.discountPercent > 0 ? 'percent' : 'selected')) === 'percent' ? `All · −${Number(c.discountPercent)}%` : `${c.counts?.priced ?? 0} products`}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setCompare((v) => !v)}
+              className={cn('px-3 py-2 rounded-full border text-[12px] font-bold', compare ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]')}
+            >
+              Compare lists
+            </button>
+            {!compare && activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) !== 'percent' && (
+              <button type="button" onClick={() => setAddOpen(true)} className="h-9 px-3 rounded-full bg-primary text-white text-[12px] font-bold flex items-center gap-1.5">
+                <Plus size={14} /> Add products
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2 text-[12px]">
-            {['1. Click any price to edit it (or tick rows, then Bulk adjust)', '2. Prices in grey use the Base price (or the list default discount) — bold prices are custom for that list', '3. When ready, use Review & publish — nothing is live until then'].map((s) => (
+            {(compare
+              ? ['Each column is one list — “Not in list” means that product keeps its Base price there', 'Tick any list on “Who gets which list” — a customer can be on several lists']
+              : ['1. Add products to this list and click a price to edit it', '2. Products not in this list stay at Base price — bold prices are custom for this list', '3. When ready, use Review & publish — nothing is live until then']
+            ).map((s) => (
               <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-[#E9E3DD] text-[#181725] font-medium">{s}</span>
             ))}
           </div>
@@ -384,8 +473,8 @@ export function PricingWorkspace() {
             </div>
           ) : (
             <PriceGrid
-              rows={rows}
-              cols={cols}
+              rows={displayRows}
+              cols={displayCols}
               dirty={dirty}
               setCell={setCell}
               loading={loading}
@@ -395,6 +484,9 @@ export function PricingWorkspace() {
               onListsChanged={() => void loadWorkspace(true)}
               selectedProductIds={selectedProductIds}
               onSelectedProductIdsChange={setSelectedProductIds}
+              compareMode={compare}
+              onAddToList={(row, col) => setCell(`${row.id}:${col.id}`, { price: null, added: true, isExcluded: false })}
+              onAddProducts={!compare && activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) !== 'percent' ? () => setAddOpen(true) : undefined}
             />
           )}
         </>
@@ -459,6 +551,14 @@ export function PricingWorkspace() {
           </div>
         </div>
       )}
+
+      <AddProductsDialog
+        open={addOpen}
+        listId={activeCol?.id ?? null}
+        listName={activeCol?.name ?? ''}
+        onClose={() => setAddOpen(false)}
+        onAdd={handleAddProducts}
+      />
 
       <ReviewPublishDrawer
         open={reviewOpen}

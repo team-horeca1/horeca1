@@ -1,10 +1,12 @@
-/* Multi-list conflict + precedence ladder hardcore test.
+/* Multi-list + precedence ladder hardcore test (Zoho model).
    5 lists, same product, different prices. Verifies:
-   - non-customer target conflicts (409 TARGET_BOUND), moveFrom moves
-   - customer conflict Skip vs Replace across lists
+   - same target may sit on several lists (no TARGET_BOUND any more)
+   - customer on 2 lists: list priority (Move up/down) decides the winner
    - ladder: customer > group > credit_status > segment > pincode > area > base
      by peeling assignments off one layer at a time
-Run: npx tsx scripts/qa-multilist-conflicts.mts */
+Run: npx tsx scripts/qa-multilist-conflicts.mts [--keep]  (--keep leaves QA data) */
+const KEEP = process.argv.includes('--keep');
+if (KEEP) console.log('(--keep: test data will be left on the demo account)');
 const BASE = 'https://demo.horeca1.com';
 const TS = Date.now().toString(36).toUpperCase();
 let failures = 0, passes = 0;
@@ -107,45 +109,43 @@ async function explain() {
   return d;
 }
 
-/* ---------- Phase 1: non-customer conflicts across lists ---------- */
-console.log('\n== Phase 1: target conflicts (pincode / area) ==');
+/* ---------- Phase 1: same target on several lists ---------- */
+console.log('\n== Phase 1: same target on several lists (allowed) ==');
 let r = await setAsg(LC, [{ type: 'pincode', pincode: PIN }]);
 assert('pincode -> LC 200', r.status === 200, r.text.slice(0, 200));
 r = await setAsg(LA, [{ type: 'pincode', pincode: PIN }]);
-assert('same pincode -> LA rejected 409 TARGET_BOUND', r.status === 409 && r.text.includes('TARGET_BOUND'), `${r.status} ${r.text.slice(0, 250)}`);
-r = await setAsg(LA, [{ type: 'pincode', pincode: PIN, moveFrom: LC }]);
-assert('moveFrom: pincode moves LC -> LA', r.status === 200, r.text.slice(0, 200));
-assert('LC lost pincode', !(await listAsg(LC)).some((a) => a.type === 'pincode'));
-assert('LA holds pincode', (await listAsg(LA)).some((a) => a.type === 'pincode'));
-r = await setAsg(LC, [{ type: 'pincode', pincode: PIN, moveFrom: LA }]);
-assert('moveFrom: pincode moves back LA -> LC', r.status === 200);
+assert('same pincode -> LA ALSO 200 (multi-list)', r.status === 200, `${r.status} ${r.text.slice(0, 250)}`);
+assert('pincode held by BOTH LC and LA', (await listAsg(LC)).some((a) => a.type === 'pincode') && (await listAsg(LA)).some((a) => a.type === 'pincode'));
 await setAsg(LA, []);
 
 r = await setAsg(LD, [{ type: 'area', area: CITY }]);
 assert('area -> LD 200', r.status === 200, r.text.slice(0, 200));
 r = await setAsg(LB, [{ type: 'area', area: CITY }]);
-assert('same area -> LB rejected 409', r.status === 409, `${r.status} ${r.text.slice(0, 200)}`);
-// note: LB keeps NO assignment from the rejected call (transaction safety)
-assert('LB untouched after rejected area claim', (await listAsg(LB)).length === 0);
+assert('same area -> LB ALSO 200 (multi-list)', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
+assert('area held by BOTH LD and LB', (await listAsg(LD)).some((a) => a.type === 'area') && (await listAsg(LB)).some((a) => a.type === 'area'));
+await setAsg(LB, []);
 
-/* ---------- Phase 2: customer skip vs replace ---------- */
-console.log('\n== Phase 2: customer conflicts (skip / replace) ==');
+/* ---------- Phase 2: customer on two lists + priority winner ---------- */
+console.log('\n== Phase 2: customer on 2 lists (priority winner) ==');
 r = await setAsg(LA, [{ type: 'customer', userId: CUST }]);
 assert('customer -> LA 200', r.status === 200);
 r = await setAsg(LB, [{ type: 'customer', userId: CUST }], [{ userId: CUST, action: 'skip' }]);
-assert('customer -> LB with SKIP 200', r.status === 200, r.text.slice(0, 200));
-assert('skip: LB has no customer', !(await listAsg(LB)).some((a) => a.type === 'customer'));
-assert('skip: LA keeps customer', (await listAsg(LA)).some((a) => a.type === 'customer'));
-r = await setAsg(LB, [{ type: 'customer', userId: CUST }], [{ userId: CUST, action: 'replace' }]);
-assert('customer -> LB with REPLACE 200', r.status === 200, r.text.slice(0, 200));
-assert('replace: LA lost customer', !(await listAsg(LA)).some((a) => a.type === 'customer'));
-assert('replace: LB holds customer', (await listAsg(LB)).some((a) => a.type === 'customer'));
+assert('customer -> LB ALSO 200 (skip ignored)', r.status === 200, r.text.slice(0, 200));
+assert('customer on BOTH LA and LB', (await listAsg(LA)).some((a) => a.type === 'customer') && (await listAsg(LB)).some((a) => a.type === 'customer'));
 {
   const e = await explain();
-  assert('after replace, explain = LB price ₹94 via customer', e.unitPrice === 94 && (e.source ?? '').includes('customer'), JSON.stringify(e));
+  assert('tie (priority 0): older LA wins ₹95 via customer', e.unitPrice === 95 && (e.source ?? '').includes('customer'), JSON.stringify(e));
+  const effR = await api(vendor, 'GET', '/api/v1/vendor/price-lists/assignments/effective');
+  const me = (dig(effR.json, ['data']) as Array<{ userId: string; effective: { lists?: Array<{ priceListName: string }> } }>).find((x) => x.userId === CUST);
+  assert('effective.lists shows both lists for customer', (me?.effective.lists?.length ?? 0) >= 2, JSON.stringify(me?.effective).slice(0, 300));
 }
-r = await setAsg(LA, [{ type: 'customer', userId: CUST }], [{ userId: CUST, action: 'replace' }]);
-assert('restore customer -> LA with REPLACE 200', r.status === 200);
+// Move LB up: LB priority 0, LA priority 5 -> LB price wins
+await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${LA}`, { priority: 5 });
+{
+  const e = await explain();
+  assert('LB moved up: LB wins ₹94 via customer', e.unitPrice === 94 && (e.source ?? '').includes('customer'), JSON.stringify(e));
+}
+await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${LA}`, { priority: 0 });
 await setAsg(LB, []);
 
 /* ---------- Phase 3: precedence ladder peel-off ---------- */
@@ -196,9 +196,13 @@ await setAsg(LD, []); // remove area layer
 
 /* cleanup */
 console.log('\n== cleanup ==');
-for (const l of ALL) await api(vendor, 'DELETE', `/api/v1/vendor/price-lists/${l}`);
-if (GID) await api(vendor, 'DELETE', `/api/v1/vendor/customer-groups/${GID}`);
-const after = (dig((await api(vendor, 'GET', '/api/v1/vendor/price-lists')).json, ['data']) as Array<{ name: string }>) ?? [];
-assert('no QA-MC lists left active', !after.some((l) => l.name.includes(`QA-MC-${TS}`)), after.map((l) => l.name).join('|'));
+if (KEEP) {
+  note('KEEP mode: QA-MC lists/group left on demo account on purpose');
+} else {
+  for (const l of ALL) await api(vendor, 'DELETE', `/api/v1/vendor/price-lists/${l}`);
+  if (GID) await api(vendor, 'DELETE', `/api/v1/vendor/customer-groups/${GID}`);
+  const after = (dig((await api(vendor, 'GET', '/api/v1/vendor/price-lists')).json, ['data']) as Array<{ name: string }>) ?? [];
+  assert('no QA-MC lists left active', !after.some((l) => l.name.includes(`QA-MC-${TS}`)), after.map((l) => l.name).join('|'));
+}
 console.log(`\n==== MULTILIST RESULT: ${passes} passed, ${failures} failed ====`);
 process.exit(failures === 0 ? 0 : 1);

@@ -12,6 +12,8 @@ export interface PriceListCol {
   id: string;
   name: string;
   discountPercent: number;
+  kind?: 'selected' | 'percent';
+  priority?: number;
   floorPercentOfBase?: number | null;
   counts?: { priced: number; excluded: number; locked: number; scheduled: number };
   assignmentSummary?: Record<string, number>;
@@ -53,7 +55,20 @@ export interface ProductRow {
   cells: Record<string, PriceListItemData | null>;
 }
 
-export type DraftCell = Partial<PriceListItemData> | null;
+export type DraftCell = (Partial<PriceListItemData> & { added?: boolean }) | null;
+
+export function isMember(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
+  if ((col.kind ?? (col.discountPercent > 0 ? 'percent' : 'selected')) === 'percent') return true;
+  const key = cellKey(row.id, col.id);
+  if (key in dirty) {
+    const d = dirty[key];
+    if (d === null) return false;
+    if (d.added) return true;
+    if (d.price != null || d.isExcluded) return true;
+    return !!row.cells[col.id];
+  }
+  return !!row.cells[col.id];
+}
 
 export interface CustomerTarget {
   userId: string;
@@ -126,6 +141,7 @@ export function dirtyToPublishCells(dirty: Record<string, DraftCell>) {
     return {
       productId,
       priceListId,
+      added: cellUpdates.added,
       customPrice: cellUpdates.price !== undefined ? cellUpdates.price : undefined,
       isExcluded: cellUpdates.isExcluded,
       isLocked: cellUpdates.isLocked,

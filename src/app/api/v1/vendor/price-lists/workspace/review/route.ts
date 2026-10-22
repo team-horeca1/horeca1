@@ -13,6 +13,7 @@ const schema = z.object({
   cells: z.array(z.object({
     priceListId: z.string().uuid(),
     productId: z.string().uuid(),
+    added: z.boolean().optional(),
     customPrice: z.number().nonnegative().nullable().optional(),
     isExcluded: z.boolean().optional(),
     isLocked: z.boolean().optional(),

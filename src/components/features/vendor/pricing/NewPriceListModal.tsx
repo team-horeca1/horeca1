@@ -14,7 +14,8 @@ interface Props {
 
 export function NewPriceListModal({ open, onClose, onCreated, existingLists }: Props) {
   const [name, setName] = useState('');
-  const [discountPercent, setDiscountPercent] = useState('0');
+  const [kind, setKind] = useState<'selected' | 'percent'>('selected');
+  const [discountPercent, setDiscountPercent] = useState('5');
   const [cloneFromId, setCloneFromId] = useState('');
   const [adjustPercent, setAdjustPercent] = useState('');
   const [saving, setSaving] = useState(false);
@@ -23,7 +24,8 @@ export function NewPriceListModal({ open, onClose, onCreated, existingLists }: P
 
   const reset = () => {
     setName('');
-    setDiscountPercent('0');
+    setKind('selected');
+    setDiscountPercent('5');
     setCloneFromId('');
     setAdjustPercent('');
   };
@@ -52,7 +54,8 @@ export function NewPriceListModal({ open, onClose, onCreated, existingLists }: P
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: trimmed,
-            discountPercent: Number(discountPercent) || 0,
+            kind,
+            discountPercent: kind === 'percent' ? Number(discountPercent) || 0 : 0,
           }),
         });
         const json = await res.json();
@@ -93,17 +96,39 @@ export function NewPriceListModal({ open, onClose, onCreated, existingLists }: P
           />
         </div>
 
-        <div>
-          <label className="text-[12px] font-medium text-[#7C7C7C]">Default discount off base (%)</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={discountPercent}
-            onChange={(e) => setDiscountPercent(e.target.value)}
-            className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] outline-none focus:border-primary tabular-nums"
-          />
-        </div>
+        {!cloneFromId && (
+          <div className="space-y-2">
+            <span className="text-[12px] font-medium text-[#7C7C7C]">What kind of list?</span>
+            <label className="flex items-start gap-2 p-3 rounded-[12px] border border-[#E9E3DD] cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-[#F8E8EC]/40">
+              <input type="radio" name="list-kind" checked={kind === 'selected'} onChange={() => setKind('selected')} className="mt-0.5" />
+              <span>
+                <span className="block text-[13px] font-bold text-[#181725]">Selected products</span>
+                <span className="block text-[12px] text-[#7C7C7C]">You add products and set each price. Everything else stays at Base price. (Recommended)</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 p-3 rounded-[12px] border border-[#E9E3DD] cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-[#F8E8EC]/40">
+              <input type="radio" name="list-kind" checked={kind === 'percent'} onChange={() => setKind('percent')} className="mt-0.5" />
+              <span>
+                <span className="block text-[13px] font-bold text-[#181725]">All products − %</span>
+                <span className="block text-[12px] text-[#7C7C7C]">Every product gets the same % off Base. You can still override single products later.</span>
+              </span>
+            </label>
+          </div>
+        )}
+
+        {kind === 'percent' && !cloneFromId && (
+          <div>
+            <label className="text-[12px] font-medium text-[#7C7C7C]">Discount off Base for every product (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={discountPercent}
+              onChange={(e) => setDiscountPercent(e.target.value)}
+              className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] outline-none focus:border-primary tabular-nums"
+            />
+          </div>
+        )}
 
         <div>
           <label className="text-[12px] font-medium text-[#7C7C7C]">Optional: clone prices from</label>
@@ -142,7 +167,7 @@ export function NewPriceListModal({ open, onClose, onCreated, existingLists }: P
           </button>
           <button
             type="button"
-            disabled={saving || !name.trim()}
+            disabled={saving || !name.trim() || (!cloneFromId && kind === 'percent' && !(Number(discountPercent) > 0))}
             onClick={() => void submit()}
             className="flex-1 h-11 rounded-[12px] bg-primary text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >

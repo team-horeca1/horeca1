@@ -2540,6 +2540,8 @@ model PriceList {
   // Optional floor: prices below (base × floorPercentOfBase / 100) are blocked on publish.
   // There is no product cost field — this is a supplier-set floor, not margin validation.
   floorPercentOfBase Decimal? @map("floor_percent_of_base") @db.Decimal(5, 2)
+  // Same-level overlap tie-breaker: lower priority wins (Move up/down in UI).
+  priority        Int       @default(0)
   isActive        Boolean   @default(true) @map("is_active")
   // List-level validity window. When set, the resolver ignores this list
   // outside [validFrom, validTo] and the customer falls back to base/other.

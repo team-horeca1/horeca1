@@ -26,6 +26,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const brandId = params.get('brandId') || undefined;
     const collectionId = params.get('collectionId') || undefined;
     const listId = params.get('listId') || undefined;
+    const membersOnly = params.get('membersOnly') === '1';
+    const excludeListId = params.get('excludeListId') || undefined;
     const cursor = params.get('cursor') || undefined;
     const limit = Math.min(Number(params.get('limit')) || 50, 200);
 
@@ -34,12 +36,14 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         where: {
           vendorId,
           isActive: true,
-          ...(listId ? { id: listId } : {}),
+          // listId filters product cells/membership below, not the list catalogue itself.
         },
         select: {
           id: true,
           name: true,
           discountPercent: true,
+          priority: true,
+          createdAt: true,
           floorPercentOfBase: true,
           assignments: { select: { type: true } },
           _count: {
@@ -49,7 +53,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             },
           },
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
       }),
       getLatestPublishId(vendorId),
     ]);
@@ -102,6 +106,18 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         : {}),
       ...(collectionId
         ? { collectionProducts: { some: { collectionId } } }
+        : {}),
+      ...(membersOnly
+        ? {
+            priceListItems: {
+              some: listId
+                ? { priceListId: listId }
+                : { priceList: { vendorId, isActive: true } },
+            },
+          }
+        : {}),
+      ...(excludeListId
+        ? { priceListItems: { none: { priceListId: excludeListId } } }
         : {}),
       ...(search
         ? {
@@ -215,6 +231,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           id: l.id,
           name: l.name,
           discountPercent: Number(l.discountPercent),
+          kind: Number(l.discountPercent) > 0 ? 'percent' as const : 'selected' as const,
+          priority: l.priority,
           floorPercentOfBase: l.floorPercentOfBase != null ? Number(l.floorPercentOfBase) : null,
           counts: countsByList.get(l.id) ?? { priced: 0, excluded: 0, locked: 0, scheduled: 0 },
           assignmentSummary: l.assignments.reduce<Record<string, number>>((acc, a) => {
@@ -238,6 +256,7 @@ const patchSchema = z.object({
   cells: z.array(z.object({
     priceListId: z.string().uuid(),
     productId: z.string().uuid(),
+    added: z.boolean().optional(),
     customPrice: z.number().nonnegative().nullable().optional(),
     isExcluded: z.boolean().optional(),
     isLocked: z.boolean().optional(),

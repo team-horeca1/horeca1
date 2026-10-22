@@ -1,10 +1,13 @@
 /* HARDCORE Price List QA — real API contracts (demo branch).
    Covers: lists CRUD, workspace publish lifecycle, guardrails (block/warn/
    floor/MRP/zero), stale-version, rollback, hidden, assignments full-set
-   (all 8 target types, twice, conflicts skip/replace/move), groups CRUD,
+   (all 8 target types, twice, multi-list allowed + priority winner), groups CRUD,
    bulk-apply, bulk-upload (SKU/productId/errors), clone+adjust, export CSV,
-   explain buyer prices, preview. Cleans up everything it creates.
-Run: npx tsx scripts/qa-pricelists-hardcore.mts */
+   explain buyer prices, preview, Zoho membership (membersOnly/excludeListId,
+   kind, unpriced review warning, remove-from-list).
+Run: npx tsx scripts/qa-pricelists-hardcore.mts [--keep]  (--keep leaves QA data on demo) */
+const KEEP = process.argv.includes('--keep');
+if (KEEP) console.log('(--keep: test data will be left on the demo account)');
 const BASE = 'https://demo.horeca1.com';
 const TS = Date.now().toString(36).toUpperCase();
 let failures = 0;
@@ -285,43 +288,39 @@ assert('assign all 7 types AGAIN 200 (regression)', r.status === 200, r.text.sli
   const pv = await api(vendor, 'POST', '/api/v1/vendor/price-lists/assignments/preview', { priceListId: L1, target: { type: 'customer', userId: CUST } });
   assert('preview assignment 200', pv.status === 200, pv.text.slice(0, 300));
 }
-/* conflicts: non-customer TARGET_BOUND + moveFrom */
+/* multi-list: same target may be on several lists (Zoho model) */
 {
-  const conflict = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [{ type: 'pincode', pincode: '999001' }] });
-  assert('pincode conflict on L2 -> 409 TARGET_BOUND', conflict.status === 409, `${conflict.status} ${conflict.text.slice(0, 300)}`);
-  const move = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [{ type: 'pincode', pincode: '999001', moveFrom: L1 }] });
-  assert('moveFrom moves pincode to L2 200', move.status === 200, move.text.slice(0, 300));
+  const second = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [{ type: 'pincode', pincode: '999001' }] });
+  assert('same pincode on L2 now ALLOWED 200 (multi-list)', second.status === 200, `${second.status} ${second.text.slice(0, 300)}`);
   const l1a = await listAssignments(L1);
-  // NOTE: L1 local set lost pincode server-side; resync curAsg
-  curAsg = FULL.filter((a) => a.type !== 'pincode');
-  assert('L1 no longer has pincode', !l1a.some((a) => a.type === 'pincode'));
-  const back = await setAssignments(L1, FULL);
-  assert('move pincode back to L1 (full set, no moveFrom -> expect 409 or auto)', back.status === 409 || back.status === 200, back.status);
-  if (back.status === 409) {
-    const back2 = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L1}`, { assignments: FULL.map((a) => a.type === 'pincode' ? { ...a, moveFrom: L2 } : a) });
-    assert('move pincode back with moveFrom 200', back2.status === 200, back2.text.slice(0, 300));
-    if (back2.status === 200) curAsg = FULL;
-  } else curAsg = FULL;
+  const l2a = await listAssignments(L2);
+  assert('pincode held by BOTH L1 and L2', l1a.some((a) => a.type === 'pincode') && l2a.some((a) => a.type === 'pincode'));
   await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [] });
 }
-/* conflicts: customer skip vs replace */
+/* multi-list: customer on two lists, priority decides the winner */
 {
-  const skip = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [asgCustomer], resolutions: [{ userId: CUST, action: 'skip' }] });
-  assert('customer assign L2 with skip 200', skip.status === 200, skip.text.slice(0, 300));
-  const l2a = await listAssignments(L2);
-  assert('skip: L2 did NOT gain customer', !l2a.some((a) => a.type === 'customer'));
-  const rep = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [asgCustomer], resolutions: [{ userId: CUST, action: 'replace' }] });
-  assert('customer assign L2 with replace 200', rep.status === 200, rep.text.slice(0, 300));
+  // Price A on L2 as well (85) so both lists price the same product.
+  const pub = await publish([{ priceListId: L2, productId: A, customPrice: 85 }]);
+  assert('publish A=85 on L2', pub.status === 200, pub.text.slice(0, 200));
+  const both = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [asgCustomer], resolutions: [{ userId: CUST, action: 'skip' }] });
+  assert('customer assign L2 (skip resolution ignored) 200', both.status === 200, both.text.slice(0, 300));
   const l1a = await listAssignments(L1);
   const l2b = await listAssignments(L2);
-  assert('replace: customer moved L1 -> L2', !l1a.some((a) => a.type === 'customer') && l2b.some((a) => a.type === 'customer'), `L1=${l1a.length} L2=${l2b.length}`);
-  /* restore: back to L1 with replace, keep rest of FULL set */
-  const restore = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L1}`, { assignments: FULL, resolutions: [{ userId: CUST, action: 'replace' }] });
-  assert('restore customer to L1 200', restore.status === 200, restore.text.slice(0, 300));
-  if (restore.status === 200) curAsg = FULL;
+  assert('customer now on BOTH L1 and L2', l1a.some((a) => a.type === 'customer') && l2b.some((a) => a.type === 'customer'), `L1=${l1a.length} L2=${l2b.length}`);
+  // Default priority tie -> older list (L1, 90) wins.
+  let e = await explain(CUST, A);
+  assert('both lists price A: older L1 wins (90)', num(e.data?.price ?? e.data?.unitPrice) === 90, e.raw.slice(0, 250));
+  // Move L2 up: priority 0 for L2, 5 for L1 -> L2 (85) wins.
+  const prio = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { priority: 0 });
+  const prio1 = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L1}`, { priority: 5 });
+  assert('set priorities 200', prio.status === 200 && prio1.status === 200);
+  e = await explain(CUST, A);
+  assert('after Move up: L2 wins (85)', num(e.data?.price ?? e.data?.unitPrice) === 85, e.raw.slice(0, 250));
+  // Restore order and detach L2.
+  await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L1}`, { priority: 0 });
   await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L2}`, { assignments: [] });
-  const e = await explain(CUST, A);
-  assert('after restore, customer sees 90 again', num(e.data?.price ?? e.data?.unitPrice) === 90);
+  e = await explain(CUST, A);
+  assert('after detach, customer sees L1 90 again', num(e.data?.price ?? e.data?.unitPrice) === 90);
 }
 /* other customer unaffected */
 {
@@ -415,8 +414,67 @@ console.log('\n== G. groups CRUD ==');
   note(`group delete status ${del.status}: ${del.text.slice(0, 150)}`);
 }
 
+/* ================= ZOHO MEMBERSHIP ================= */
+console.log('\n== H. Zoho membership (selected vs percent, membersOnly, unpriced, remove) ==');
+{
+  // workspace meta: kind + priority present
+  const { data } = await ws();
+  const meta = (data as unknown as { priceLists: Array<{ id: string; kind?: string; priority?: number }> }).priceLists.find((l) => l.id === L1);
+  assert('workspace list meta has kind=selected + priority', !!meta && (meta as { kind?: string }).kind === 'selected' && typeof (meta as { priority?: number }).priority === 'number', JSON.stringify(meta));
+
+  // membersOnly for L1 contains Widget A (priced there), not an unrelated product search miss
+  const mo = await api(vendor, 'GET', `/api/v1/vendor/price-lists/workspace?limit=100&listId=${L1}&membersOnly=1`);
+  const moRows = (dig(mo.json, ['data', 'products']) as Array<{ id: string }>) ?? [];
+  assert('membersOnly(L1) includes Widget A', moRows.some((p) => p.id === A), `${moRows.length} rows`);
+  assert('membersOnly(L1) rows all have an L1 cell', moRows.length > 0);
+
+  // excludeListId=L1 must NOT return Widget A
+  const ex = await api(vendor, 'GET', `/api/v1/vendor/price-lists/workspace?limit=100&excludeListId=${L1}`);
+  const exRows = (dig(ex.json, ['data', 'products']) as Array<{ id: string }>) ?? [];
+  assert('excludeListId(L1) excludes Widget A (already in list)', !exRows.some((p) => p.id === A));
+
+  // percent kind list
+  const pct = await api(vendor, 'POST', '/api/v1/vendor/price-lists', { name: `QA-HC-${TS}-Pct`, kind: 'percent', discountPercent: 10 });
+  const PCT = dig(pct.json, ['data', 'id']) as string;
+  assert('create percent list 201', pct.status === 201 && !!PCT, pct.text.slice(0, 200));
+  const badPct = await api(vendor, 'POST', '/api/v1/vendor/price-lists', { name: `QA-HC-${TS}-PctBad`, kind: 'percent', discountPercent: 0 });
+  assert('percent list without discount rejected', badPct.status === 400, `${badPct.status}`);
+  const { data: wsPct } = await ws();
+  const pctMeta = (wsPct as unknown as { priceLists: Array<{ id: string; kind?: string }> }).priceLists.find((l) => l.id === PCT);
+  assert('workspace kind=percent for -10% list', (pctMeta as { kind?: string } | undefined)?.kind === 'percent', JSON.stringify(pctMeta));
+
+  // unpriced review warning: added-but-empty cell (Widget A has no item on PCT yet)
+  const rev = await api(vendor, 'POST', '/api/v1/vendor/price-lists/workspace/review', {
+    baseVersion: null,
+    cells: [{ priceListId: PCT, productId: A, added: true, customPrice: null, isExcluded: false }],
+  });
+  const revData = dig(rev.json, ['data']) as { summary?: { unpriced?: number }; unpriced?: unknown[] } | null;
+  note(`review unpriced: ${JSON.stringify(revData?.summary)}`);
+  assert('review warns added-but-unpriced (summary.unpriced >= 1)', rev.status === 200 && (revData?.summary?.unpriced ?? 0) >= 1, rev.text.slice(0, 300));
+
+  // remove-from-list: clear Q1 from L2 then membersOnly(L2) must drop it
+  const pubQ1 = await publish([{ priceListId: L2, productId: Q1, customPrice: 77 }]);
+  assert('publish Q1=77 on L2', pubQ1.status === 200, pubQ1.text.slice(0, 200));
+  const moBefore = await api(vendor, 'GET', `/api/v1/vendor/price-lists/workspace?limit=100&listId=${L2}&membersOnly=1`);
+  assert('membersOnly(L2) has Q1 after publish', ((dig(moBefore.json, ['data', 'products']) as Array<{ id: string }>) ?? []).some((p) => p.id === Q1));
+  const rm = await publish([{ priceListId: L2, productId: Q1, customPrice: null, isExcluded: false }]);
+  assert('remove-from-list publish (clear cell) 200', rm.status === 200, rm.text.slice(0, 200));
+  const moAfter = await api(vendor, 'GET', `/api/v1/vendor/price-lists/workspace?limit=100&listId=${L2}&membersOnly=1`);
+  assert('membersOnly(L2) drops Q1 after remove', !((dig(moAfter.json, ['data', 'products']) as Array<{ id: string }>) ?? []).some((p) => p.id === Q1));
+
+  // single-list export only members
+  const expOne = await api(vendor, 'GET', `/api/v1/vendor/price-lists/workspace/export?listId=${L1}`);
+  assert('export?listId=L1 200 with one list column', expOne.status === 200 && expOne.text.split('\n')[0].split(',').length === 4, expOne.text.split('\n')[0]);
+
+  if (!KEEP) { await api(vendor, 'DELETE', `/api/v1/vendor/price-lists/${PCT}`); }
+  else note(`kept percent list ${PCT}`);
+}
+
 /* ================= CLEANUP ================= */
-console.log('\n== H. cleanup ==');
+console.log('\n== I. cleanup ==');
+if (KEEP) {
+  note('KEEP mode: QA-HC lists/products/groups left on demo account on purpose');
+} else {
 await setAssignments(L1, []);
 for (const id of [L1, L2, CLONE].filter(Boolean)) {
   const d = await api(vendor, 'DELETE', `/api/v1/vendor/price-lists/${id}`);
@@ -432,6 +490,7 @@ for (const pid of [Q1, Q2]) {
   assert('workspace clean: QA products gone', !names.some((n) => n.includes(`QAH-${TS}`) || n.includes('QA-HARDCORE Super')), names.join('|').slice(0, 200));
   const lists = (dig((await api(vendor, 'GET', '/api/v1/vendor/price-lists')).json, ['data']) as Array<{ name: string }>) ?? [];
   assert('lists clean: no QA-HC lists active', !lists.some((l) => l.name.includes(`QA-HC-${TS}`)), lists.map((l) => l.name).join('|'));
+}
 }
 console.log(`\n==== RESULT: ${passes} passed, ${failures} failed ====`);
 process.exit(failures === 0 ? 0 : 1);

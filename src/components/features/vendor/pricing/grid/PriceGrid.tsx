@@ -14,6 +14,10 @@ import {
   Eye,
   Percent,
   RotateCcw,
+  ArrowUp,
+  ArrowDown,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -25,6 +29,7 @@ import {
   inr,
   isDirty,
   isExcluded,
+  isMember,
 } from '../types';
 
 interface Props {
@@ -39,6 +44,9 @@ interface Props {
   onListsChanged?: () => void;
   selectedProductIds?: Set<string>;
   onSelectedProductIdsChange?: (ids: Set<string>) => void;
+  compareMode?: boolean;
+  onAddToList?: (row: ProductRow, col: PriceListCol) => void;
+  onAddProducts?: () => void;
 }
 
 function cellLocked(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
@@ -77,6 +85,9 @@ export function PriceGrid({
   onListsChanged,
   selectedProductIds,
   onSelectedProductIdsChange,
+  compareMode,
+  onAddToList,
+  onAddProducts,
 }: Props) {
   const [active, setActive] = useState<{ r: number; c: number } | null>(null);
   const [anchor, setAnchor] = useState<{ r: number; c: number } | null>(null);
@@ -377,6 +388,30 @@ export function PriceGrid({
     }
   };
 
+  const moveList = async (id: string, dir: -1 | 1) => {
+    const idx = cols.findIndex((c) => c.id === id);
+    const swap = idx + dir;
+    if (idx < 0 || swap < 0 || swap >= cols.length) return;
+    setColMenu(null);
+    setColBusy(id);
+    try {
+      const reordered = [...cols];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(swap, 0, moved);
+      for (let i = 0; i < reordered.length; i++) {
+        if ((reordered[i].priority ?? i) === i) continue;
+        const res = await fetch(`/api/v1/vendor/price-lists/${reordered[i].id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priority: i }),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error?.message || 'Reorder failed');
+      }
+      toast.success('List order updated — this decides which list wins when both price the same product');
+      onListsChanged?.();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Reorder failed'); } finally { setColBusy(null); }
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!active || editing) return;
@@ -456,14 +491,25 @@ export function PriceGrid({
           <button type="button" className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1" onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) { const p = effective(r, c, dirty); mergeCellFields(r.id, c.id, { price: Math.round(p * 1.05 * 100) / 100, isExcluded: false }); } })}>
             <Percent size={13} /> +5%
           </button>
-          <button
-            type="button"
-            className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
-            title="Set the price to exactly the Base price (ignores the list default discount)"
-            onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) mergeCellFields(r.id, c.id, { price: r.basePrice, isExcluded: false }); })}
-          >
-            <RotateCcw size={13} /> Use Base price
-          </button>
+          {cols[active.c].discountPercent > 0 ? (
+            <button
+              type="button"
+              className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
+              title="Set the price to exactly the Base price (ignores the list default discount)"
+              onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) mergeCellFields(r.id, c.id, { price: r.basePrice, isExcluded: false }); })}
+            >
+              <RotateCcw size={13} /> Use Base price
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
+              title="Remove this product from the list — it goes back to Base price (or the next list the customer is on)"
+              onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) setCellFields(r.id, c.id, null); })}
+            >
+              <Trash2 size={13} /> Remove from list
+            </button>
+          )}
           <button
             type="button"
             className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
@@ -527,7 +573,9 @@ export function PriceGrid({
                         {col.name}
                       </div>
                       <div className="text-[10px] text-[#7C7C7C] tabular-nums">
-                        {col.counts?.priced ?? 0} custom · {col.counts?.excluded ?? 0} hidden
+                        {(col.kind ?? (col.discountPercent > 0 ? 'percent' : 'selected')) === 'percent'
+                          ? `All products · −${Number(col.discountPercent)}%`
+                          : `${col.counts?.priced ?? 0} products · ${col.counts?.excluded ?? 0} hidden`}
                       </div>
                     </div>
                     <button
@@ -577,6 +625,18 @@ export function PriceGrid({
                   <Loader2 className="inline animate-spin mr-2" size={18} /> Loading products…
                 </td>
               </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={3 + cols.length} className="p-12 text-center">
+                  <p className="text-[13px] font-bold text-[#AEAEAE]">No products in this list yet</p>
+                  <p className="text-[12px] text-[#AEAEAE] mt-1">Products you don’t add stay at Base price for these customers.</p>
+                  {onAddProducts && (
+                    <button type="button" onClick={onAddProducts} className="mt-3 h-10 px-4 rounded-[12px] bg-primary text-white font-semibold text-[13px] inline-flex items-center gap-1.5">
+                      <Plus size={14} /> Add products
+                    </button>
+                  )}
+                </td>
+              </tr>
             ) : (
               rows.map((row, ri) => (
                 <tr key={row.id} className="hover:bg-[#FAF7F2]/50">
@@ -613,6 +673,9 @@ export function PriceGrid({
                     const isActiveCell = active?.r === ri && active?.c === ci;
                     const inSel = selection.has(`${ri}:${ci}`);
                     const isEdit = editing?.r === ri && editing?.c === ci;
+                    const member = isMember(row, col, dirty);
+                    const dirtyForCell = dirty[cellKey(row.id, col.id)];
+                    const addedNew = !!dirtyForCell && dirtyForCell !== null && !!dirtyForCell.added && dirtyForCell.price == null && !row.cells[col.id];
 
                     return (
                       <td
@@ -645,6 +708,17 @@ export function PriceGrid({
                             }}
                             className="w-full h-9 px-2 text-right outline-none bg-white border-2 border-primary"
                           />
+                        ) : !member ? (
+                          <div className="px-2 py-2 flex items-center justify-end gap-1.5 min-h-[36px] text-[#AEAEAE]">
+                            <span className="text-[10px] font-semibold">Not in list</span>
+                            {onAddToList && (
+                              <button type="button" aria-label={`Add ${row.name} to ${col.name}`} title="Add to this list" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); onAddToList(row, col); }}><Plus size={13} /></button>
+                            )}
+                          </div>
+                        ) : addedNew ? (
+                          <button type="button" className="w-full px-2 py-2 flex items-center justify-end min-h-[36px]" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}>
+                            <span className="inline-flex px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold normal-case">New · set price</span>
+                          </button>
                         ) : excluded ? (
                           <div className="px-2 py-2 flex items-center justify-end gap-1.5 min-h-[36px]">
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold normal-case"><EyeOff size={10} /> Hidden</span>
@@ -705,6 +779,22 @@ export function PriceGrid({
             className="fixed z-50 bg-white border border-[#E9E3DD] rounded-[12px] shadow-xl py-1 w-[208px] max-w-[calc(100vw-24px)] text-[13px]"
             style={{ left: colMenu.x, top: colMenu.y }}
           >
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40"
+              disabled={cols.findIndex((x) => x.id === colMenu.id) <= 0}
+              onClick={() => void moveList(colMenu.id, -1)}
+            >
+              <ArrowUp size={14} /> Move up (wins ties)
+            </button>
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40"
+              disabled={cols.findIndex((x) => x.id === colMenu.id) >= cols.length - 1}
+              onClick={() => void moveList(colMenu.id, 1)}
+            >
+              <ArrowDown size={14} /> Move down
+            </button>
             <button
               type="button"
               className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2"
@@ -857,7 +947,7 @@ export function PriceGrid({
             <div>
               <p className="text-[12px] font-semibold text-[#181725] mb-1.5">Apply to</p>
               <div className="flex gap-2" role="group" aria-label="Apply scope">
-                <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>All products</button>
+                <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>{compareMode ? 'All products shown' : 'All products in this list'}</button>
                 <button type="button" disabled={!selectedProductIds || selectedProductIds.size === 0} onClick={() => setBulkScope('selected')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold disabled:opacity-40', bulkScope === 'selected' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>Only ticked rows ({selectedProductIds?.size ?? 0})</button>
               </div>
               {bulkScope === 'selected' && <p className="text-[11px] text-amber-700 mt-1.5">Only the ticked product rows will change — untick them on the grid for all products.</p>}

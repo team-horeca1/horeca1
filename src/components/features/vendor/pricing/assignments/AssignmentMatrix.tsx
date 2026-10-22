@@ -5,7 +5,6 @@ import { Loader2, Pencil, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { AssignmentType, CustomerTarget, PriceListCol } from '../types';
-import { ConflictDialog, type PreviewConflict } from './ConflictDialog';
 import { CustomerPricePanel } from './CustomerPricePanel';
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 
@@ -64,6 +63,7 @@ type EffectiveRow = {
     priceListName: string;
     via: string;
     assignedAt: string | null;
+    lists?: Array<{ priceListId: string; priceListName: string; via: string; assignedAt: string | null; itemCount: number }>;
   };
 };
 
@@ -104,18 +104,6 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
   const [busyCell, setBusyCell] = useState<string | null>(null);
   const busyRef = useRef(false);
 
-  const [conflict, setConflict] = useState<{
-    priceListId: string;
-    listName: string;
-    target: TargetRow;
-    preview: {
-      affectedCount: number;
-      conflicts: PreviewConflict[];
-      alreadyBound: { priceListId: string; priceListName: string } | null;
-    };
-    pendingAssignments: PriceListAssignment[];
-  } | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -137,6 +125,8 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
             id: l.id,
             name: l.name,
             discountPercent: Number(l.discountPercent),
+            kind: l.kind,
+            priority: l.priority,
             assignments: l.assignments ?? [],
           })),
         );
@@ -314,37 +304,26 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         return;
       }
 
-      const previewRes = await fetch('/api/v1/vendor/price-lists/assignments/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceListId: list.id,
-          target: buildTarget(target),
-        }),
-      });
-      const previewJson = await previewRes.json();
-      if (!previewJson.success) throw new Error(previewJson.error?.message || 'Preview failed');
-      const preview = previewJson.data as {
-        affectedCount: number;
-        conflicts: PreviewConflict[];
-        alreadyBound: { priceListId: string; priceListName: string } | null;
-      };
+      // A target can be on several lists — save directly, no conflict blocking.
+      // Overlap info is best-effort only (shown in the toast, never blocks).
+      let overlapNote = '';
+      try {
+        const previewRes = await fetch('/api/v1/vendor/price-lists/assignments/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceListId: list.id, target: buildTarget(target) }),
+        });
+        const previewJson = await previewRes.json();
+        const overlaps = (previewJson?.data?.overlaps ?? []) as Array<{ otherListName: string; productCount: number; winner: string }>;
+        if (previewJson.success && overlaps.length > 0) {
+          const o = overlaps[0];
+          overlapNote = ` · also on ${o.otherListName} (${o.productCount} shared products — ${o.winner} wins those)`;
+        }
+      } catch { /* preview is informational only */ }
 
       const nextAssignments = [...current, buildTarget(target) as PriceListAssignment];
-
-      if (preview.conflicts.length > 0 || preview.alreadyBound) {
-        setConflict({
-          priceListId: list.id,
-          listName: list.name,
-          target,
-          preview,
-          pendingAssignments: nextAssignments,
-        });
-        return;
-      }
-
       await patchAssignments(list.id, nextAssignments);
-      toast.success('Assignment saved');
+      toast.success(`Assignment saved${overlapNote}`);
       await load();
       onReloadLists?.();
     } catch (e) {
@@ -451,26 +430,6 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     toast.success(`${row.name} added — tick a price list to assign it`);
   };
 
-  const applyConflict = async (mode: 'skip' | 'replace') => {
-    if (!conflict) return;
-    setBusyCell(`${conflict.target.id}:${conflict.priceListId}`);
-    try {
-      const resolutions = conflict.preview.conflicts.map((c) => ({
-        userId: c.userId,
-        action: mode,
-      }));
-      await patchAssignments(conflict.priceListId, conflict.pendingAssignments, resolutions);
-      toast.success(mode === 'replace' ? 'Assignments replaced' : 'Assigned (conflicts skipped)');
-      setConflict(null);
-      await load();
-      onReloadLists?.();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save');
-    } finally {
-      setBusyCell(null);
-    }
-  };
-
   const selectedCustomer = targets?.customers.find((c) => c.userId === selectedCustomerId) ?? null;
   const selectedEffective = effective.find((e) => e.userId === selectedCustomerId) ?? null;
 
@@ -507,7 +466,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
             </span>
           ))}
         </p>
-        <p className="text-[#7C7C7C] mt-1.5">Top beats bottom. Tick a box to give that price list to a customer or group of customers — we will warn you if someone would move lists.</p>
+        <p className="text-[#7C7C7C] mt-1.5">Top beats bottom. A customer can be on several lists — per product, the first list that prices it wins; products not in any list stay at Base price.</p>
       </div>
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 min-h-[480px]">
       <div className="rounded-[12px] border border-[#E9E3DD] bg-white overflow-hidden flex flex-col">
@@ -594,11 +553,27 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
                           <Pencil size={9} /> Edit group
                         </button>
                       )}
-                      {row.type === 'customer' && effectiveByUser.get(row.value) && (
-                        <span className="text-[10px] px-1.5 py-px rounded-full bg-[#F8E8EC] text-primary font-bold" title={effectiveByUser.get(row.value)!.effective.via}>
-                          Gets: {effectiveByUser.get(row.value)!.effective.priceListName}
-                        </span>
-                      )}
+                      {row.type === 'customer' && effectiveByUser.get(row.value) && (() => {
+                        const eff = effectiveByUser.get(row.value)!.effective;
+                        const lists = eff.lists ?? [];
+                        if (lists.length > 1) {
+                          return (
+                            <>
+                              <span className="text-[10px] px-1.5 py-px rounded-full bg-[#F8E8EC] text-primary font-bold" title={lists.map((l) => `${l.priceListName} (${l.itemCount} products, ${l.via})`).join(' · ')}>
+                                Gets: {lists.map((l) => `${l.priceListName} (${l.itemCount})`).join(' + ')}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-px rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-bold" title="When two lists price the same product, the first one here wins">
+                                {lists[0].priceListName} wins overlaps
+                              </span>
+                            </>
+                          );
+                        }
+                        return (
+                          <span className="text-[10px] px-1.5 py-px rounded-full bg-[#F8E8EC] text-primary font-bold" title={eff.via}>
+                            Gets: {eff.priceListName}{lists[0] ? ` (${lists[0].itemCount} products)` : ''}
+                          </span>
+                        );
+                      })()}
                       {row.type === 'customer' && <span className="text-[10px] text-primary font-semibold">View details →</span>}
                     </div>
                   </td>
@@ -795,16 +770,6 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         </div>
       )}
 
-      <ConflictDialog
-        open={!!conflict}
-        listName={conflict?.listName ?? ''}
-        affectedCount={conflict?.preview.affectedCount ?? 0}
-        conflicts={conflict?.preview.conflicts ?? []}
-        alreadyBound={conflict?.preview.alreadyBound ?? null}
-        onClose={() => setConflict(null)}
-        onSkip={() => void applyConflict('skip')}
-        onReplace={() => void applyConflict('replace')}
-      />
     </div>
     </div>
   );

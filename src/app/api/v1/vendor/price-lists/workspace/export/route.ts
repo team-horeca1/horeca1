@@ -18,6 +18,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       categoryId: params.get('categoryId') || undefined,
       brandId: params.get('brandId') || undefined,
       collectionId: params.get('collectionId') || undefined,
+      listId: params.get('listId') || undefined,
     });
     return new NextResponse(csv, {
       status: 200,

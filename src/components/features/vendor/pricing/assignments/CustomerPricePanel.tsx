@@ -15,6 +15,7 @@ type EffectiveRow = {
     priceListName: string;
     via: string;
     assignedAt: string | null;
+    lists?: Array<{ priceListId: string; priceListName: string; via: string; assignedAt: string | null; itemCount: number }>;
   };
 };
 
@@ -56,6 +57,17 @@ export function CustomerPricePanel({ customer, effective, onExplain }: Props) {
         {effective?.effective.assignedAt && (
           <div className="text-[11px] text-[#7C7C7C] mt-1 tabular-nums">
             Since {new Date(effective.effective.assignedAt).toLocaleDateString('en-IN')}
+          </div>
+        )}
+        {(effective?.effective.lists?.length ?? 0) > 1 && (
+          <div className="mt-3 space-y-1.5">
+            <div className="text-[11px] font-medium text-[#7C7C7C] uppercase tracking-wide">On these lists (first wins overlaps)</div>
+            {effective!.effective.lists!.map((l) => (
+              <div key={l.priceListId} className="flex items-center justify-between gap-2 text-[12px] bg-white border border-[#E9E3DD] rounded-[10px] px-2.5 py-1.5">
+                <span className="font-semibold text-[#181725] truncate">{l.priceListName}</span>
+                <span className="text-[#7C7C7C] tabular-nums shrink-0">{l.itemCount} products · {l.via}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>

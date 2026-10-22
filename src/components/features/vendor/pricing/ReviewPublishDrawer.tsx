@@ -29,8 +29,10 @@ type ReviewData = {
     restored: number;
     blocks: number;
     warns: number;
+    unpriced?: number;
     customersAffected: number;
   };
+  unpriced?: Array<{ priceListId: string; productId: string; productName: string; listName: string }>;
 };
 
 interface Props {
@@ -169,6 +171,23 @@ export function ReviewPublishDrawer({ open, onClose, dirty, baseVersion, onPubli
                     <ShieldAlert size={14} /> {blocks} blocking issue(s)
                   </div>
                   Fix blocked rows in the grid before publishing.
+                </div>
+              )}
+
+              {(review.unpriced?.length ?? review.summary.unpriced ?? 0) > 0 && (
+                <div className="p-3 rounded-[12px] bg-amber-50 border border-amber-200 text-[13px] text-amber-900">
+                  <div className="font-bold flex items-center gap-1.5 mb-1">
+                    <AlertTriangle size={14} /> {review.unpriced?.length ?? review.summary.unpriced} added product(s) have no price
+                  </div>
+                  <p>These were added to a list but left without a price, so they will <strong>not</strong> be saved. Set a price in the grid, or publish now and add them later.</p>
+                  {review.unpriced && review.unpriced.length > 0 && (
+                    <ul className="mt-1.5 list-disc pl-4 space-y-0.5">
+                      {review.unpriced.slice(0, 20).map((u) => (
+                        <li key={`${u.priceListId}:${u.productId}`}>{u.productName} <span className="text-amber-700">({u.listName})</span></li>
+                      ))}
+                      {review.unpriced.length > 20 && <li>+ {review.unpriced.length - 20} more</li>}
+                    </ul>
+                  )}
                 </div>
               )}
 

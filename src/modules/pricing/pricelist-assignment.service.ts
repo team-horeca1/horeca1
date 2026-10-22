@@ -1,10 +1,11 @@
 /**
- * Assignment preview (read-only) + save with Skip/Replace resolutions.
- * One list per non-customer target value per vendor.
+ * Assignment preview (read-only) + save.
+ * Zoho-style: a target may be on several lists. Winner per product is
+ * ladder level, then list priority (see pricing.service.ts).
  */
 
 import { prisma } from '@/lib/prisma';
-import { Errors, ApiError } from '@/middleware/errorHandler';
+import { Errors } from '@/middleware/errorHandler';
 import { normalizeCreditStatus } from '@/modules/pricing/pricing.service';
 import { marketplaceCustomerFilter } from '@/lib/marketplaceCustomers';
 import type { PriceListAssignmentType } from '@prisma/client';
@@ -172,7 +173,7 @@ type AssignmentRow = {
   type: string; userId: string | null; businessAccountId: string | null; outletId: string | null;
   groupId: string | null; pincode: string | null; area: string | null; segment: string | null;
   creditStatus: string | null; assignedAt: Date | null;
-  priceList: { id: string; name: string };
+  priceList: { id: string; name: string; priority?: number; createdAt?: Date | string; _count?: { items: number } };
 };
 
 const VIA_LABELS: Record<string, string> = {
@@ -198,14 +199,41 @@ function assignmentMatchesCustomer(a: AssignmentRow, c: UniverseCustomer): boole
   }
 }
 
-function computeEffective(c: UniverseCustomer, assignments: AssignmentRow[], excludeListId?: string) {
+export type EffectiveList = {
+  priceListId: string; priceListName: string; via: string; assignedAt: string | null; itemCount: number;
+};
+
+function computeEffectiveLists(c: UniverseCustomer, assignments: AssignmentRow[], excludeListId?: string): EffectiveList[] {
+  const lists: EffectiveList[] = [];
   for (const type of LADDER_ORDER) {
-    const match = assignments.find((a) => a.type === type && a.priceList.id !== excludeListId && assignmentMatchesCustomer(a, c));
-    if (match) {
-      return { priceListId: match.priceList.id, priceListName: match.priceList.name, via: VIA_LABELS[type] ?? type, assignedAt: match.assignedAt?.toISOString() ?? null };
+    const matches = assignments
+      .filter((a) => a.type === type && a.priceList.id !== excludeListId && assignmentMatchesCustomer(a, c))
+      .sort((x, y) => {
+        const dp = (x.priceList.priority ?? 0) - (y.priceList.priority ?? 0);
+        if (dp !== 0) return dp;
+        return new Date(x.priceList.createdAt ?? 0).getTime() - new Date(y.priceList.createdAt ?? 0).getTime();
+      });
+    for (const m of matches) {
+      if (lists.some((l) => l.priceListId === m.priceList.id)) continue;
+      lists.push({
+        priceListId: m.priceList.id,
+        priceListName: m.priceList.name,
+        via: VIA_LABELS[type] ?? type,
+        assignedAt: m.assignedAt?.toISOString() ?? null,
+        itemCount: m.priceList._count?.items ?? 0,
+      });
     }
   }
-  return { priceListId: null as string | null, priceListName: 'Base catalogue', via: 'No rule matched — Base price applies', assignedAt: null as string | null };
+  return lists;
+}
+
+function computeEffective(c: UniverseCustomer, assignments: AssignmentRow[], excludeListId?: string) {
+  const lists = computeEffectiveLists(c, assignments, excludeListId);
+  const first = lists[0];
+  if (first) {
+    return { priceListId: first.priceListId as string | null, priceListName: first.priceListName, via: first.via, assignedAt: first.assignedAt, lists };
+  }
+  return { priceListId: null as string | null, priceListName: 'Base catalogue', via: 'No rule matched — Base price applies', assignedAt: null as string | null, lists };
 }
 
 async function expandAffectedCustomers(
@@ -270,67 +298,68 @@ export async function previewAssignment(args: {
 }) {
   const list = await prisma.priceList.findFirst({
     where: { id: args.priceListId, vendorId: args.vendorId },
-    select: { id: true, name: true, _count: { select: { items: true } } },
+    select: { id: true, name: true, priority: true, createdAt: true, discountPercent: true, _count: { select: { items: true } } },
   });
   if (!list) throw Errors.notFound('Price list');
 
-  // One-list-per-target for non-customer types
-  let alreadyBound: { priceListId: string; priceListName: string } | null = null;
-  if (args.target.type !== 'customer') {
-    const keyFields: Record<string, unknown> = { type: args.target.type };
-    if (args.target.type === 'pincode') keyFields.pincode = args.target.pincode;
-    if (args.target.type === 'area') keyFields.area = args.target.area;
-    if (args.target.type === 'segment') keyFields.segment = args.target.segment;
-    if (args.target.type === 'group') keyFields.groupId = args.target.groupId;
-    if (args.target.type === 'outlet') keyFields.outletId = args.target.outletId;
-    if (args.target.type === 'brand') {
-      if (args.target.brandId) keyFields.brandId = args.target.brandId;
-      else keyFields.brandName = args.target.brandName;
-    }
-    if (args.target.type === 'credit_status') keyFields.creditStatus = args.target.creditStatus;
-
-    const other = await prisma.priceListAssignment.findFirst({
-      where: {
-        ...keyFields,
-        priceList: { vendorId: args.vendorId, isActive: true, id: { not: args.priceListId } },
-      },
-      include: { priceList: { select: { id: true, name: true } } },
-    });
-    if (other) {
-      alreadyBound = { priceListId: other.priceList.id, priceListName: other.priceList.name };
-    }
-  }
-
   const affected = await expandAffectedCustomers(args.vendorId, args.target);
+  // Backward-compat fields: multi-list means no hard binding/conflict.
+  const alreadyBound: { priceListId: string; priceListName: string } | null = null;
   const conflicts: Array<{
-    userId: string;
-    customerName: string;
-    existingPricelistId: string;
-    existingPricelist: string;
-    via: string;
+    userId: string; customerName: string; existingPricelistId: string; existingPricelist: string; via: string;
   }> = [];
+  const overlaps: Array<{ otherListId: string; otherListName: string; productCount: number; winner: string }> = [];
 
   if (affected.length > 0) {
-    const [universe, allAssignments] = await Promise.all([
+    const [universe, allAssignments, thisItems, otherItems] = await Promise.all([
       loadCustomerUniverse(args.vendorId),
       prisma.priceListAssignment.findMany({
         where: { priceList: { vendorId: args.vendorId, isActive: true } },
-        include: { priceList: { select: { id: true, name: true } } },
+        include: { priceList: { select: { id: true, name: true, priority: true, createdAt: true, _count: { select: { items: true } } } } },
+      }),
+      prisma.priceListItem.findMany({ where: { priceListId: list.id }, select: { productId: true } }),
+      prisma.priceListItem.findMany({
+        where: { priceList: { vendorId: args.vendorId, isActive: true, id: { not: list.id } } },
+        select: { priceListId: true, productId: true },
       }),
     ]);
+    const thisSet = new Set(thisItems.map((i) => i.productId));
+    // A percent list overlaps everything by definition.
+    const isPercent = Number(list.discountPercent) > 0;
+    const overlapByList = new Map<string, Set<string>>();
+    for (const oi of otherItems) {
+      if (!isPercent && !thisSet.has(oi.productId)) continue;
+      const s = overlapByList.get(oi.priceListId) ?? new Set<string>();
+      s.add(oi.productId);
+      overlapByList.set(oi.priceListId, s);
+    }
     const universeById = new Map(universe.map((u) => [u.userId, u]));
+    const targetLevel = (LADDER_ORDER as readonly string[]).indexOf(args.target.type);
+    const seenOther = new Set<string>();
     for (const c of affected) {
       const cust = universeById.get(c.userId);
       if (!cust) continue;
-      const eff = computeEffective(cust, allAssignments as AssignmentRow[], args.priceListId);
-      if (eff.priceListId) {
-        conflicts.push({
-          userId: c.userId,
-          customerName: c.label,
-          existingPricelistId: eff.priceListId,
-          existingPricelist: eff.priceListName,
-          via: eff.via,
-        });
+      const lists = computeEffectiveLists(cust, allAssignments as AssignmentRow[], args.priceListId);
+      for (const l of lists) {
+        if (seenOther.has(l.priceListId)) continue;
+        const shared = overlapByList.get(l.priceListId);
+        const productCount = isPercent ? (shared?.size ?? l.itemCount) : (shared?.size ?? 0);
+        if (!isPercent && productCount === 0) continue;
+        seenOther.add(l.priceListId);
+        // Winner: earlier ladder level wins; same level -> lower priority, then older.
+        const otherRow = (allAssignments as AssignmentRow[]).find((a) => a.priceList.id === l.priceListId);
+        const otherLevel = otherRow ? (LADDER_ORDER as readonly string[]).indexOf(otherRow.type) : 99;
+        let winner = list.name;
+        if (otherLevel >= 0 && targetLevel >= 0) {
+          if (otherLevel < targetLevel) winner = l.priceListName;
+          else if (otherLevel === targetLevel) {
+            const op = otherRow?.priceList.priority ?? 0;
+            if (op < list.priority || (op === list.priority && new Date(otherRow?.priceList.createdAt ?? 0).getTime() < list.createdAt.getTime())) winner = l.priceListName;
+          }
+        } else if (otherLevel >= 0) {
+          winner = l.priceListName;
+        }
+        overlaps.push({ otherListId: l.priceListId, otherListName: l.priceListName, productCount, winner });
       }
     }
   }
@@ -342,6 +371,7 @@ export async function previewAssignment(args: {
     affectedCount: affected.length,
     affected,
     conflicts,
+    overlaps,
     alreadyBound,
     targetKey: targetKey(args.target),
   };
@@ -360,71 +390,11 @@ export async function saveAssignments(args: {
   });
   if (!list) throw Errors.notFound('Price list');
 
-  const resolutionMap = new Map((args.resolutions ?? []).map((r) => [r.userId, r.action]));
-  let skipped = 0;
-  let replaced = 0;
+  // Multi-list: resolutions/moveFrom are accepted for backward compat and ignored.
+  void args.resolutions;
+  const finalAssignments = args.assignments;
 
   await prisma.$transaction(async (tx) => {
-    // Enforce one-list-per-target for non-customer targets
-    for (const a of args.assignments) {
-      if (a.type === 'customer') continue;
-      const other = await tx.priceListAssignment.findFirst({
-        where: {
-          type: a.type,
-          priceList: { vendorId: args.vendorId, isActive: true, id: { not: args.priceListId } },
-          ...(a.type === 'pincode' ? { pincode: a.pincode ?? undefined } : {}),
-          ...(a.type === 'area' ? { area: a.area ?? undefined } : {}),
-          ...(a.type === 'segment' ? { segment: a.segment ?? undefined } : {}),
-          ...(a.type === 'group' ? { groupId: a.groupId ?? undefined } : {}),
-          ...(a.type === 'outlet' ? { outletId: a.outletId ?? undefined } : {}),
-          ...(a.type === 'credit_status' ? { creditStatus: a.creditStatus ?? undefined } : {}),
-          ...(a.type === 'brand' && a.brandId ? { brandId: a.brandId } : {}),
-          ...(a.type === 'brand' && !a.brandId && a.brandName ? { brandName: a.brandName } : {}),
-        },
-        include: { priceList: { select: { id: true, name: true } } },
-      });
-      if (other && a.moveFrom !== other.priceList.id) {
-        throw new ApiError(
-          'TARGET_BOUND',
-          `"${other.priceList.name}" already uses this target. Move it first.`,
-          409,
-          { holdingListId: other.priceList.id, holdingListName: other.priceList.name },
-        );
-      }
-      if (other && a.moveFrom === other.priceList.id) {
-        await tx.priceListAssignment.delete({ where: { id: other.id } });
-      }
-    }
-
-    // Apply Skip/Replace for customers who already have a direct assignment
-    for (const a of args.assignments) {
-      if (a.type !== 'customer' || !a.userId) continue;
-      const action = resolutionMap.get(a.userId);
-      if (!action) continue;
-      const other = await tx.priceListAssignment.findFirst({
-        where: {
-          type: 'customer',
-          userId: a.userId,
-          priceList: { vendorId: args.vendorId, isActive: true, id: { not: args.priceListId } },
-        },
-      });
-      if (!other) continue;
-      if (action === 'replace') {
-        await tx.priceListAssignment.delete({ where: { id: other.id } });
-        replaced++;
-      } else if (action === 'skip') {
-        skipped++;
-      }
-    }
-
-    // Filter out skipped customers from the new assignment set
-    const skipUsers = new Set(
-      [...resolutionMap.entries()].filter(([, v]) => v === 'skip').map(([k]) => k),
-    );
-    const finalAssignments = args.assignments.filter(
-      (a) => !(a.type === 'customer' && a.userId && skipUsers.has(a.userId)),
-    );
-
     await tx.priceListAssignment.deleteMany({ where: { priceListId: args.priceListId } });
     if (finalAssignments.length > 0) {
       const assignedAt = new Date();
@@ -449,11 +419,7 @@ export async function saveAssignments(args: {
     }
   });
 
-  return {
-    saved: args.assignments.length - skipped,
-    skipped,
-    replaced,
-  };
+  return { saved: finalAssignments.length, skipped: 0, replaced: 0 };
 }
 
 export async function listEffectiveAssignments(vendorId: string) {
@@ -461,7 +427,7 @@ export async function listEffectiveAssignments(vendorId: string) {
     loadCustomerUniverse(vendorId),
     prisma.priceListAssignment.findMany({
       where: { priceList: { vendorId, isActive: true } },
-      include: { priceList: { select: { id: true, name: true } } },
+      include: { priceList: { select: { id: true, name: true, priority: true, createdAt: true, _count: { select: { items: true } } } } },
     }),
   ]);
 

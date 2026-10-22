@@ -128,7 +128,22 @@ interface ListShape {
   id: string;
   name?: string;
   discountPercent: Prisma.Decimal | number;
+  /** Same-level overlap tie-breaker: lower wins, then oldest list. */
+  priority?: number;
+  createdAt?: Date | string;
   items: ItemShape[];
+}
+
+function byListPriority(a: AssignmentShape, b: AssignmentShape): number {
+  const dp = (a.priceList.priority ?? 0) - (b.priceList.priority ?? 0);
+  if (dp !== 0) return dp;
+  const ta = a.priceList.createdAt ? new Date(a.priceList.createdAt).getTime() : 0;
+  const tb = b.priceList.createdAt ? new Date(b.priceList.createdAt).getTime() : 0;
+  return ta - tb;
+}
+
+function sortedByPriority(assignments: AssignmentShape[]): AssignmentShape[] {
+  return [...assignments].sort(byListPriority);
 }
 
 type AssignmentShape = Pick<
@@ -198,7 +213,7 @@ function findExclusion(
   creditStatus: string | null,
   now: Date,
 ): { priceListId: string; priceListItemId: string } | null {
-  for (const a of assignments) {
+  for (const a of sortedByPriority(assignments)) {
     if (!assignmentEligible(a, customer, product, customerTags, customerGroups, creditStatus)) continue;
     const item = a.priceList.items.find(
       (i) => i.productId === product.id && i.isExcluded && itemIsLive(i, now),
@@ -274,7 +289,7 @@ function evaluateAssignmentChain(
   now: Date = new Date(),
 ): ResolutionResult | null {
   for (const { type, key } of ORDERED_TYPES) {
-    for (const a of assignments) {
+    for (const a of sortedByPriority(assignments)) {
       if (a.type !== type || !assignmentEligible(a, customer, product, customerTags, customerGroups, creditStatus)) continue;
       const r = applyListForProduct(a.priceList, product.id, product.basePrice, quantity, key, now);
       if (r) return r;
@@ -387,6 +402,8 @@ export async function resolveUnitPrice(
               id: true,
               name: true,
               discountPercent: true,
+              priority: true,
+              createdAt: true,
               items: { where: { productId: input.productId }, select: ITEM_SELECT },
             },
           },
@@ -542,6 +559,8 @@ export async function resolveCatalogPrices(
             name: true,
             vendorId: true,
             discountPercent: true,
+            priority: true,
+            createdAt: true,
             items: { where: { productId: { in: productIds } }, select: ITEM_SELECT },
           },
         },
@@ -792,6 +811,8 @@ export async function explainPrice(
             id: true,
             name: true,
             discountPercent: true,
+            priority: true,
+            createdAt: true,
             items: { where: { productId: input.productId }, select: ITEM_SELECT },
           },
         },
@@ -850,29 +871,30 @@ export async function explainPrice(
   const creditStatus = normalizeCreditStatus(creditWallet?.status, creditWallet?.workflowStatus);
 
   for (const { type, key } of ORDERED_TYPES) {
-    const matches = assignments.filter(
+    const matches = sortedByPriority(assignments.filter(
       (a) => a.type === type && assignmentEligible(a, input.customer, productInput, customerTags, customerGroups, creditStatus),
-    );
+    ));
     if (matches.length === 0) {
       ladder.push({ level: key, matched: false });
       continue;
     }
-    for (const a of matches) {
+    matches.forEach((a, idx) => {
       const item = a.priceList.items.find((i) => i.productId === product.id && itemIsLive(i, now));
+      const alsoOn = matches.length > 1 ? (idx === 0 ? ' · wins if it prices this product' : ' · also on this list') : '';
       ladder.push({
         level: key,
         matched: true,
-        detail: item?.isExcluded
+        detail: (item?.isExcluded
           ? 'Excluded (Hidden wins)'
           : item
             ? `Item ${item.pricingType}`
             : Number(a.priceList.discountPercent) > 0
               ? `List discount ${a.priceList.discountPercent}%`
-              : 'No item for this SKU (falls through)',
+              : 'No item for this SKU (falls through)') + alsoOn,
         priceListId: a.priceList.id,
         priceListName: a.priceList.name,
       });
-    }
+    });
   }
 
   let cell: ExplainPriceResult['cell'];

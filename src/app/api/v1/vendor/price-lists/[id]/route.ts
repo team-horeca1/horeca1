@@ -75,6 +75,7 @@ const assignmentSchema = z.object({
 const patchSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   discountPercent: z.number().min(0).max(100).optional(),
+  priority: z.number().int().min(0).max(9999).optional(),
   floorPercentOfBase: z.number().min(0).max(100).nullable().optional(),
   isActive: z.boolean().optional(),
   // Optional list-level validity window (ISO datetime strings or null).
@@ -205,6 +206,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         data: {
           ...(body.name !== undefined && { name: body.name }),
           ...(body.discountPercent !== undefined && { discountPercent: body.discountPercent }),
+          ...(body.priority !== undefined && { priority: body.priority }),
           ...(body.floorPercentOfBase !== undefined && { floorPercentOfBase: body.floorPercentOfBase }),
           ...(body.isActive !== undefined && { isActive: body.isActive }),
           ...(body.validFrom !== undefined && { validFrom: body.validFrom ? new Date(body.validFrom) : null }),

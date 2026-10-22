@@ -12,11 +12,17 @@ import { resolveVendorId } from '@/lib/resolveVendorId';
 
 const createSchema = z.object({
   name: z.string().min(1).max(255),
-  discountPercent: z.number().min(0).max(100).default(0),
+  // Zoho kinds: 'selected' = only added products (default); 'percent' = all products at -discountPercent%.
+  kind: z.enum(['selected', 'percent']).optional().default('selected'),
+  discountPercent: z.number().min(0).max(100).optional(),
+  priority: z.number().int().min(0).max(9999).optional(),
   // Optional list-level validity window (ISO datetime strings or null).
   validFrom: z.string().nullable().optional(),
   validTo: z.string().nullable().optional(),
-});
+}).refine(
+  (b) => b.kind !== 'percent' || (typeof b.discountPercent === 'number' && b.discountPercent > 0),
+  { message: 'An "All products" list needs discountPercent > 0' },
+);
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
@@ -29,7 +35,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         assignments: true,
         _count: { select: { items: true, customers: true, assignments: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
     });
 
     return NextResponse.json({ success: true, data: priceLists });
@@ -48,7 +54,9 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       data: {
         vendorId,
         name: body.name,
-        discountPercent: body.discountPercent,
+        // 'selected' lists must not carry a list-wide discount (membership = priced items).
+        discountPercent: body.kind === 'percent' ? body.discountPercent ?? 0 : 0,
+        ...(body.priority !== undefined && { priority: body.priority }),
         validFrom: body.validFrom ? new Date(body.validFrom) : null,
         validTo: body.validTo ? new Date(body.validTo) : null,
       },

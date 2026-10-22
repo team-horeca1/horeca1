@@ -24,6 +24,8 @@ export type CellState = {
 export type DraftCell = {
   priceListId: string;
   productId: string;
+  /** True when the row was explicitly added to the list in this draft (membership intent). */
+  added?: boolean;
   customPrice?: number | null;
   isExcluded?: boolean;
   isLocked?: boolean;
@@ -138,8 +140,10 @@ export async function reviewWorkspacePublish(args: {
     restored: number;
     blocks: number;
     warns: number;
+    unpriced: number;
     customersAffected: number;
   };
+  unpriced: Array<{ priceListId: string; productId: string; productName: string; listName: string }>;
 }> {
   const latestVersion = await getLatestPublishId(args.vendorId);
   const stale = (args.baseVersion ?? null) !== latestVersion;
@@ -171,6 +175,7 @@ export async function reviewWorkspacePublish(args: {
   }));
 
   const diffs: DiffRow[] = [];
+  const unpriced: Array<{ priceListId: string; productId: string; productName: string; listName: string }> = [];
   let priced = 0, base = 0, removed = 0, restored = 0, blocks = 0, warns = 0;
   let maxCustomers = 0;
 
@@ -203,6 +208,13 @@ export async function reviewWorkspacePublish(args: {
           scheduledFrom: c.scheduledFrom !== undefined ? c.scheduledFrom : before?.scheduledFrom ?? null,
           scheduledTo: c.scheduledTo !== undefined ? c.scheduledTo : before?.scheduledTo ?? null,
         };
+
+    // Added to the list in this draft but left without a price: it will not
+    // be saved on publish (membership = a priced row). Warn, don't block.
+    if (c.added && !before && (c.customPrice == null) && !c.isExcluded) {
+      unpriced.push({ priceListId: c.priceListId, productId: c.productId, productName: product.name, listName: list.name });
+      warns++;
+    }
 
     if (JSON.stringify(before) === JSON.stringify(after)) continue;
 
@@ -272,8 +284,10 @@ export async function reviewWorkspacePublish(args: {
     stale,
     latestVersion,
     diffs,
+    unpriced,
     summary: {
       priced, base, removed, restored, blocks, warns,
+      unpriced: unpriced.length,
       customersAffected: maxCustomers,
     },
   };
@@ -732,13 +746,16 @@ export async function exportWorkspaceCsv(args: {
   categoryId?: string;
   brandId?: string;
   collectionId?: string;
+  listId?: string;
 }): Promise<string> {
   const NOT_TOMBSTONED = { slug: { not: { startsWith: '_deleted_' } } } as const;
   const priceLists = await prisma.priceList.findMany({
-    where: { vendorId: args.vendorId, isActive: true },
+    where: { vendorId: args.vendorId, isActive: true, ...(args.listId ? { id: args.listId } : {}) },
     select: { id: true, name: true, discountPercent: true },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
   });
+  const single = args.listId ? priceLists[0] : undefined;
+  const singleIsSelected = !!single && Number(single.discountPercent) === 0;
 
   const products = await prisma.product.findMany({
     where: {
@@ -754,6 +771,10 @@ export async function exportWorkspaceCsv(args: {
       ...(args.collectionId
         ? { collectionProducts: { some: { collectionId: args.collectionId } } }
         : {}),
+      // Selected-products list export = members only; percent list = whole catalogue.
+      ...(singleIsSelected && single
+        ? { priceListItems: { some: { priceListId: single.id } } }
+        : {}),
       ...(args.search
         ? {
             OR: [
@@ -767,7 +788,7 @@ export async function exportWorkspaceCsv(args: {
     select: {
       id: true, name: true, sku: true, basePrice: true,
       priceListItems: {
-        where: { priceList: { vendorId: args.vendorId, isActive: true } },
+        where: { priceList: { vendorId: args.vendorId, isActive: true, ...(args.listId ? { id: args.listId } : {}) } },
         select: { priceListId: true, customPrice: true, isExcluded: true, discountPercent: true },
       },
     },
@@ -785,6 +806,9 @@ export async function exportWorkspaceCsv(args: {
       if (it?.customPrice != null) return String(Number(it.customPrice));
       if (it?.discountPercent != null) {
         return String(Math.round(Number(p.basePrice) * (1 - Number(it.discountPercent) / 100) * 100) / 100);
+      }
+      if (Number(l.discountPercent) > 0) {
+        return String(Math.round(Number(p.basePrice) * (1 - Number(l.discountPercent) / 100) * 100) / 100);
       }
       return '';
     });
