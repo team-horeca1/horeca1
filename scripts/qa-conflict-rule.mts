@@ -108,7 +108,7 @@ async function preview(listId: string) {
 }
 async function explain(productId: string) {
   const r = await api(vendor, 'GET', `/api/v1/vendor/price-lists/explain?customerId=${CUST}&productId=${productId}`);
-  return dig(r.json, ['data']) as { unitPrice: number | null; priceListName?: string | null } | null;
+  return dig(r.json, ['data']) as { unitPrice: number | null; priceListName?: string | null; source?: string; excluded?: boolean } | null;
 }
 
 /* 1. disjoint lists both assign cleanly */
@@ -167,7 +167,25 @@ assert('assign L2 (Widget B, different product) — no conflict', (await assign(
   const r = await assign(L5);
   assert('assign Hide-list ok', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
   const ex = await explain(PA.id);
-  assert('Hidden wins: Widget A has no purchasable price', ex?.unitPrice == null, JSON.stringify(ex));
+  assert('Hidden wins: Widget A excluded', ex?.excluded === true || ex?.source === 'excluded', JSON.stringify(ex));
+}
+
+/* 7. cross-level overlap follows the client ladder (not a conflict) */
+{
+  const L6 = await mkList('PinA85');
+  ALL.push(L6);
+  assert('publish A=85 on pincode list', (await publishCell(L6, PA.id, { customPrice: 85 })).status === 200);
+  const effR = await api(vendor, 'GET', '/api/v1/vendor/price-lists/assignments/effective');
+  const row = (dig(effR.json, ['data']) as Array<{ userId: string; pincodes?: string[] }>).find((x) => x.userId === CUST);
+  const pin = row?.pincodes?.[0];
+  assert('demo customer has pincode', !!pin, JSON.stringify(row?.pincodes));
+  if (pin) {
+    const r = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L6}`, { assignments: [{ type: 'pincode', pincode: pin }] });
+    assert('cross-level (pincode vs customer list) assign allowed — ladder decides', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
+    await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${L5}`, { assignments: [] }); // un-hide to see the ladder price
+    const ex = await explain(PA.id);
+    assert('ladder: customer-level price 70 still wins over pincode 85', Number(ex?.unitPrice) === 70, JSON.stringify(ex));
+  }
 }
 
 /* cleanup */

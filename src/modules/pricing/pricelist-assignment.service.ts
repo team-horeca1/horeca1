@@ -2,11 +2,12 @@
  * Assignment preview (read-only) + save.
  * Client rule: a customer may have several lists from one supplier when
  * they cover DIFFERENT products. If two applicable lists both price the
- * SAME product for the same customer, that is a conflict — detected here
- * at assignment time; the supplier must Skip, Replace, or Review Manually.
- * Never silently resolved by list order/priority. Hidden (excluded) items
- * are not prices, so they never conflict (Hidden wins at resolve time).
- * Different suppliers are independent (everything is vendor-scoped).
+ * SAME product for the same customer at the SAME ladder level, that is a
+ * conflict — detected here at assignment time; the supplier must Skip,
+ * Replace, or Review Manually. Never silently resolved by list order.
+ * Different levels follow the client's documented ladder (specific beats
+ * broad). Hidden (excluded) items are not prices, so they never conflict
+ * (Hidden wins at resolve time). Suppliers are independent (vendor-scoped).
  */
 
 import { prisma } from '@/lib/prisma';
@@ -308,11 +309,17 @@ async function detectConflicts(args: {
 
   for (const target of args.targets) {
     const affected = await expandAffectedCustomers(args.vendorId, target);
+    const targetLevel = (LADDER_ORDER as readonly string[]).indexOf(target.type);
     for (const aff of affected) {
       const cust = universeById.get(aff.userId);
       if (!cust) continue;
       const others = computeEffectiveLists(cust, allAssignments as AssignmentRow[], args.priceListId);
       for (const other of others) {
+        // Client ladder resolves DIFFERENT levels deterministically
+        // (customer > group > area > global). Only a SAME-level overlap is
+        // ambiguous — that is the conflict the supplier must decide.
+        const otherLevel = (LADDER_ORDER as readonly string[]).indexOf(other.type);
+        if (targetLevel >= 0 && otherLevel >= 0 && otherLevel !== targetLevel) continue;
         const otherPriced = pricedMap.get(other.priceListId) ?? new Set<string>();
         const overlap = [...thisPriced].filter((id) => otherPriced.has(id));
         if (overlap.length === 0) continue;
@@ -581,19 +588,22 @@ export async function listEffectiveAssignments(vendorId: string) {
 
   return universe.map((c) => {
     const effective = computeEffective(c, assignments as AssignmentRow[]);
-    // Existing overlap between the lists this customer already gets
-    // (created before the conflict gate, or via shared rules).
+    // Existing SAME-level overlap between lists this customer already gets
+    // (created before the conflict gate). Cross-level overlaps are resolved
+    // by the client ladder and are not conflicts.
     let conflict: { productCount: number; listNames: string[] } | null = null;
     const lists = effective?.lists ?? [];
     if (lists.length > 1) {
-      const seen = new Set<string>();
+      const seenByLevel = new Map<string, Set<string>>();
       const clash = new Set<string>();
       const clashLists = new Set<string>();
       for (const l of lists) {
+        const seen = seenByLevel.get(l.type) ?? new Set<string>();
         for (const pid of pricedMap.get(l.priceListId) ?? []) {
           if (seen.has(pid)) { clash.add(pid); clashLists.add(l.priceListName); }
           seen.add(pid);
         }
+        seenByLevel.set(l.type, seen);
       }
       if (clash.size > 0) conflict = { productCount: clash.size, listNames: [...clashLists] };
     }
