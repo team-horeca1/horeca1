@@ -178,8 +178,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       for (const uId of uIds) {
         const cust = customers.get(uId);
         if (cust) {
-          if (o.pincode) cust.pincodes.push(o.pincode);
-          if (o.city) cust.cities.push(o.city);
+          if (o.pincode && !cust.pincodes.includes(o.pincode)) cust.pincodes.push(o.pincode);
+          if (o.city && !cust.cities.includes(o.city)) cust.cities.push(o.city);
         }
       }
     }
