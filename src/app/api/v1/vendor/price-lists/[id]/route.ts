@@ -57,17 +57,19 @@ const itemSchema = z.object({
 // given `type` (DB CHECK enforces this too — defence in depth).
 const assignmentSchema = z.object({
   type: z.enum(['customer', 'outlet', 'pincode', 'area', 'segment', 'brand', 'group', 'credit_status']),
-  userId: z.string().uuid().optional(),
-  businessAccountId: z.string().uuid().optional(),
-  outletId: z.string().uuid().optional(),
-  brandId: z.string().uuid().optional(),
-  groupId: z.string().uuid().optional(),
-  pincode: z.string().max(10).optional(),
-  area: z.string().max(100).optional(),
-  segment: z.string().max(100).optional(),
-  brandName: z.string().max(150).optional(),
-  creditStatus: z.string().max(32).optional(),
-  moveFrom: z.string().uuid().optional(),
+  // nullish (not just optional): clients legitimately echo back full DB rows
+  // from GET /price-lists, where irrelevant target columns are null.
+  userId: z.string().uuid().nullish(),
+  businessAccountId: z.string().uuid().nullish(),
+  outletId: z.string().uuid().nullish(),
+  brandId: z.string().uuid().nullish(),
+  groupId: z.string().uuid().nullish(),
+  pincode: z.string().max(10).nullish(),
+  area: z.string().max(100).nullish(),
+  segment: z.string().max(100).nullish(),
+  brandName: z.string().max(150).nullish(),
+  creditStatus: z.string().max(32).nullish(),
+  moveFrom: z.string().uuid().nullish(),
 });
 
 const patchSchema = z.object({

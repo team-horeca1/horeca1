@@ -488,7 +488,26 @@ export function PriceGrid({
           <thead className="sticky top-0 z-30 bg-[#FAF7F2]">
             <tr>
               <th className="sticky left-0 z-40 bg-[#FAF7F2] p-2 border-b border-[#E9E3DD] text-left min-w-[180px]">
-                Product
+                <label className="flex items-center gap-2 cursor-pointer">
+                  {onSelectedProductIdsChange && rows.length > 0 && (
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible products"
+                      checked={rows.every((r) => selectedProductIds?.has(r.id))}
+                      ref={(el) => {
+                        if (el) el.indeterminate = rows.some((r) => selectedProductIds?.has(r.id)) && !rows.every((r) => selectedProductIds?.has(r.id));
+                      }}
+                      onChange={(e) => {
+                        const next = new Set(selectedProductIds ?? []);
+                        if (e.target.checked) rows.forEach((r) => next.add(r.id));
+                        else rows.forEach((r) => next.delete(r.id));
+                        onSelectedProductIdsChange(next);
+                      }}
+                      className="shrink-0"
+                    />
+                  )}
+                  <span>Product{selectedProductIds && selectedProductIds.size > 0 ? ` (${selectedProductIds.size} selected)` : ''}</span>
+                </label>
               </th>
               <th className="sticky left-[180px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[88px]">
                 SKU

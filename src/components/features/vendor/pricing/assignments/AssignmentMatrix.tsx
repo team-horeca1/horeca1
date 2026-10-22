@@ -11,6 +11,10 @@ import { CustomerPricePanel } from './CustomerPricePanel';
 type PriceListAssignment = {
   type: AssignmentType;
   userId?: string | null;
+  businessAccountId?: string | null;
+  outletId?: string | null;
+  brandId?: string | null;
+  brandName?: string | null;
   pincode?: string | null;
   area?: string | null;
   segment?: string | null;
@@ -227,10 +231,26 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     assignments: PriceListAssignment[],
     resolutions?: Array<{ userId: string; action: 'skip' | 'replace' }>,
   ) => {
+    // Strip null/undefined target fields — list.assignments echoes raw DB rows
+    // (irrelevant columns are null), which the API schema rejects.
+    const clean = assignments.map((a) => {
+      const out: Record<string, string> = { type: a.type };
+      if (a.userId) out.userId = a.userId;
+      if (a.businessAccountId) out.businessAccountId = a.businessAccountId;
+      if (a.outletId) out.outletId = a.outletId;
+      if (a.brandId) out.brandId = a.brandId;
+      if (a.brandName) out.brandName = a.brandName;
+      if (a.pincode) out.pincode = a.pincode;
+      if (a.area) out.area = a.area;
+      if (a.segment) out.segment = a.segment;
+      if (a.groupId) out.groupId = a.groupId;
+      if (a.creditStatus) out.creditStatus = a.creditStatus;
+      return out;
+    });
     const res = await fetch(`/api/v1/vendor/price-lists/${priceListId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignments, resolutions }),
+      body: JSON.stringify({ assignments: clean, resolutions }),
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error?.message || 'Update failed');
