@@ -128,15 +128,18 @@ interface ListShape {
   id: string;
   name?: string;
   discountPercent: Prisma.Decimal | number;
-  /** Same-level overlap tie-breaker: lower wins, then oldest list. */
+  /**
+   * Kept for shape compatibility only. Overlapping same-level prices are a
+   * supplier conflict (blocked at assignment), never silently ordered —
+   * same-level lists here are ordered oldest-first purely for determinism
+   * on legacy data.
+   */
   priority?: number;
   createdAt?: Date | string;
   items: ItemShape[];
 }
 
 function byListPriority(a: AssignmentShape, b: AssignmentShape): number {
-  const dp = (a.priceList.priority ?? 0) - (b.priceList.priority ?? 0);
-  if (dp !== 0) return dp;
   const ta = a.priceList.createdAt ? new Date(a.priceList.createdAt).getTime() : 0;
   const tb = b.priceList.createdAt ? new Date(b.priceList.createdAt).getTime() : 0;
   return ta - tb;
@@ -880,7 +883,7 @@ export async function explainPrice(
     }
     matches.forEach((a, idx) => {
       const item = a.priceList.items.find((i) => i.productId === product.id && itemIsLive(i, now));
-      const alsoOn = matches.length > 1 ? (idx === 0 ? ' · wins if it prices this product' : ' · also on this list') : '';
+      const alsoOn = matches.length > 1 ? ' · also matches this customer' : '';
       ladder.push({
         level: key,
         matched: true,

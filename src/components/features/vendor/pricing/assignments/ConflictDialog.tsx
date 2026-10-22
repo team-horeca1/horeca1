@@ -9,6 +9,8 @@ export type PreviewConflict = {
   existingPricelistId: string;
   existingPricelist: string;
   via: string;
+  productCount?: number;
+  productNames?: string[];
 };
 
 interface Props {
@@ -16,10 +18,10 @@ interface Props {
   listName: string;
   affectedCount: number;
   conflicts: PreviewConflict[];
-  alreadyBound: { priceListId: string; priceListName: string } | null;
   onClose: () => void;
   onSkip: () => void;
   onReplace: () => void;
+  onReviewManually: () => void;
 }
 
 export function ConflictDialog({
@@ -27,10 +29,10 @@ export function ConflictDialog({
   listName,
   affectedCount,
   conflicts,
-  alreadyBound,
   onClose,
   onSkip,
   onReplace,
+  onReviewManually,
 }: Props) {
   if (!open) return null;
 
@@ -44,64 +46,67 @@ export function ConflictDialog({
               <AlertTriangle size={20} />
             </div>
             <div>
-              <h2 className="text-[17px] font-bold text-[#181725]">Assignment conflicts</h2>
+              <h2 className="text-[17px] font-bold text-[#181725]">Same product, two prices</h2>
               <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                Assigning <span className="font-semibold text-[#181725]">{listName}</span> affects{' '}
-                <span className="tabular-nums">{affectedCount}</span> customer(s).
+                <span className="font-semibold text-[#181725]">{listName}</span> and another list both
+                price the same product for {affectedCount} customer(s). Nothing is saved until you choose.
+                Lists covering different products can always be combined.
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#FAF7F2]">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#FAF7F2]" aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
         <div className="p-5 overflow-auto flex-1 space-y-3 text-[13px]">
-          {alreadyBound && (
-            <div className="p-3 rounded-[12px] bg-amber-50 border border-amber-200 text-amber-900">
-              This target is already on list <strong>{alreadyBound.priceListName}</strong>. Replacing will
-              move it to {listName}.
-            </div>
-          )}
-
-          {conflicts.length === 0 ? (
-            <p className="text-[#7C7C7C]">No per-customer conflicts detected.</p>
-          ) : (
-            <ul className="divide-y divide-[#E9E3DD] border border-[#E9E3DD] rounded-[12px]">
-              {conflicts.slice(0, 50).map((c) => (
-                <li key={c.userId} className="p-3">
-                  <div className="font-medium text-[#181725]">{c.customerName}</div>
-                  <div className="text-[12px] text-[#7C7C7C]">
-                    Currently on {c.existingPricelist} ({c.via})
+          <ul className="divide-y divide-[#E9E3DD] border border-[#E9E3DD] rounded-[12px]">
+            {conflicts.slice(0, 50).map((c) => (
+              <li key={`${c.userId}-${c.existingPricelistId}`} className="p-3">
+                <div className="font-medium text-[#181725]">{c.customerName}</div>
+                <div className="text-[12px] text-[#7C7C7C]">
+                  Already priced on <span className="font-medium text-[#181725]">{c.existingPricelist}</span> ({c.via})
+                  {typeof c.productCount === 'number' && (
+                    <> · <span className="tabular-nums">{c.productCount}</span> shared product{c.productCount === 1 ? '' : 's'}</>
+                  )}
+                </div>
+                {c.productNames && c.productNames.length > 0 && (
+                  <div className="text-[11px] text-[#7C7C7C] mt-0.5 truncate">
+                    {c.productNames.slice(0, 4).join(', ')}{c.productNames.length > 4 ? '…' : ''}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                )}
+              </li>
+            ))}
+          </ul>
           {conflicts.length > 50 && (
-            <p className="text-[11px] text-[#7C7C7C]">+ {conflicts.length - 50} more conflicts</p>
+            <p className="text-[11px] text-[#7C7C7C]">+ {conflicts.length - 50} more</p>
           )}
+          <div className="text-[12px] text-[#7C7C7C] space-y-1">
+            <p><strong className="text-[#181725]">Skip</strong> — keep the existing list; don&apos;t add this one for those customers.</p>
+            <p><strong className="text-[#181725]">Replace</strong> — remove those customers from the existing list and put them on {listName}.</p>
+            <p><strong className="text-[#181725]">Review manually</strong> — open both lists side-by-side and remove the overlap yourself.</p>
+          </div>
         </div>
 
         <div className="p-4 border-t border-[#E9E3DD] flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={onReviewManually}
             className="h-11 px-4 rounded-[12px] border border-[#E9E3DD] font-semibold"
           >
-            Cancel
+            Review manually
           </button>
           <button
             type="button"
             onClick={onSkip}
-            className="h-11 px-4 rounded-[12px] border border-[#E9E3DD] font-semibold flex-1 min-w-[120px]"
+            className="h-11 px-4 rounded-[12px] border border-[#E9E3DD] font-semibold flex-1 min-w-[110px]"
           >
-            Skip conflicts
+            Skip
           </button>
           <button
             type="button"
             onClick={onReplace}
-            className="h-11 px-4 rounded-[12px] bg-primary text-white font-semibold flex-1 min-w-[120px]"
+            className="h-11 px-4 rounded-[12px] bg-primary text-white font-semibold flex-1 min-w-[110px]"
           >
             Replace
           </button>

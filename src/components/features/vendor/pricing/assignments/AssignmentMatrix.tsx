@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { AssignmentType, CustomerTarget, PriceListCol } from '../types';
 import { CustomerPricePanel } from './CustomerPricePanel';
+import { ConflictDialog, type PreviewConflict } from './ConflictDialog';
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 
 type PriceListAssignment = {
@@ -65,12 +66,15 @@ type EffectiveRow = {
     assignedAt: string | null;
     lists?: Array<{ priceListId: string; priceListName: string; via: string; assignedAt: string | null; itemCount: number }>;
   };
+  conflict?: { productCount: number; listNames: string[] } | null;
 };
 
 interface Props {
   priceLists: PriceListCol[];
   onReloadLists?: () => void;
   onOpenExplain?: (customerId: string) => void;
+  /** Switch to the Prices tab in Compare mode so the supplier can fix overlaps. */
+  onReviewConflicts?: () => void;
 }
 
 function buildTarget(target: TargetRow) {
@@ -92,7 +96,7 @@ function buildTarget(target: TargetRow) {
   }
 }
 
-export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: Props) {
+export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain, onReviewConflicts }: Props) {
   const [lists, setLists] = useState<PriceListWithAssignments[]>([]);
   const [targets, setTargets] = useState<PricingTargets | null>(null);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -103,6 +107,11 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [busyCell, setBusyCell] = useState<string | null>(null);
   const busyRef = useRef(false);
+  const [pendingConflict, setPendingConflict] = useState<{
+    list: PriceListWithAssignments;
+    nextAssignments: PriceListAssignment[];
+    conflicts: PreviewConflict[];
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -304,9 +313,9 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         return;
       }
 
-      // A target can be on several lists — save directly, no conflict blocking.
-      // Overlap info is best-effort only (shown in the toast, never blocks).
-      let overlapNote = '';
+      // Several lists per customer are fine when they cover different
+      // products. Only a SAME-product price overlap needs a decision.
+      const nextAssignments = [...current, buildTarget(target) as PriceListAssignment];
       try {
         const previewRes = await fetch('/api/v1/vendor/price-lists/assignments/preview', {
           method: 'POST',
@@ -314,16 +323,15 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
           body: JSON.stringify({ priceListId: list.id, target: buildTarget(target) }),
         });
         const previewJson = await previewRes.json();
-        const overlaps = (previewJson?.data?.overlaps ?? []) as Array<{ otherListName: string; productCount: number; winner: string }>;
-        if (previewJson.success && overlaps.length > 0) {
-          const o = overlaps[0];
-          overlapNote = ` · also on ${o.otherListName} (${o.productCount} shared products — ${o.winner} wins those)`;
+        const conflicts = (previewJson?.data?.conflicts ?? []) as PreviewConflict[];
+        if (previewJson.success && conflicts.length > 0) {
+          setPendingConflict({ list, nextAssignments, conflicts });
+          return;
         }
-      } catch { /* preview is informational only */ }
+      } catch { /* preview failed — the save below still enforces conflicts (409) */ }
 
-      const nextAssignments = [...current, buildTarget(target) as PriceListAssignment];
       await patchAssignments(list.id, nextAssignments);
-      toast.success(`Assignment saved${overlapNote}`);
+      toast.success('Assignment saved');
       await load();
       onReloadLists?.();
     } catch (e) {
@@ -331,6 +339,25 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     } finally {
       busyRef.current = false;
       setBusyCell(null);
+    }
+  };
+
+  const resolveConflict = async (action: 'skip' | 'replace') => {
+    if (!pendingConflict || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      const resolutions = [...new Set(pendingConflict.conflicts.map((c) => c.userId))].map(
+        (userId) => ({ userId, action }),
+      );
+      await patchAssignments(pendingConflict.list.id, pendingConflict.nextAssignments, resolutions);
+      toast.success(action === 'skip' ? 'Kept existing lists — new list not added for those customers' : 'Moved to the new list');
+      setPendingConflict(null);
+      await load();
+      onReloadLists?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to update');
+    } finally {
+      busyRef.current = false;
     }
   };
 
@@ -466,7 +493,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
             </span>
           ))}
         </p>
-        <p className="text-[#7C7C7C] mt-1.5">Top beats bottom. A customer can be on several lists — per product, the first list that prices it wins; products not in any list stay at Base price.</p>
+        <p className="text-[#7C7C7C] mt-1.5">Top beats bottom between different kinds of rules. A customer can be on several lists when they cover different products. If two lists price the same product for a customer, we ask you — Skip, Replace, or Review manually — never silently picked by list order. Products in no list stay at Base price.</p>
       </div>
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 min-h-[480px]">
       <div className="rounded-[12px] border border-[#E9E3DD] bg-white overflow-hidden flex flex-col">
@@ -554,7 +581,8 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
                         </button>
                       )}
                       {row.type === 'customer' && effectiveByUser.get(row.value) && (() => {
-                        const eff = effectiveByUser.get(row.value)!.effective;
+                        const rowEff = effectiveByUser.get(row.value)!;
+                        const eff = rowEff.effective;
                         const lists = eff.lists ?? [];
                         if (lists.length > 1) {
                           return (
@@ -562,9 +590,11 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
                               <span className="text-[10px] px-1.5 py-px rounded-full bg-[#F8E8EC] text-primary font-bold" title={lists.map((l) => `${l.priceListName} (${l.itemCount} products, ${l.via})`).join(' · ')}>
                                 Gets: {lists.map((l) => `${l.priceListName} (${l.itemCount})`).join(' + ')}
                               </span>
-                              <span className="text-[10px] px-1.5 py-px rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-bold" title="When two lists price the same product, the first one here wins">
-                                {lists[0].priceListName} wins overlaps
-                              </span>
+                              {rowEff.conflict && (
+                                <span className="text-[10px] px-1.5 py-px rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-bold" title={`Both lists price the same ${rowEff.conflict.productCount} product(s). Remove the overlap in Prices → Compare, or re-tick to choose Skip/Replace.`}>
+                                  ⚠ {rowEff.conflict.productCount} product{rowEff.conflict.productCount === 1 ? '' : 's'} priced twice — review
+                                </span>
+                              )}
                             </>
                           );
                         }
@@ -614,6 +644,21 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
           }
         />
       </div>
+
+      <ConflictDialog
+        open={!!pendingConflict}
+        listName={pendingConflict?.list.name ?? ''}
+        affectedCount={pendingConflict ? new Set(pendingConflict.conflicts.map((c) => c.userId)).size : 0}
+        conflicts={pendingConflict?.conflicts ?? []}
+        onClose={() => setPendingConflict(null)}
+        onSkip={() => void resolveConflict('skip')}
+        onReplace={() => void resolveConflict('replace')}
+        onReviewManually={() => {
+          setPendingConflict(null);
+          onReviewConflicts?.();
+          toast.message('Compare both lists and remove the overlapping product from one of them, then tick again.');
+        }}
+      />
 
       {groupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

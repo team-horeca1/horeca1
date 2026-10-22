@@ -501,6 +501,7 @@ export function PricingWorkspace() {
             setExplainProductId(rows[0]?.id ?? null);
             setExplainOpen(true);
           }}
+          onReviewConflicts={() => { setCompare(true); setTab('prices'); }}
         />
       )}
 

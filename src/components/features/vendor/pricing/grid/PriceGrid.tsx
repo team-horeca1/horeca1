@@ -14,8 +14,6 @@ import {
   Eye,
   Percent,
   RotateCcw,
-  ArrowUp,
-  ArrowDown,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -388,29 +386,8 @@ export function PriceGrid({
     }
   };
 
-  const moveList = async (id: string, dir: -1 | 1) => {
-    const idx = cols.findIndex((c) => c.id === id);
-    const swap = idx + dir;
-    if (idx < 0 || swap < 0 || swap >= cols.length) return;
-    setColMenu(null);
-    setColBusy(id);
-    try {
-      const reordered = [...cols];
-      const [moved] = reordered.splice(idx, 1);
-      reordered.splice(swap, 0, moved);
-      for (let i = 0; i < reordered.length; i++) {
-        if ((reordered[i].priority ?? i) === i) continue;
-        const res = await fetch(`/api/v1/vendor/price-lists/${reordered[i].id}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priority: i }),
-        });
-        const json = await res.json();
-        if (!json.success) throw new Error(json.error?.message || 'Reorder failed');
-      }
-      toast.success('List order updated — this decides which list wins when both price the same product');
-      onListsChanged?.();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Reorder failed'); } finally { setColBusy(null); }
-  };
+  // No "move up/down" winner control: overlapping products across lists are
+  // a supplier conflict (Skip/Replace/Review at assignment), never an order.
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -779,22 +756,6 @@ export function PriceGrid({
             className="fixed z-50 bg-white border border-[#E9E3DD] rounded-[12px] shadow-xl py-1 w-[208px] max-w-[calc(100vw-24px)] text-[13px]"
             style={{ left: colMenu.x, top: colMenu.y }}
           >
-            <button
-              type="button"
-              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40"
-              disabled={cols.findIndex((x) => x.id === colMenu.id) <= 0}
-              onClick={() => void moveList(colMenu.id, -1)}
-            >
-              <ArrowUp size={14} /> Move up (wins ties)
-            </button>
-            <button
-              type="button"
-              className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40"
-              disabled={cols.findIndex((x) => x.id === colMenu.id) >= cols.length - 1}
-              onClick={() => void moveList(colMenu.id, 1)}
-            >
-              <ArrowDown size={14} /> Move down
-            </button>
             <button
               type="button"
               className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2"

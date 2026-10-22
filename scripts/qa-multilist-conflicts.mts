@@ -1,4 +1,7 @@
-/* Multi-list + precedence ladder hardcore test (Zoho model).
+/* SUPERSEDED by qa-conflict-rule.mts (2026-10-22 client decision: same-product
+   overlap across lists is an assignment-time conflict — Skip/Replace/Review —
+   never a priority winner). The ladder-peel phases below predate that rule.
+   Multi-list + precedence ladder hardcore test (Zoho model).
    5 lists, same product, different prices. Verifies:
    - same target may sit on several lists (no TARGET_BOUND any more)
    - customer on 2 lists: list priority (Move up/down) decides the winner

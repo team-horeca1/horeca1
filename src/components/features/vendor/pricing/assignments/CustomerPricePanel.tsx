@@ -17,6 +17,7 @@ type EffectiveRow = {
     assignedAt: string | null;
     lists?: Array<{ priceListId: string; priceListName: string; via: string; assignedAt: string | null; itemCount: number }>;
   };
+  conflict?: { productCount: number; listNames: string[] } | null;
 };
 
 interface Props {
@@ -59,9 +60,15 @@ export function CustomerPricePanel({ customer, effective, onExplain }: Props) {
             Since {new Date(effective.effective.assignedAt).toLocaleDateString('en-IN')}
           </div>
         )}
+        {effective?.conflict && (
+          <div className="mt-3 p-2.5 rounded-[10px] bg-amber-50 border border-amber-200 text-amber-900 text-[12px]">
+            ⚠ <strong>{effective.conflict.productCount} product{effective.conflict.productCount === 1 ? '' : 's'} priced on more than one list</strong> ({effective.conflict.listNames.join(' + ')}).
+            Remove the overlap in Prices → Compare — the system does not pick a winner by list order.
+          </div>
+        )}
         {(effective?.effective.lists?.length ?? 0) > 1 && (
           <div className="mt-3 space-y-1.5">
-            <div className="text-[11px] font-medium text-[#7C7C7C] uppercase tracking-wide">On these lists (first wins overlaps)</div>
+            <div className="text-[11px] font-medium text-[#7C7C7C] uppercase tracking-wide">Lists this customer gets</div>
             {effective!.effective.lists!.map((l) => (
               <div key={l.priceListId} className="flex items-center justify-between gap-2 text-[12px] bg-white border border-[#E9E3DD] rounded-[10px] px-2.5 py-1.5">
                 <span className="font-semibold text-[#181725] truncate">{l.priceListName}</span>
