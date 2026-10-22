@@ -490,7 +490,17 @@ export function PricingWorkspace() {
               selectedProductIds={selectedProductIds}
               onSelectedProductIdsChange={setSelectedProductIds}
               compareMode={compare}
-              onAddToList={(row, col) => setCell(`${row.id}:${col.id}`, { price: null, added: true, isExcluded: false })}
+              onAddToList={(row, col) => {
+                const key = `${row.id}:${col.id}`;
+                // Re-adding a product removed earlier in this same draft
+                // restores its original cell (not a blank "new" entry).
+                if (key in dirty && dirty[key] === null && row.cells[col.id]) {
+                  const orig = row.cells[col.id]!;
+                  setCell(key, { price: orig.price, isExcluded: orig.isExcluded, isLocked: orig.isLocked });
+                  return;
+                }
+                setCell(key, { price: null, added: true, isExcluded: false });
+              }}
             />
           )}
         </>

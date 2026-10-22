@@ -716,6 +716,7 @@ export function PriceGrid({
                                 aria-label={`Add ${row.name} to ${col.name}`}
                                 title={`Add ${row.name} to ${col.name}`}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-white text-[11px] font-bold shrink-0 hover:bg-[#5A1926]"
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); onAddToList(row, col); }}
                               >
                                 <Plus size={12} /> Add
@@ -759,6 +760,7 @@ export function PriceGrid({
                                 aria-label={`Remove ${row.name} from ${col.name}`}
                                 title={`Remove ${row.name} from ${col.name} (draft — publish to apply)`}
                                 className="w-5 h-5 rounded-full border border-[#E9E3DD] bg-white text-[#DC2626] text-[12px] font-bold leading-none flex items-center justify-center shrink-0 hover:bg-red-50"
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); setCellFields(row.id, col.id, null); toast.success(`${row.name} removed from ${col.name} (draft) — Review & publish to apply`); }}
                               >
                                 ×
