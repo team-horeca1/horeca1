@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Pencil, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -102,6 +102,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
   const [filterType, setFilterType] = useState<string>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [busyCell, setBusyCell] = useState<string | null>(null);
+  const busyRef = useRef(false);
 
   const [conflict, setConflict] = useState<{
     priceListId: string;
@@ -283,6 +284,12 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
   };
 
   const toggle = async (target: TargetRow, list: PriceListWithAssignments) => {
+    // Assignments are saved as a full-set replace computed from current
+    // state. A second toggle while a save is in flight would compute from
+    // stale state and silently overwrite the first — ignore it (checkboxes
+    // are also disabled while busy).
+    if (busyRef.current) return;
+    busyRef.current = true;
     const key = `${target.id}:${list.id}`;
     setBusyCell(key);
     try {
@@ -343,6 +350,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to update');
     } finally {
+      busyRef.current = false;
       setBusyCell(null);
     }
   };
@@ -602,7 +610,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={busyCell === cellKey}
+                          disabled={busyCell !== null}
                           onChange={() => void toggle(row, col)}
                           className="w-4 h-4 accent-[#6B1D2E] cursor-pointer"
                           aria-label={`Assign ${col.name} to ${row.name}`}
