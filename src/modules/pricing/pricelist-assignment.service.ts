@@ -6,6 +6,7 @@
 import { prisma } from '@/lib/prisma';
 import { Errors, ApiError } from '@/middleware/errorHandler';
 import { normalizeCreditStatus } from '@/modules/pricing/pricing.service';
+import { marketplaceCustomerFilter } from '@/lib/marketplaceCustomers';
 import type { PriceListAssignmentType } from '@prisma/client';
 
 export type AssignmentTarget = {
@@ -46,6 +47,7 @@ function targetKey(t: AssignmentTarget): string {
 type UniverseCustomer = {
   userId: string;
   label: string;
+  hcidDisplay: string | null;
   tags: string[];
   creditStatus: string | null;
   accountIds: Set<string>;
@@ -66,27 +68,33 @@ const userLabel = (u: { fullName: string | null; businessName: string | null; em
  * "0 affected" and show "Base catalogue" even when directly assigned.
  */
 async function loadCustomerUniverse(vendorId: string): Promise<UniverseCustomer[]> {
-  const [crm, orders, wallets] = await Promise.all([
+  const [crm, orders, wallets, platformCustomers] = await Promise.all([
     prisma.vendorCustomer.findMany({
       where: { vendorId },
       select: {
         userId: true, tags: true,
-        user: { select: { id: true, fullName: true, businessName: true, email: true, userRoles: { select: { businessAccountId: true } } } },
+        user: { select: { id: true, fullName: true, businessName: true, email: true, hcidDisplay: true, pincode: true, userRoles: { select: { businessAccountId: true } } } },
       },
     }),
     prisma.order.findMany({
       where: { vendorId },
       distinct: ['userId'],
-      select: { userId: true, businessAccountId: true, user: { select: { id: true, fullName: true, businessName: true, email: true } } },
+      select: { userId: true, businessAccountId: true, user: { select: { id: true, fullName: true, businessName: true, email: true, hcidDisplay: true, pincode: true } } },
     }),
     prisma.creditWallet.findMany({ where: { vendorId }, select: { userId: true, status: true, workflowStatus: true } }),
+    // All platform customers — assignments/effective must work for buyers who
+    // have not ordered from this vendor yet too, not only past buyers.
+    prisma.user.findMany({
+      where: marketplaceCustomerFilter(),
+      select: { id: true, fullName: true, businessName: true, email: true, hcidDisplay: true, pincode: true, accountMemberships: { select: { businessAccountId: true } } },
+    }),
   ]);
 
   const byId = new Map<string, UniverseCustomer & { creditRaw?: { status: string; workflowStatus: string } }>();
   const ensure = (userId: string, label: string): UniverseCustomer & { creditRaw?: { status: string; workflowStatus: string } } => {
     let c = byId.get(userId);
     if (!c) {
-      c = { userId, label, tags: [], creditStatus: null, accountIds: new Set(), outletIds: new Set(), pincodes: new Set(), cities: new Set(), states: new Set(), groupIds: new Set() };
+      c = { userId, label, hcidDisplay: null, tags: [], creditStatus: null, accountIds: new Set(), outletIds: new Set(), pincodes: new Set(), cities: new Set(), states: new Set(), groupIds: new Set() };
       byId.set(userId, c);
     }
     return c;
@@ -95,11 +103,21 @@ async function loadCustomerUniverse(vendorId: string): Promise<UniverseCustomer[
   for (const c of crm) {
     const cust = ensure(c.userId, userLabel(c.user, c.userId));
     cust.tags = Array.from(new Set([...cust.tags, ...(c.tags ?? [])]));
+    if (!cust.hcidDisplay && c.user.hcidDisplay) cust.hcidDisplay = c.user.hcidDisplay;
+    if (c.user.pincode) cust.pincodes.add(c.user.pincode);
     for (const r of c.user.userRoles) cust.accountIds.add(r.businessAccountId);
   }
   for (const o of orders) {
     const cust = ensure(o.userId, userLabel(o.user, o.userId));
+    if (!cust.hcidDisplay && o.user.hcidDisplay) cust.hcidDisplay = o.user.hcidDisplay;
+    if (o.user.pincode) cust.pincodes.add(o.user.pincode);
     if (o.businessAccountId) cust.accountIds.add(o.businessAccountId);
+  }
+  for (const u of platformCustomers) {
+    const cust = ensure(u.id, userLabel(u, u.id));
+    if (!cust.hcidDisplay && u.hcidDisplay) cust.hcidDisplay = u.hcidDisplay;
+    if (u.pincode) cust.pincodes.add(u.pincode);
+    for (const m of u.accountMemberships) cust.accountIds.add(m.businessAccountId);
   }
   const walletUserIds = wallets.map((w) => w.userId).filter((id) => !byId.has(id));
   if (walletUserIds.length > 0) {
@@ -450,6 +468,7 @@ export async function listEffectiveAssignments(vendorId: string) {
   return universe.map((c) => ({
     userId: c.userId,
     label: c.label,
+    hcidDisplay: c.hcidDisplay,
     tags: c.tags,
     creditStatus: c.creditStatus,
     pincodes: [...c.pincodes],

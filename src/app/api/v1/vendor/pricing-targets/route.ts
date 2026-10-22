@@ -16,19 +16,20 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { normalizeCreditStatus } from '@/modules/pricing/pricing.service';
+import { marketplaceCustomerFilter } from '@/lib/marketplaceCustomers';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'priceLists.view');
     const vendorId = await resolveVendorId(ctx, req);
 
-    const [orderBuyers, crmCustomers, creditAccounts] = await Promise.all([
+    const [orderBuyers, crmCustomers, creditAccounts, platformCustomers, serviceAreas, savedAssignments] = await Promise.all([
       prisma.order.findMany({
         where: { vendorId },
         select: {
           businessAccountId: true,
           userId: true,
-          user: { select: { fullName: true, businessName: true, email: true } },
+          user: { select: { fullName: true, businessName: true, email: true, hcidDisplay: true, pincode: true } },
         },
         distinct: ['userId'],
       }),
@@ -42,6 +43,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
               fullName: true,
               businessName: true,
               email: true,
+              hcidDisplay: true,
+              pincode: true,
               userRoles: { select: { businessAccountId: true } },
             },
           },
@@ -51,12 +54,36 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         where: { vendorId },
         select: { userId: true, status: true, workflowStatus: true },
       }),
+      // ALL platform customers (same source as /vendor/customers) — a supplier
+      // can price for any buyer on Horeca1, not only past buyers.
+      prisma.user.findMany({
+        where: marketplaceCustomerFilter(),
+        select: {
+          id: true,
+          fullName: true,
+          businessName: true,
+          email: true,
+          hcidDisplay: true,
+          pincode: true,
+          accountMemberships: { select: { businessAccountId: true } },
+        },
+      }),
+      // The vendor's own delivery service areas are valid pincode/area targets.
+      prisma.serviceArea.findMany({
+        where: { vendorId, isActive: true },
+        select: { pincode: true, cityLabel: true, areaLabel: true },
+      }),
+      // Targets already assigned (incl. manually added ones) must persist as rows.
+      prisma.priceListAssignment.findMany({
+        where: { priceList: { vendorId, isActive: true } },
+        select: { pincode: true, area: true, segment: true },
+      }),
     ]);
 
     const label = (u: { fullName: string | null; businessName: string | null; email: string | null }, id: string) =>
       u.businessName ?? u.fullName ?? u.email ?? id;
 
-    const customers = new Map<string, { userId: string; label: string; creditStatus: string | null; pincodes: string[]; cities: string[]; tags: string[] }>();
+    const customers = new Map<string, { userId: string; label: string; hcidDisplay: string | null; creditStatus: string | null; pincodes: string[]; cities: string[]; tags: string[] }>();
     const accountIds = new Set<string>();
 
     // Use the resolver's canonical normalisation so the panel, assignment
@@ -70,8 +97,9 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       customers.set(o.userId, {
         userId: o.userId,
         label: label(o.user, o.userId),
+        hcidDisplay: o.user.hcidDisplay ?? null,
         creditStatus: creditMap.get(o.userId) ?? null,
-        pincodes: [],
+        pincodes: o.user.pincode ? [o.user.pincode] : [],
         cities: [],
         tags: [],
       });
@@ -83,15 +111,33 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         customers.set(c.userId, {
           userId: c.userId,
           label: label(c.user, c.userId),
+          hcidDisplay: c.user.hcidDisplay ?? null,
           creditStatus: creditMap.get(c.userId) ?? null,
-          pincodes: [],
+          pincodes: c.user.pincode ? [c.user.pincode] : [],
           cities: [],
           tags: c.tags || [],
         });
       } else {
         existing.tags = Array.from(new Set([...existing.tags, ...(c.tags || [])]));
+        if (!existing.hcidDisplay && c.user.hcidDisplay) existing.hcidDisplay = c.user.hcidDisplay;
+        if (c.user.pincode && !existing.pincodes.includes(c.user.pincode)) existing.pincodes.push(c.user.pincode);
       }
       for (const r of c.user.userRoles) accountIds.add(r.businessAccountId);
+    }
+    // Every remaining platform customer (never ordered / not in CRM yet)
+    for (const u of platformCustomers) {
+      if (!customers.has(u.id)) {
+        customers.set(u.id, {
+          userId: u.id,
+          label: label(u, u.id),
+          hcidDisplay: u.hcidDisplay ?? null,
+          creditStatus: creditMap.get(u.id) ?? null,
+          pincodes: u.pincode ? [u.pincode] : [],
+          cities: [],
+          tags: [],
+        });
+      }
+      for (const m of u.accountMemberships) accountIds.add(m.businessAccountId);
     }
 
     const outlets = accountIds.size
@@ -138,8 +184,20 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       }
     }
 
-    const pincodes = [...new Set(outlets.map((o) => o.pincode).filter(Boolean))] as string[];
-    const cities = [...new Set(outlets.map((o) => o.city).filter(Boolean))] as string[];
+    // Pincodes/areas = vendor ServiceAreas ∪ customer outlets/profiles ∪ already-assigned targets
+    const pincodes = [...new Set([
+      ...outlets.map((o) => o.pincode),
+      ...serviceAreas.map((s) => s.pincode),
+      ...savedAssignments.map((a) => a.pincode),
+      ...customersList.flatMap((c) => c.pincodes),
+    ].filter(Boolean))] as string[];
+    const cities = [...new Set([
+      ...outlets.map((o) => o.city),
+      ...outlets.map((o) => o.state),
+      ...serviceAreas.map((s) => s.cityLabel),
+      ...serviceAreas.map((s) => s.areaLabel),
+      ...savedAssignments.map((a) => a.area),
+    ].filter(Boolean))] as string[];
     const states = [...new Set(outlets.map((o) => o.state).filter(Boolean))] as string[];
 
     const segmentsSet = new Set<string>();
@@ -149,6 +207,9 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           if (t) segmentsSet.add(t);
         }
       }
+    }
+    for (const a of savedAssignments) {
+      if (a.segment) segmentsSet.add(a.segment);
     }
 
     return NextResponse.json({

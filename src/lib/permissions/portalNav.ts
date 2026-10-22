@@ -143,6 +143,7 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Customers',
     links: [
       { name: 'Customers', icon: UserCircle, href: '/vendor/customers', feature: 'customers', requiredPerm: 'customers.view' },
+      { name: 'Customer Groups', icon: Users, href: '/vendor/customer-groups', feature: 'customers', requiredPerm: 'customers.view' },
       // Hidden for now — re-enable with sales-team / commissions
       // { name: 'Sales Team', icon: BadgeIndianRupee, href: '/vendor/sales-team', feature: 'salespersons', requiredPerm: ['salespersons.view', 'commissions.view'] },
     ],

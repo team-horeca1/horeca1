@@ -58,6 +58,7 @@ export type DraftCell = Partial<PriceListItemData> | null;
 export interface CustomerTarget {
   userId: string;
   label: string;
+  hcidDisplay?: string | null;
   creditStatus: string | null;
   pincodes: string[];
   cities: string[];

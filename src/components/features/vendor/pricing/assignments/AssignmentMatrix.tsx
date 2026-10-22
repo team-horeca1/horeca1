@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Pencil, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { AssignmentType, CustomerTarget, PriceListCol } from '../types';
@@ -30,6 +30,19 @@ type TargetRow = {
   type: AssignmentType;
   value: string;
   displayType: string;
+  hcidDisplay?: string | null;
+  searchText: string;
+};
+
+/** One-line Zoho-style explanation shown under the filter pills. */
+const FILTER_HELP: Record<string, string> = {
+  all: 'Tick a box to give that price list to a customer or a group of customers. Use the filters to find them faster.',
+  customer: 'Give a special price list to specific buyers (search by name or Customer ID).',
+  group: "Bundle multiple customers (e.g. 'VIP Hotels') and assign a list to the whole group in one tick.",
+  credit_status: 'Auto-price by DiSCCO credit state (Active credit vs Pending/Closed).',
+  pincode: 'From your delivery service areas + customer addresses, or add any pincode.',
+  area: 'City / locality / state (e.g. Navi Mumbai, Thane).',
+  segment: 'Customer tags like Hotel, Cafe, Caterer, Distributor.',
 };
 
 type PricingTargets = {
@@ -146,6 +159,8 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
 
   const displayLists = lists.length > 0 ? lists : priceLists.map((p) => ({ ...p, assignments: [] }));
 
+  const [customRows, setCustomRows] = useState<TargetRow[]>([]);
+
   const targetRows = useMemo(() => {
     if (!targets) return [] as TargetRow[];
     const rows: TargetRow[] = [];
@@ -156,6 +171,8 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         type: 'customer',
         value: c.userId,
         displayType: 'Customer',
+        hcidDisplay: c.hcidDisplay ?? null,
+        searchText: [c.label, c.hcidDisplay ?? '', ...(c.pincodes ?? []), ...(c.cities ?? []), ...(c.tags ?? [])].join(' ').toLowerCase(),
       });
     });
     targets.pincodes.forEach((p) => {
@@ -165,6 +182,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         type: 'pincode',
         value: p,
         displayType: 'Pincode',
+        searchText: `pincode ${p}`,
       });
     });
     targets.cities.forEach((city) => {
@@ -174,6 +192,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         type: 'area',
         value: city,
         displayType: 'Area',
+        searchText: `area ${city.toLowerCase()}`,
       });
     });
     targets.segments.forEach((seg) => {
@@ -183,6 +202,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         type: 'segment',
         value: seg,
         displayType: 'Segment',
+        searchText: `segment ${seg.toLowerCase()}`,
       });
     });
     targets.creditStatuses.forEach((cs) => {
@@ -192,6 +212,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         type: 'credit_status',
         value: cs,
         displayType: 'Credit status',
+        searchText: `credit ${cs.toLowerCase()}`,
       });
     });
     groups.forEach((g) => {
@@ -201,16 +222,20 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
         type: 'group',
         value: g.id,
         displayType: 'Group',
+        searchText: `group ${g.name.toLowerCase()}`,
       });
     });
+    for (const r of customRows) {
+      if (!rows.some((x) => x.id === r.id)) rows.push(r);
+    }
 
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      const matchesSearch = !q || r.name.toLowerCase().includes(q);
+      const matchesSearch = !q || r.searchText.includes(q) || r.name.toLowerCase().includes(q);
       if (filterType === 'all') return matchesSearch;
       return matchesSearch && r.type === filterType;
     });
-  }, [targets, groups, search, filterType]);
+  }, [targets, groups, search, filterType, customRows]);
 
   const isAssigned = (target: TargetRow, list: PriceListWithAssignments) => {
     const assignments = list.assignments ?? [];
@@ -321,6 +346,96 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     }
   };
 
+  const [groupModal, setGroupModal] = useState<{
+    groupId: string | null;
+    name: string;
+    memberIds: string[];
+    memberSearch: string;
+    saving: boolean;
+  } | null>(null);
+  const [targetModal, setTargetModal] = useState<{
+    type: 'pincode' | 'area' | 'segment';
+    value: string;
+    priceListId: string;
+  } | null>(null);
+
+  const openEditGroup = async (row: TargetRow) => {
+    setGroupModal({ groupId: row.value, name: row.name, memberIds: [], memberSearch: '', saving: true });
+    try {
+      const res = await fetch(`/api/v1/vendor/customer-groups/${row.value}`);
+      const json = await res.json();
+      const members = (json.data?.members ?? []) as Array<{ userId: string | null }>;
+      setGroupModal((m) => (m ? { ...m, memberIds: members.map((x) => x.userId).filter((x): x is string => !!x), saving: false } : m));
+    } catch {
+      setGroupModal((m) => (m ? { ...m, saving: false } : m));
+      toast.error('Could not load group members');
+    }
+  };
+
+  const saveGroup = async () => {
+    if (!groupModal || !groupModal.name.trim()) return;
+    setGroupModal((m) => (m ? { ...m, saving: true } : m));
+    try {
+      const isEdit = !!groupModal.groupId;
+      const res = await fetch(
+        isEdit ? `/api/v1/vendor/customer-groups/${groupModal.groupId}` : '/api/v1/vendor/customer-groups',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: groupModal.name.trim(), members: groupModal.memberIds.map((userId) => ({ userId })) }),
+        },
+      );
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed to save group');
+      toast.success(isEdit ? 'Group updated' : 'Group created — now tick a price list for it');
+      setGroupModal(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save group');
+      setGroupModal((m) => (m ? { ...m, saving: false } : m));
+    }
+  };
+
+  const deleteGroup = async () => {
+    if (!groupModal?.groupId) return;
+    if (!window.confirm(`Delete group "${groupModal.name}"? Price lists assigned to it will lose that assignment.`)) return;
+    try {
+      const res = await fetch(`/api/v1/vendor/customer-groups/${groupModal.groupId}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Delete failed');
+      toast.success('Group deleted');
+      setGroupModal(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Delete failed');
+    }
+  };
+
+  const saveTarget = async () => {
+    if (!targetModal || !targetModal.value.trim()) return;
+    const value = targetModal.value.trim();
+    const row: TargetRow = {
+      id: `${targetModal.type}:${value}`,
+      name: targetModal.type === 'pincode' ? `Pincode ${value}` : targetModal.type === 'area' ? `Area ${value}` : `Segment ${value}`,
+      type: targetModal.type,
+      value,
+      displayType: targetModal.type === 'pincode' ? 'Pincode' : targetModal.type === 'area' ? 'Area' : 'Segment',
+      searchText: `${targetModal.type} ${value.toLowerCase()}`,
+    };
+    setCustomRows((prev) => [...prev.filter((r) => r.id !== row.id), row]);
+    const listId = targetModal.priceListId;
+    setTargetModal(null);
+    setFilterType(targetModal.type);
+    if (listId) {
+      const list = displayLists.find((l) => l.id === listId);
+      if (list && !isAssigned(row, list)) {
+        await toggle(row, list);
+        return;
+      }
+    }
+    toast.success(`${row.name} added — tick a price list to assign it`);
+  };
+
   const applyConflict = async (mode: 'skip' | 'replace') => {
     if (!conflict) return;
     setBusyCell(`${conflict.target.id}:${conflict.priceListId}`);
@@ -382,15 +497,31 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 min-h-[480px]">
       <div className="rounded-[12px] border border-[#E9E3DD] bg-white overflow-hidden flex flex-col">
         <div className="p-3 border-b border-[#E9E3DD] space-y-2.5">
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customers, pincodes, areas…"
-              aria-label="Search targets"
-              className="w-full h-10 pl-9 pr-3 rounded-[12px] border border-[#E9E3DD] text-[13px] outline-none focus:border-primary"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by customer name, ID (HC-…), pincode, group…"
+                aria-label="Search targets"
+                className="w-full h-10 pl-9 pr-3 rounded-[12px] border border-[#E9E3DD] text-[13px] outline-none focus:border-primary"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setGroupModal({ groupId: null, name: '', memberIds: [], memberSearch: '', saving: false })}
+              className="h-10 px-3 rounded-[12px] bg-primary text-white text-[12px] font-bold flex items-center gap-1.5 shrink-0"
+            >
+              <Plus size={14} /> New group
+            </button>
+            <button
+              type="button"
+              onClick={() => setTargetModal({ type: 'pincode', value: '', priceListId: '' })}
+              className="h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white text-[12px] font-bold flex items-center gap-1.5 shrink-0"
+            >
+              <Plus size={14} /> Add pincode / area / segment
+            </button>
           </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter target type">
             {filterPills.map((p) => (
@@ -399,6 +530,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-[#7C7C7C]">{FILTER_HELP[filterType] ?? FILTER_HELP.all}</p>
         </div>
 
         <div className="overflow-auto flex-1">
@@ -435,6 +567,18 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
                     <div className="font-medium text-[#181725] truncate max-w-[220px]">{row.name}</div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       <span className="text-[10px] px-1.5 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C] font-semibold">{row.displayType}</span>
+                      {row.type === 'customer' && row.hcidDisplay && (
+                        <span className="text-[10px] px-1.5 py-px rounded-full bg-white border border-[#E9E3DD] text-[#181725] font-bold tabular-nums" title="Customer ID">{row.hcidDisplay}</span>
+                      )}
+                      {row.type === 'group' && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); void openEditGroup(row); }}
+                          className="text-[10px] px-1.5 py-px rounded-full bg-white border border-[#E9E3DD] text-primary font-bold flex items-center gap-0.5"
+                        >
+                          <Pencil size={9} /> Edit group
+                        </button>
+                      )}
                       {row.type === 'customer' && effectiveByUser.get(row.value) && (
                         <span className="text-[10px] px-1.5 py-px rounded-full bg-[#F8E8EC] text-primary font-bold" title={effectiveByUser.get(row.value)!.effective.via}>
                           Gets: {effectiveByUser.get(row.value)!.effective.priceListName}
@@ -480,6 +624,117 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain }: P
           }
         />
       </div>
+
+      {groupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setGroupModal(null)} aria-hidden />
+          <div className="relative bg-white rounded-[16px] shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-auto" role="dialog" aria-label={groupModal.groupId ? 'Edit customer group' : 'New customer group'}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-[17px] font-bold text-[#181725]">{groupModal.groupId ? 'Edit customer group' : 'New customer group'}</h2>
+                <p className="text-[12px] text-[#7C7C7C] mt-0.5">Bundle customers once, then give the whole group a price list in one tick.</p>
+              </div>
+              <button type="button" onClick={() => setGroupModal(null)} className="p-1.5 rounded-lg hover:bg-[#FAF7F2]" aria-label="Close"><X size={18} /></button>
+            </div>
+            <label className="block text-[12px] font-semibold text-[#181725]">Group name
+              <input
+                value={groupModal.name}
+                onChange={(e) => setGroupModal((m) => (m ? { ...m, name: e.target.value } : m))}
+                placeholder="e.g. VIP Hotels, Premium Cafes"
+                className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-normal"
+              />
+            </label>
+            <div>
+              <p className="text-[12px] font-semibold text-[#181725] mb-1.5">Customers in this group ({groupModal.memberIds.length})</p>
+              <input
+                value={groupModal.memberSearch}
+                onChange={(e) => setGroupModal((m) => (m ? { ...m, memberSearch: e.target.value } : m))}
+                placeholder="Search by name or Customer ID (HC-…)"
+                aria-label="Search customers for group"
+                className="w-full h-10 px-3 border border-[#E9E3DD] rounded-[12px] text-[13px]"
+              />
+              <div className="mt-2 max-h-[220px] overflow-auto border border-[#E9E3DD] rounded-[12px] divide-y divide-[#E9E3DD]">
+                {(targets?.customers ?? [])
+                  .filter((c) => {
+                    const q = groupModal.memberSearch.trim().toLowerCase();
+                    return !q || c.label.toLowerCase().includes(q) || (c.hcidDisplay ?? '').toLowerCase().includes(q);
+                  })
+                  .slice(0, 100)
+                  .map((c) => (
+                    <label key={c.userId} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[#FAF7F2] text-[13px]">
+                      <input
+                        type="checkbox"
+                        checked={groupModal.memberIds.includes(c.userId)}
+                        onChange={(e) => setGroupModal((m) => (m ? { ...m, memberIds: e.target.checked ? [...m.memberIds, c.userId] : m.memberIds.filter((id) => id !== c.userId) } : m))}
+                        className="w-4 h-4 accent-[#6B1D2E]"
+                      />
+                      <span className="font-medium text-[#181725] truncate">{c.label}</span>
+                      {c.hcidDisplay && <span className="text-[10px] px-1.5 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] font-bold tabular-nums shrink-0">{c.hcidDisplay}</span>}
+                    </label>
+                  ))}
+                {(targets?.customers ?? []).length === 0 && <p className="p-3 text-[12px] text-[#7C7C7C]">No customers found.</p>}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {groupModal.groupId && (
+                <button type="button" onClick={() => void deleteGroup()} className="h-11 px-3 rounded-[12px] border border-red-200 text-red-700 font-semibold text-[13px]">Delete</button>
+              )}
+              <button type="button" onClick={() => setGroupModal(null)} className="flex-1 h-11 rounded-[12px] border border-[#E9E3DD] font-semibold">Cancel</button>
+              <button type="button" disabled={groupModal.saving || !groupModal.name.trim()} onClick={() => void saveGroup()} className="flex-1 h-11 rounded-[12px] bg-primary text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                {groupModal.saving && <Loader2 size={15} className="animate-spin" />} {groupModal.groupId ? 'Save group' : 'Create group'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {targetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setTargetModal(null)} aria-hidden />
+          <div className="relative bg-white rounded-[16px] shadow-xl w-full max-w-md p-6 space-y-4" role="dialog" aria-label="Add pincode, area or segment">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-[17px] font-bold text-[#181725]">Add pincode / area / segment</h2>
+                <p className="text-[12px] text-[#7C7C7C] mt-0.5">Add any target, even if no customer matches it yet. Then tick a price list for it.</p>
+              </div>
+              <button type="button" onClick={() => setTargetModal(null)} className="p-1.5 rounded-lg hover:bg-[#FAF7F2]" aria-label="Close"><X size={18} /></button>
+            </div>
+            <label className="block text-[12px] font-semibold text-[#181725]">Type
+              <select
+                value={targetModal.type}
+                onChange={(e) => setTargetModal((m) => (m ? { ...m, type: e.target.value as 'pincode' | 'area' | 'segment' } : m))}
+                className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal"
+              >
+                <option value="pincode">Pincode (e.g. 400706)</option>
+                <option value="area">Area / City (e.g. Thane, Navi Mumbai)</option>
+                <option value="segment">Segment tag (e.g. Hotel, Cafe, Caterer)</option>
+              </select>
+            </label>
+            <label className="block text-[12px] font-semibold text-[#181725]">Value
+              <input
+                value={targetModal.value}
+                onChange={(e) => setTargetModal((m) => (m ? { ...m, value: e.target.value } : m))}
+                placeholder={targetModal.type === 'pincode' ? 'e.g. 400706' : targetModal.type === 'area' ? 'e.g. Thane' : 'e.g. Hotel'}
+                className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-normal"
+              />
+            </label>
+            <label className="block text-[12px] font-semibold text-[#181725]">Assign to price list now (optional)
+              <select
+                value={targetModal.priceListId}
+                onChange={(e) => setTargetModal((m) => (m ? { ...m, priceListId: e.target.value } : m))}
+                className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal"
+              >
+                <option value="">Just add the row — I will tick it myself</option>
+                {displayLists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setTargetModal(null)} className="flex-1 h-11 rounded-[12px] border border-[#E9E3DD] font-semibold">Cancel</button>
+              <button type="button" disabled={!targetModal.value.trim()} onClick={() => void saveTarget()} className="flex-1 h-11 rounded-[12px] bg-primary text-white font-semibold disabled:opacity-50">Add target</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConflictDialog
         open={!!conflict}
