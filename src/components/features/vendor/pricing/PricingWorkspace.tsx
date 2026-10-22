@@ -357,7 +357,7 @@ export function PricingWorkspace() {
       {tab === 'prices' && (
         <>
           <div className="flex flex-wrap gap-2 text-[12px]">
-            {['1. Click any price to edit it (or tick rows, then Bulk adjust)', '2. Prices in grey use the Base price — bold prices are custom for that list', '3. When ready, use Review & publish — nothing is live until then'].map((s) => (
+            {['1. Click any price to edit it (or tick rows, then Bulk adjust)', '2. Prices in grey use the Base price (or the list default discount) — bold prices are custom for that list', '3. When ready, use Review & publish — nothing is live until then'].map((s) => (
               <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-[#E9E3DD] text-[#181725] font-medium">{s}</span>
             ))}
           </div>

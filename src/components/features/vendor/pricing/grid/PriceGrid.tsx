@@ -459,7 +459,8 @@ export function PriceGrid({
           <button
             type="button"
             className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
-            onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) setCellFields(r.id, c.id, null); })}
+            title="Set the price to exactly the Base price (ignores the list default discount)"
+            onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) mergeCellFields(r.id, c.id, { price: r.basePrice, isExcluded: false }); })}
           >
             <RotateCcw size={13} /> Use Base price
           </button>
@@ -667,7 +668,7 @@ export function PriceGrid({
                                 {price === row.basePrice ? 'Base' : `${price < row.basePrice ? '−' : '+'}${Math.abs(Math.round((price / row.basePrice - 1) * 100))}%`}
                               </span>
                             )}
-                            {baseFb && <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">Base</span>}
+                            {baseFb && <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">{col.discountPercent > 0 && price !== row.basePrice ? `List −${Number(col.discountPercent)}%` : 'Base'}</span>}
                             {isActiveCell && !locked && (
                               <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
                             )}
