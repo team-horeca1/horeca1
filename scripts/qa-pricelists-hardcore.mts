@@ -96,6 +96,26 @@ const OLD_QA_LISTS = ['QA-HARDCORE', 'QA-HARDCORE-EMPTY', 'QA Hardcore List', 'Q
   const lists = (dig((await api(vendor, 'GET', '/api/v1/vendor/price-lists')).json, ['data']) as Array<{ id: string; name: string }>) ?? [];
   for (const l of lists) if (OLD_QA_LISTS.includes(l.name)) { await api(vendor, 'DELETE', `/api/v1/vendor/price-lists/${l.id}`); note(`removed leftover QA list "${l.name}"`); }
 }
+/* Showcase lists (QA-SHOW / Sample, kept on demo on purpose) target the demo
+   customer too. Snapshot their assignments, clear for the run, restore after. */
+const showcaseSnap = new Map<string, Array<Record<string, unknown>>>();
+{
+  const lists = (dig((await api(vendor, 'GET', '/api/v1/vendor/price-lists')).json, ['data']) as Array<{ id: string; assignments?: Array<Record<string, unknown>> }>) ?? [];
+  for (const l of lists) {
+    const clean: Array<Record<string, unknown>> = (l.assignments ?? []).map((a) => {
+      const out: Record<string, unknown> = { type: a.type };
+      for (const k of ['userId', 'businessAccountId', 'outletId', 'brandId', 'brandName', 'pincode', 'area', 'segment', 'groupId', 'creditStatus']) {
+        if (a[k]) out[k] = a[k];
+      }
+      return out;
+    });
+    if (clean.length > 0) {
+      showcaseSnap.set(l.id, clean);
+      await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${l.id}`, { assignments: [] });
+    }
+  }
+  note(`temporarily cleared assignments on ${showcaseSnap.size} showcase list(s); will restore`);
+}
 
 /* ================= A. LISTS ================= */
 console.log('\n== A. lists ==');
@@ -472,6 +492,10 @@ console.log('\n== H. Zoho membership (selected vs percent, membersOnly, unpriced
 
 /* ================= CLEANUP ================= */
 console.log('\n== I. cleanup ==');
+for (const [listId, assignments] of showcaseSnap) {
+  const r = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${listId}`, { assignments });
+  note(`restored showcase assignments on ${listId.slice(0, 8)} -> ${r.status}`);
+}
 if (KEEP) {
   note('KEEP mode: QA-HC lists/products/groups left on demo account on purpose');
 } else {

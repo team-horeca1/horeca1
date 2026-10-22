@@ -74,6 +74,30 @@ const LE = await mkList('Extra');  // credit/segment  ₹92/₹93
 const ALL = [LA, LB, LC, LD, LE];
 assert('5 lists created', ALL.every(Boolean));
 
+/* Showcase data (QA-SHOW etc, left on demo on purpose) also targets this
+   customer and would pollute the ladder. Snapshot every other list's
+   assignments, clear them for the run, restore at cleanup. */
+type RawAsg = Record<string, unknown>;
+const snap = new Map<string, Asg[]>();
+{
+  const all = (dig((await api(vendor, 'GET', '/api/v1/vendor/price-lists')).json, ['data']) as Array<{ id: string; assignments?: RawAsg[] }>) ?? [];
+  for (const l of all) {
+    if (ALL.includes(l.id)) continue;
+    const clean: Asg[] = (l.assignments ?? []).map((a) => {
+      const out: Asg = { type: a.type };
+      for (const k of ['userId', 'businessAccountId', 'outletId', 'brandId', 'brandName', 'pincode', 'area', 'segment', 'groupId', 'creditStatus']) {
+        if (a[k]) out[k] = a[k];
+      }
+      return out;
+    });
+    if (clean.length > 0) {
+      snap.set(l.id, clean);
+      await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${l.id}`, { assignments: [] });
+    }
+  }
+  note(`temporarily cleared assignments on ${snap.size} showcase/other list(s); will restore`);
+}
+
 async function wsVersion() {
   const r = await api(vendor, 'GET', '/api/v1/vendor/price-lists/workspace?limit=50');
   return (dig(r.json, ['data']) as { baseVersion: string | null }).baseVersion;
@@ -196,6 +220,10 @@ await setAsg(LD, []); // remove area layer
 
 /* cleanup */
 console.log('\n== cleanup ==');
+for (const [listId, assignments] of snap) {
+  const r = await api(vendor, 'PATCH', `/api/v1/vendor/price-lists/${listId}`, { assignments });
+  note(`restored assignments on ${listId.slice(0, 8)} -> ${r.status}`);
+}
 if (KEEP) {
   note('KEEP mode: QA-MC lists/group left on demo account on purpose');
 } else {
