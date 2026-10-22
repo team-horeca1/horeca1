@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Plus,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -93,6 +94,7 @@ export function PriceGrid({
   const [editVal, setEditVal] = useState('');
   const editRef = useRef<HTMLInputElement>(null);
   const [colMenu, setColMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ r: number; x: number; y: number } | null>(null);
   const [rename, setRename] = useState<{ id: string; name: string } | null>(null);
   const [renameVal, setRenameVal] = useState('');
   const [colBusy, setColBusy] = useState<string | null>(null);
@@ -617,7 +619,7 @@ export function PriceGrid({
             ) : (
               rows.map((row, ri) => (
                 <tr key={row.id} className="hover:bg-[#FAF7F2]/50">
-                  <td className="sticky left-0 z-20 bg-white p-2 border-b border-[#E9E3DD] font-medium text-[#181725] min-w-[300px] w-[300px]">
+                  <td className="sticky left-0 z-20 bg-white p-2 pr-9 border-b border-[#E9E3DD] font-medium text-[#181725] min-w-[300px] w-[300px] relative">
                     <label className="flex items-start gap-2 cursor-pointer">
                       {onSelectedProductIdsChange && (
                         <input
@@ -632,8 +634,26 @@ export function PriceGrid({
                           className="shrink-0 mt-0.5"
                         />
                       )}
-                      <span className="whitespace-normal break-words leading-snug" title={row.name}>{row.name}</span>
+                      <span className="flex-1 whitespace-normal break-words leading-snug" title={row.name}>{row.name}</span>
                     </label>
+                    <button
+                      type="button"
+                      aria-label={`Actions for ${row.name}`}
+                      title="Product actions: edit price, remove from list, hide, edit product"
+                      className="absolute right-1 top-1.5 p-1.5 rounded-lg border border-[#E9E3DD] bg-white hover:bg-[#F8E8EC] text-[#6B1D2E] shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        const menuW = 230; const menuH = 190;
+                        setRowMenu({
+                          r: ri,
+                          x: Math.max(12, Math.min(rect.left, window.innerWidth - menuW - 12)),
+                          y: Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - menuH - 12)),
+                        });
+                      }}
+                    >
+                      <MoreVertical size={14} />
+                    </button>
                   </td>
                   <td className="sticky left-[300px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-[#7C7C7C]">
                     {row.sku || '—'}
@@ -746,6 +766,43 @@ export function PriceGrid({
           Load more products
         </button>
       )}
+
+      {rowMenu && rows[rowMenu.r] && (() => {
+        const row = rows[rowMenu.r];
+        const ci = Math.min(active?.c ?? 0, Math.max(cols.length - 1, 0));
+        const col = cols[ci];
+        if (!col) return null;
+        const locked = cellLocked(row, col, dirty);
+        const excluded = isExcluded(row, col, dirty);
+        const isPercent = Number(col.discountPercent) > 0;
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
+            <div
+              role="menu"
+              aria-label={`Actions for ${row.name}`}
+              className="fixed z-50 bg-white border border-[#E9E3DD] rounded-[12px] shadow-xl py-1 w-[230px] max-w-[calc(100vw-24px)] text-[13px]"
+              style={{ left: rowMenu.x, top: rowMenu.y }}
+            >
+              <div className="px-3 py-1.5 text-[11px] font-semibold text-[#7C7C7C] truncate">In list: {col.name}</div>
+              <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); setActive({ r: rowMenu.r, c: ci }); startEdit(rowMenu.r, ci); }}>
+                <Pencil size={14} /> Edit price
+              </button>
+              {!isPercent && (
+                <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); setCellFields(row.id, col.id, null); toast.success(`${row.name} removed from ${col.name} (draft) — Review & publish to apply`); }}>
+                  <Trash2 size={14} /> Remove from list
+                </button>
+              )}
+              <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); mergeCellFields(row.id, col.id, { isExcluded: !excluded }); }}>
+                {excluded ? <Eye size={14} /> : <EyeOff size={14} />} {excluded ? 'Restore product' : 'Hide product'}
+              </button>
+              <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2" onClick={() => { setRowMenu(null); window.open(`/vendor/products?edit=${row.id}`, '_blank'); }}>
+                <ExternalLink size={14} /> Edit product details
+              </button>
+            </div>
+          </>
+        );
+      })()}
 
       {colMenu && (
         <>

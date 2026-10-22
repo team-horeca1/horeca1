@@ -74,7 +74,13 @@ export function AddProductsDialog({ open, listId, listName, onClose, onAdd }: Pr
           {loading ? (
             <div className="p-8 text-center text-[#7C7C7C] text-[13px]"><Loader2 className="inline animate-spin mr-2" size={16} />Loading…</div>
           ) : rows.length === 0 ? (
-            <div className="p-8 text-center text-[#7C7C7C] text-[13px]">No more products to add — everything is already in this list.</div>
+            <div className="p-8 text-center text-[#7C7C7C] text-[13px]">
+              <p>No more products to add — everything in your catalogue is already in this list.</p>
+              <a href="/vendor/products?action=add" target="_blank" rel="noreferrer" className="inline-block mt-3 h-10 px-4 leading-10 rounded-[12px] bg-primary text-white font-semibold text-[13px]">
+                Create a brand-new product instead
+              </a>
+              <p className="text-[11px] mt-2">New products are created on the Products page, then come back here to add them.</p>
+            </div>
           ) : rows.map((r) => (
             <label key={r.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[#FAF7F2]">
               <input type="checkbox" checked={picked.has(r.id)} onChange={() => toggle(r.id)} className="shrink-0" />
@@ -86,6 +92,11 @@ export function AddProductsDialog({ open, listId, listName, onClose, onAdd }: Pr
             </label>
           ))}
         </div>
+        <p className="text-[11px] text-[#7C7C7C]">
+          Product not in your catalogue yet?{' '}
+          <a href="/vendor/products?action=add" target="_blank" rel="noreferrer" className="text-primary font-semibold underline">Create a new product</a>
+          {' '}on the Products page, then add it here.
+        </p>
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className="flex-1 h-11 rounded-[12px] border border-[#E9E3DD] font-semibold">Cancel</button>
           <button

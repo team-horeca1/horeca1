@@ -441,11 +441,21 @@ export function PricingWorkspace() {
                 <Plus size={14} /> Add products
               </button>
             )}
+            {!compare && activeCol && (activeCol.kind ?? (activeCol.discountPercent > 0 ? 'percent' : 'selected')) === 'percent' && (
+              <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]" title="A percent list automatically covers every product at its discount — no need to add products">
+                All products included automatically (−{Number(activeCol.discountPercent)}%)
+              </span>
+            )}
+            {compare && (
+              <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]">
+                Comparing lists — pick one list above to add products
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 text-[12px]">
             {(compare
               ? ['Each column is one list — “Not in list” means that product keeps its Base price there', 'Tick any list on “Who gets which list” — a customer can be on several lists']
-              : ['1. Add products to this list and click a price to edit it', '2. Products not in this list stay at Base price — bold prices are custom for this list', '3. When ready, use Review & publish — nothing is live until then']
+              : ['1. Add products (button above) adds products from your catalogue to this list', '2. Edit a price: double-click it, or use the ⋮ menu on the product row (Edit price / Remove from list / Hide / Edit product details)', '3. Products not in this list stay at Base price', '4. When ready, use Review & publish — nothing is live until then']
             ).map((s) => (
               <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-[#E9E3DD] text-[#181725] font-medium">{s}</span>
             ))}
