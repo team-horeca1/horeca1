@@ -22,15 +22,24 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       where: { id: customerId },
       select: {
         id: true,
-        userRoles: { select: { businessAccountId: true }, take: 1 },
+        userRoles: { select: { businessAccountId: true } },
+        accountMemberships: { select: { businessAccountId: true } },
       },
     });
     if (!user) throw Errors.notFound('Customer');
 
-    const baId = user.userRoles[0]?.businessAccountId ?? null;
-    const outlet = baId
+    // Business accounts can be linked via UserRole OR BusinessAccountMember —
+    // checking only userRoles left outlet geo empty for membership-linked
+    // customers, so pincode/area rules could never match in this preview
+    // even though they apply at catalog/cart time.
+    const baIds = [...new Set([
+      ...user.userRoles.map((r) => r.businessAccountId),
+      ...user.accountMemberships.map((m) => m.businessAccountId),
+    ])];
+    const baId = baIds[0] ?? null;
+    const outlet = baIds.length
       ? await prisma.outlet.findFirst({
-          where: { businessAccountId: baId, isActive: true },
+          where: { businessAccountId: { in: baIds }, isActive: true },
           select: { id: true, pincode: true, city: true, state: true },
         })
       : null;
