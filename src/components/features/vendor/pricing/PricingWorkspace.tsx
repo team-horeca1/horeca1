@@ -12,6 +12,8 @@ import {
   X,
   FileDown,
   ListChecks,
+  ChevronDown,
+  Columns2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -417,63 +419,79 @@ export function PricingWorkspace() {
 
       {tab === 'prices' && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            {!compare && cols.map((c) => {
-              const count = c.counts?.priced ?? 0;
-              return (
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+              {!compare && cols.length > 0 && (
+                <div className="relative shrink-0">
+                  <label htmlFor="price-list-select" className="sr-only">Price list</label>
+                  <select
+                    id="price-list-select"
+                    value={activeCol?.id ?? ''}
+                    onChange={(e) => setActiveListId(e.target.value || null)}
+                    title={activeCol ? listSubtitle(activeCol) : undefined}
+                    className="appearance-none h-11 pl-3.5 pr-9 min-w-[200px] max-w-[min(360px,100%)] rounded-[12px] border border-[#E9E3DD] bg-white text-[13px] font-semibold text-[#181725] focus:border-primary outline-none tabular-nums"
+                  >
+                    {cols.map((c) => {
+                      const count = c.counts?.priced ?? 0;
+                      const prefix = isPercentList(c) ? `−${Number(c.discountPercent)}% · ` : '';
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({prefix}{count} products)
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]"
+                    aria-hidden
+                  />
+                </div>
+              )}
+              {compare && (
+                <span className="h-11 px-3.5 inline-flex items-center rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] text-[13px] font-semibold text-[#7C7C7C]">
+                  Comparing {cols.length} lists
+                </span>
+              )}
+              <div className="relative flex-1 min-w-[220px] max-w-sm">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search product or SKU"
+                  className="w-full h-11 pl-9 pr-3 rounded-[12px] border border-[#E9E3DD] bg-white text-[13px] outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!compare && activeCol && (
                 <button
-                  key={c.id}
                   type="button"
-                  onClick={() => setActiveListId(c.id)}
-                  title={listSubtitle(c)}
-                  className={cn(
-                    'px-3 py-2 rounded-full border text-[12px] font-bold max-w-[280px]',
-                    activeCol?.id === c.id ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]',
-                  )}
+                  onClick={() => openPicker({ id: activeCol.id, name: activeCol.name })}
+                  className="h-11 px-3.5 rounded-[12px] border border-[#E9E3DD] bg-white hover:bg-[#FAF7F2] text-[13px] font-semibold text-[#181725] inline-flex items-center gap-1.5"
                 >
-                  <span className="truncate">{c.name}</span>
-                  <span className={cn('ml-1.5 font-semibold tabular-nums', activeCol?.id === c.id ? 'text-white/80' : 'text-[#7C7C7C]')}>
-                    {isPercentList(c) ? `−${Number(c.discountPercent)}% · ` : ''}{count} products
-                  </span>
+                  <ListChecks size={15} /> Edit products
                 </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setCompare((v) => !v)}
-              className={cn('px-3 py-2 rounded-full border text-[12px] font-bold', compare ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]')}
-            >
-              Compare lists
-            </button>
-            {!compare && activeCol && (
+              )}
               <button
                 type="button"
-                onClick={() => openPicker({ id: activeCol.id, name: activeCol.name })}
-                className="px-3 py-2 rounded-full border border-[#E9E3DD] bg-white text-[12px] font-bold text-[#181725] flex items-center gap-1.5"
+                onClick={() => setCompare((v) => !v)}
+                className={cn(
+                  'h-11 px-3.5 rounded-[12px] border text-[13px] font-semibold inline-flex items-center gap-1.5',
+                  compare
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white border-[#E9E3DD] text-[#181725] hover:bg-[#FAF7F2]',
+                )}
               >
-                <ListChecks size={14} /> Edit products
+                <Columns2 size={15} /> {compare ? 'Exit compare' : 'Compare lists'}
               </button>
-            )}
-            {compare && (
-              <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]">
-                Comparing lists side by side
-              </span>
-            )}
+            </div>
           </div>
           <p className="text-[12px] text-[#667085]">
             {compare
               ? 'Each column is one list. A dash means the product is not in that list. Badge = Custom / List −% / Base.'
               : 'Only ticked products are in this list. Edit products to add or remove · click a price to override · Review & publish to go live.'}
           </p>
-          <div className="relative max-w-md">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search product or SKU"
-              className="w-full h-11 pl-9 pr-3 rounded-[12px] border border-[#E9E3DD] text-[13px] outline-none focus:border-primary"
-            />
-          </div>
 
           {cols.length === 0 && !loading ? (
             <div className="p-10 text-center rounded-[12px] border border-[#E9E3DD] bg-white">
