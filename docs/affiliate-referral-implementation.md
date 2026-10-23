@@ -71,17 +71,26 @@ Recorded in git after the commit. See the checklist below for verification.
 
 ## Acceptance checks
 
+Ran on `https://demo.horeca1.com` after deploy of `64f34d4a`. Demo database only (`horeca1-demo-db` / `horeca1_demo`).
+
 | Check | Status | Evidence |
 |---|---|---|
-| 1 Query `?ref=A-0001` sets `h1_ref` | NOT STARTED | |
-| 2 Three forms prefilled with `A-0001` | NOT STARTED | |
-| 3 Referred registrations store `A-0001` | NOT STARTED | |
-| 4 Empty code succeeds and stores NULL | NOT STARTED | |
-| 5 `junk!!` succeeds and stores NULL | NOT STARTED | |
-| 6 `/A-0001` redirects home and sets the cookie | NOT STARTED | |
-| 7 Later `/A-0002` keeps `A-0001` | NOT STARTED | |
-| 8 Exports contain Referral Code | NOT STARTED | |
-| 9 Existing registrations unchanged | NOT STARTED | |
+| 1 Query `?ref=A-0001` sets `h1_ref` | PASS | `Set-Cookie: h1_ref=A-0001; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=lax` and no `Domain`. Playwright cookie domain `demo.horeca1.com`, value `A-0001`. |
+| 2 Three forms prefilled with `A-0001` | PASS | Playwright read `#referral-code` on `/register?role=customer`, `/vendor/register`, and `/brand/register`. Each value was `A-0001`. |
+| 3 Referred registrations store `A-0001` | PASS | Demo SQL: customer `Ref Kitchen One` / `9234510101`, supplier `Ref Supplier One` / `9234510201`, brand `Ref Brand One` / `9234510301` all have `referral_code = A-0001`. Customer was created in the browser. Supplier and brand used the public submit endpoints those forms call, after a real OTP. |
+| 4 Empty code succeeds and stores NULL | PASS | Browser registration `Empty Referral Kitchen` / `9234510102` reached “Complete your profile”. SQL `referral_code` is NULL. Export cell is blank. |
+| 5 `junk!!` succeeds and stores NULL | PASS | Browser accepted `junk!!` and created `Junk Referral Kitchen` / `9234510103`. SQL `referral_code` is NULL. Export cell is blank. |
+| 6 `/A-0001` redirects home and sets the cookie | PASS | HTTP 307 `location: /` plus `h1_ref=A-0001`. Playwright finished on `https://demo.horeca1.com/` with cookie `A-0001`. |
+| 7 Later `/A-0002` keeps `A-0001` | PASS | Request with `Cookie: h1_ref=A-0001` to `/A-0002` is 307 to `/` and does not send a new `Set-Cookie`. Playwright cookie stayed `A-0001`. An invalid existing cookie `junk!!` was replaced by a later valid code. |
+| 8 Exports contain Referral Code | PASS | Admin CSV for customers, suppliers, and brands. Anonymous request is 401. Logged-in admin export is 200. Customer row `Ref Kitchen One` ends with `A-0001`; empty and junk rows end blank. Supplier and brand rows include Live Product Count `0` and `A-0001`. Export CSV buttons are on all three admin registries. XLSX returns 200. |
+| 9 Existing registrations unchanged | PASS | Before tests: 19 business accounts, 19 NULL referral codes. After: 24 accounts, 21 NULL, 3 `A-0001`, and 0 codes on any other legal name. Supplier `is_verified` is false. Brand `approval_status` is pending. |
+
+## Release evidence
+
+- Commit `64f34d4a` on `demo` only. Not pushed to `master`.
+- GitHub Actions run `39927553098` (`CI / Deploy Demo`) completed success: type check and lint, migrations and drift, image build, deploy to demo.horeca1.com.
+- https://github.com/team-horeca1/horeca1/actions/runs/39927553098
+- Production was not deployed.
 
 ## Commands and deployment
 
