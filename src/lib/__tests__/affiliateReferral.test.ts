@@ -118,32 +118,50 @@ describe('affiliate cookie', () => {
 });
 
 describe('decideAffiliateReferral', () => {
-  it('sets the cookie for a valid short link and redirects home', () => {
+  it('sets the cookie for a valid short link and opens registration', () => {
     expect(decideAffiliateReferral({
       pathname: '/A-0001',
       refQuery: null,
       existingCookie: undefined,
-    })).toEqual({ kind: 'redirect-home', setCookie: 'A-0001' });
+    })).toEqual({ kind: 'redirect-register', setCookie: 'A-0001' });
   });
 
-  it('sets the cookie for a valid query referral without redirecting', () => {
+  it('sets the cookie for a valid query referral and opens registration', () => {
     expect(decideAffiliateReferral({
       pathname: '/',
       refQuery: 'a-0001',
       existingCookie: undefined,
-    })).toEqual({ kind: 'continue', setCookie: 'A-0001' });
+    })).toEqual({ kind: 'redirect-register', setCookie: 'A-0001' });
   });
 
-  it('keeps the first valid code', () => {
+  it('keeps the first valid code and still opens registration', () => {
     expect(decideAffiliateReferral({
       pathname: '/A-0002',
       refQuery: null,
       existingCookie: 'A-0001',
-    })).toEqual({ kind: 'redirect-home', setCookie: null });
+    })).toEqual({ kind: 'redirect-register', setCookie: null });
     expect(decideAffiliateReferral({
       pathname: '/',
       refQuery: 'A-0002',
       existingCookie: 'A-0001',
+    })).toEqual({ kind: 'redirect-register', setCookie: null });
+  });
+
+  it('does not redirect again when already on a registration route', () => {
+    expect(decideAffiliateReferral({
+      pathname: '/register',
+      refQuery: 'A-0001',
+      existingCookie: undefined,
+    })).toEqual({ kind: 'continue', setCookie: 'A-0001' });
+    expect(decideAffiliateReferral({
+      pathname: '/vendor/register',
+      refQuery: 'A-0002',
+      existingCookie: 'A-0001',
+    })).toEqual({ kind: 'none', setCookie: null });
+    expect(decideAffiliateReferral({
+      pathname: '/brand/register',
+      refQuery: null,
+      existingCookie: undefined,
     })).toEqual({ kind: 'none', setCookie: null });
   });
 
@@ -157,7 +175,7 @@ describe('decideAffiliateReferral', () => {
       pathname: '/A-0002',
       refQuery: null,
       existingCookie: 'junk!!',
-    })).toEqual({ kind: 'redirect-home', setCookie: 'A-0002' });
+    })).toEqual({ kind: 'redirect-register', setCookie: 'A-0002' });
   });
 
   it('leaves ordinary routes unchanged and does not loop on the homepage', () => {
@@ -175,7 +193,7 @@ describe('decideAffiliateReferral', () => {
       pathname: '/',
       refQuery: null,
       existingCookie: 'A-0001',
-    }).kind).not.toBe('redirect-home');
+    }).kind).not.toBe('redirect-register');
   });
 
   it('accepts the optional prefix on a short link', () => {
@@ -183,6 +201,6 @@ describe('decideAffiliateReferral', () => {
       pathname: '/h1-a-7',
       refQuery: null,
       existingCookie: undefined,
-    })).toEqual({ kind: 'redirect-home', setCookie: 'H1-A-7' });
+    })).toEqual({ kind: 'redirect-register', setCookie: 'H1-A-7' });
   });
 });

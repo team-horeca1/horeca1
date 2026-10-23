@@ -22,8 +22,6 @@ import {
 } from '@/lib/brandProfileMapper';
 import {
   AFFILIATE_REFERRAL_COOKIE,
-  hasReferralField,
-  referralFieldValue,
   resolveRegistrationReferral,
 } from '@/lib/affiliateReferral';
 
@@ -86,8 +84,7 @@ async function postHandler(req: NextRequest) {
     const raw = await req.json();
     const input = parseBody(raw);
     const referralCode = resolveRegistrationReferral({
-      submitted: referralFieldValue(raw),
-      submittedPresent: hasReferralField(raw),
+      submittedPresent: false,
       cookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
     });
 

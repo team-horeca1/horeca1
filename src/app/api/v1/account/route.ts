@@ -24,8 +24,6 @@ import { kindFromFlags, type BusinessKind } from '@/lib/businessCapability';
 import { provisionBusinessProfile } from '@/modules/account/provisionBusinessProfile';
 import {
   AFFILIATE_REFERRAL_COOKIE,
-  hasReferralField,
-  referralFieldValue,
   resolveRegistrationReferral,
 } from '@/lib/affiliateReferral';
 
@@ -200,8 +198,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const body = createAccountBodySchema(relaxedContact).parse(raw);
     const kind = kindFromBody(body);
     const referralCode = resolveRegistrationReferral({
-      submitted: referralFieldValue(raw),
-      submittedPresent: hasReferralField(raw),
+      submittedPresent: false,
       cookie: ctx.role === 'admin' ? undefined : req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
     });
 

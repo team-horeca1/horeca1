@@ -16,6 +16,10 @@ The site records an optional affiliate referral code. Earnchilada matches affili
 8. Do not change registration, authentication, approval, or authorization behavior.
 9. Run the nine acceptance checks on the isolated demo environment.
 
+## Link-only update (2026-10-23)
+
+`?ref=` and `/A-0005` set `h1_ref` and open `/register`. Registration forms do not show a referral field. The server stores the cookie. Super Admin → Affiliates lists each code with customer, supplier, and brand counts, and exports the people on that code. Codes with no registrations are not invented.
+
 ## Code policy (discrepancy resolved)
 
 The note's validator is `^(?:H1-)?A-\d{1,6}$`. The short-link example is `/A-0001`. Both are the same code, with an optional `H1-` prefix.

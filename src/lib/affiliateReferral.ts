@@ -66,14 +66,17 @@ export function affiliateCookieOptions(secure: boolean): {
 }
 
 export interface AffiliateReferralDecision {
-  kind: 'none' | 'continue' | 'redirect-home';
+  kind: 'none' | 'continue' | 'redirect-register';
   /** Normalized code to store, or null when the existing valid cookie must be kept. */
   setCookie: string | null;
 }
 
+const REGISTRATION_PATH = /^\/(?:register|vendor\/register|brand\/register)(?:\/|$)/;
+
 /**
  * First valid `h1_ref` wins. An invalid existing cookie does not block a later valid code.
- * A short link (`/A-0001` or `/H1-A-0001`) always redirects home. `?ref=` stays on the page.
+ * A short link or `?ref=` opens `/register`, except when the visitor is already on a
+ * registration route (those only receive the cookie, so the redirect cannot loop).
  */
 export function decideAffiliateReferral(input: {
   pathname: string;
@@ -89,9 +92,10 @@ export function decideAffiliateReferral(input: {
   const existingValid = cleanReferral(input.existingCookie);
   const incoming = fromPath ?? fromQuery;
   const setCookie = incoming && !existingValid ? incoming : null;
+  const onRegistration = REGISTRATION_PATH.test(path);
 
-  if (fromPath) {
-    return { kind: 'redirect-home', setCookie };
+  if (incoming && !onRegistration) {
+    return { kind: 'redirect-register', setCookie };
   }
   if (setCookie) {
     return { kind: 'continue', setCookie };

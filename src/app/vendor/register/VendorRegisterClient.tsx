@@ -38,7 +38,6 @@ import {
   resolveRegisterVerifyChannel,
 } from '@/lib/config/registerEmailOtp';
 import { getEffectiveVendorTypeSelections } from '@/lib/validators/vendor-profile';
-import { ReferralCodeField } from '@/components/auth/ReferralCodeField';
 
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
@@ -143,11 +142,7 @@ function inferStepFromMessage(message: string): number | null {
   return null;
 }
 
-export default function VendorRegisterClient({
-  initialReferralCode = '',
-}: {
-  initialReferralCode?: string;
-}) {
+export default function VendorRegisterClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Auth-aware mode: when a user is already signed in, the wizard runs in
@@ -166,7 +161,6 @@ export default function VendorRegisterClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState<{ hcid: string } | null>(null);
-  const [referralCode, setReferralCode] = useState(initialReferralCode);
 
   // Step 1 — phone verify
   const [phone, setPhone] = useState(
@@ -891,7 +885,6 @@ export default function VendorRegisterClient({
           isCustomer: false,
           isVendor: true,
           isBrand: false,
-          referralCode,
           primaryOutlet: {
             name: derivedTradeName(vendorProfile) || tradeName.trim() || businessName.trim(),
             addressLine: effectivePickup.addressLine,
@@ -992,7 +985,6 @@ export default function VendorRegisterClient({
         udyamNumber: udyamNumber.trim(),
         cinNumber: cinNumber.trim(),
         verificationToken: verificationToken || undefined,
-        referralCode,
       };
       const res = await fetch('/api/v1/vendor/onboarding/submit', {
         method: 'POST',
@@ -1739,10 +1731,6 @@ export default function VendorRegisterClient({
               </div>
             </section>
           )}
-
-          <div className="mt-8 pt-6 border-t border-[#EEEEEE]">
-            <ReferralCodeField value={referralCode} onChange={setReferralCode} />
-          </div>
         </div>
       </main>
 

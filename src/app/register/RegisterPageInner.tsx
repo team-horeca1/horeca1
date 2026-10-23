@@ -24,17 +24,12 @@ import {
   derivedFullName,
   derivedLegalName,
 } from '@/lib/validators/customer-profile';
-import { ReferralCodeField } from '@/components/auth/ReferralCodeField';
 
 const RESEND_COOLDOWN = 60;
 
 type Step = 'form' | 'otp' | 'complete' | 'success';
 
-export default function RegisterPageInner({
-  initialReferralCode = '',
-}: {
-  initialReferralCode?: string;
-}) {
+export default function RegisterPageInner() {
   const params = useSearchParams();
   const router = useRouter();
   const redirectTo = params?.get('redirect') || null;
@@ -76,7 +71,6 @@ export default function RegisterPageInner({
     ...(prefilledEmail.includes('@') ? { email: prefilledEmail } : {}),
   }));
   const [password, setPassword] = useState('');
-  const [referralCode, setReferralCode] = useState(initialReferralCode);
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -220,8 +214,6 @@ export default function RegisterPageInner({
         lastName: profile.lastName ?? '',
         displayName: profile.displayName ?? '',
         tradeName: profile.displayName ?? '',
-        referralCode,
-        referralCodeSubmitted: '1',
       });
       if (result?.error) {
         setApiError('Invalid or expired OTP. Please try again.');
@@ -503,10 +495,6 @@ export default function RegisterPageInner({
             mode="full"
             visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
           />
-
-          <div className="mt-6">
-            <ReferralCodeField value={referralCode} onChange={setReferralCode} />
-          </div>
 
           <div className="mt-6">
             <button onClick={handleSendOtp} disabled={isLoading} className={cn(FORM.primaryBtn, 'w-full h-[46px]')}>

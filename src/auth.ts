@@ -83,8 +83,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         latitude: {},
         longitude: {},
         placeId: {},
-        referralCode: {},
-        referralCodeSubmitted: {},
       },
       async authorize(credentials) {
         const phone = normalizePhone(String(credentials?.phone ?? ''));
@@ -198,8 +196,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // authorize() can run outside a request cookie store
           }
           const referralCode = resolveRegistrationReferral({
-            submitted: credentials?.referralCode,
-            submittedPresent: credentials?.referralCodeSubmitted === '1' || credentials?.referralCodeSubmitted === true,
+            submittedPresent: false,
             cookie: affiliateCookie,
           });
 

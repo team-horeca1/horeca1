@@ -31,7 +31,6 @@ import {
   isRegisterEmailOtpEnabled,
   resolveRegisterVerifyChannel,
 } from '@/lib/config/registerEmailOtp';
-import { ReferralCodeField } from '@/components/auth/ReferralCodeField';
 
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
@@ -47,11 +46,7 @@ const BRAND_FIELD_ORDER = [
   'outletName', 'addressLine', 'pincode', 'gstin',
 ];
 
-export default function BrandRegisterClient({
-  initialReferralCode = '',
-}: {
-  initialReferralCode?: string;
-}) {
+export default function BrandRegisterClient() {
   const { data: session, status: sessionStatus } = useSession();
   const searchParams = useSearchParams();
   const isAuthMode = sessionStatus === 'authenticated';
@@ -61,7 +56,6 @@ export default function BrandRegisterClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState<{ hcid: string } | null>(null);
-  const [referralCode, setReferralCode] = useState(initialReferralCode);
 
   const [phone, setPhone] = useState(
     () => searchParams.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '',
@@ -368,7 +362,7 @@ export default function BrandRegisterClient({
         const res = await fetch('/api/v1/account', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...buildAddBusinessPayload(profile), referralCode }),
+          body: JSON.stringify(buildAddBusinessPayload(profile)),
         });
         const json = await parseJsonResponse<{ success: boolean; data?: { account: { id: string }; outlet: { id: string } } }>(res);
         if (!json.success || !json.data) {
@@ -401,7 +395,6 @@ export default function BrandRegisterClient({
         email: profile.email?.trim().toLowerCase() || (emailVerified ? verifiedEmail : ''),
         password: password || undefined,
         verificationToken: verificationToken || undefined,
-        referralCode,
       };
 
       const res = await fetch('/api/v1/brand/onboarding/submit', {
@@ -589,8 +582,6 @@ export default function BrandRegisterClient({
                 </div>
               )}
 
-              <ReferralCodeField value={referralCode} onChange={setReferralCode} />
-
               {!otpSent && (
                 <button type="button" onClick={sendOtp} disabled={otpLoading}
                   className={cn(FORM.primaryBtn, 'w-full h-[48px] text-[14px]')}>
@@ -636,8 +627,6 @@ export default function BrandRegisterClient({
                 password={password}
                 onPasswordChange={setPassword}
               />
-
-              <ReferralCodeField value={referralCode} onChange={setReferralCode} />
 
               <div className="flex gap-3 pt-2">
                 {!isAuthMode && (

@@ -120,9 +120,9 @@ export async function proxy(req: NextRequest) {
     existingCookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
   });
 
-  if (decision.kind === 'redirect-home') {
+  if (decision.kind === 'redirect-register') {
     const url = req.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = '/register';
     url.search = '';
     return withAffiliateCookie(NextResponse.redirect(url), decision.setCookie, secure);
   }

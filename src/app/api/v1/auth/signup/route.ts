@@ -10,8 +10,6 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/utils';
 import {
   AFFILIATE_REFERRAL_COOKIE,
-  hasReferralField,
-  referralFieldValue,
   resolveRegistrationReferral,
 } from '@/lib/affiliateReferral';
 
@@ -39,8 +37,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const input = signupSchema.parse(body);
     const referralCode = resolveRegistrationReferral({
-      submitted: referralFieldValue(body),
-      submittedPresent: hasReferralField(body),
+      submittedPresent: false,
       cookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
     });
 

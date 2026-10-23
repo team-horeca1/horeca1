@@ -17,6 +17,8 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   // Admin
   { methods: ['GET'], pattern: /^admin\/users(?:\/|$)/, permission: 'customers.view' },
   { methods: ['GET'], pattern: /^admin\/registrations\/export$/, permission: ['customers.view', 'vendors.view', 'brands.view'] },
+  { methods: ['GET'], pattern: /^admin\/affiliates\/export$/, permission: ['customers.view', 'vendors.view', 'brands.view'] },
+  { methods: ['GET'], pattern: /^admin\/affiliates(?:\/|$)/, permission: ['customers.view', 'vendors.view', 'brands.view'] },
   { methods: ['GET'], pattern: /^admin\/products(?:\/|$)/, permission: 'products.view' },
   { methods: ['GET'], pattern: /^admin\/categories(?:\/|$)/, permission: 'products.view' },
   { methods: ['GET'], pattern: /^admin\/brands\/[^/]+\/hero(?:\/|$)/, permission: 'brands.view' },

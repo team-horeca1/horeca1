@@ -4,6 +4,40 @@
  */
 
 export type RegistrationExportKind = 'customer' | 'vendor' | 'brand';
+export type AffiliateAccountType = RegistrationExportKind;
+
+export interface AffiliateCodeSummary {
+  code: string;
+  customers: number;
+  suppliers: number;
+  brands: number;
+}
+
+export function summarizeAffiliateCodes(
+  rows: Array<{ referralCode: string; accountType: AffiliateAccountType }>,
+): { totalRegistrations: number; codes: AffiliateCodeSummary[] } {
+  const map = new Map<string, AffiliateCodeSummary>();
+  for (const row of rows) {
+    const current = map.get(row.referralCode) ?? {
+      code: row.referralCode,
+      customers: 0,
+      suppliers: 0,
+      brands: 0,
+    };
+    if (row.accountType === 'customer') current.customers += 1;
+    else if (row.accountType === 'vendor') current.suppliers += 1;
+    else current.brands += 1;
+    map.set(row.referralCode, current);
+  }
+  const codes = [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
+  return { totalRegistrations: rows.length, codes };
+}
+
+export function affiliateAccountTypeLabel(kind: AffiliateAccountType): string {
+  if (kind === 'vendor') return 'Supplier';
+  if (kind === 'brand') return 'Brand';
+  return 'Customer';
+}
 
 export interface RegistrationExportRow {
   accountId: string;
@@ -71,6 +105,60 @@ export function registrationExportCsv(kind: RegistrationExportKind, rows: Regist
   const header = registrationExportHeaders(kind).map(csvCell).join(',');
   const body = rows.map((row) => rowCells(kind, row).map(csvCell).join(','));
   return [header, ...body].join('\n');
+}
+
+export function affiliateDetailHeaders(): string[] {
+  return [
+    'Account ID',
+    'Business Name',
+    'Mobile Number',
+    'Email',
+    'Created At',
+    'Account Type',
+    'GSTIN',
+    'FSSAI',
+    'Live Product Count',
+    'Referral Code',
+  ];
+}
+
+export function affiliateDetailCsv(
+  rows: Array<RegistrationExportRow & { accountType: AffiliateAccountType }>,
+): string {
+  const header = affiliateDetailHeaders().map(csvCell).join(',');
+  const body = rows.map((row) => [
+    row.accountId,
+    row.businessName,
+    row.mobile ?? '',
+    row.email ?? '',
+    row.createdAt.toISOString(),
+    affiliateAccountTypeLabel(row.accountType),
+    row.gstin ?? '',
+    row.fssai ?? '',
+    row.accountType === 'customer' || row.liveProductCount == null ? '' : String(row.liveProductCount),
+    row.referralCode ?? '',
+  ].map(csvCell).join(','));
+  return [header, ...body].join('\n');
+}
+
+export function affiliateDetailMatrix(
+  rows: Array<RegistrationExportRow & { accountType: AffiliateAccountType }>,
+): string[][] {
+  return [
+    affiliateDetailHeaders(),
+    ...rows.map((row) => [
+      row.accountId,
+      row.businessName,
+      row.mobile ?? '',
+      row.email ?? '',
+      row.createdAt.toISOString(),
+      affiliateAccountTypeLabel(row.accountType),
+      row.gstin ?? '',
+      row.fssai ?? '',
+      row.accountType === 'customer' || row.liveProductCount == null ? '' : String(row.liveProductCount),
+      row.referralCode ?? '',
+    ].map((cell) => spreadsheetSafe(cell))),
+  ];
 }
 
 export function registrationExportMatrix(kind: RegistrationExportKind, rows: RegistrationExportRow[]): string[][] {

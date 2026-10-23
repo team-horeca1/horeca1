@@ -14,7 +14,6 @@ import {
     X,
     SlidersHorizontal,
     Upload,
-    Download,
     UserCircle,
     ArrowUpRight,
     Mail,
@@ -373,13 +372,6 @@ export default function CustomersPage() {
                 subtitle="Manage buyer accounts, audit profiles, and bulk-update customer mappings"
                 actions={
                     <>
-                        <button
-                            type="button"
-                            onClick={() => { window.location.assign('/api/v1/admin/registrations/export?kind=customer&format=csv'); }}
-                            className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
-                        >
-                            <Download size={16} /> Export CSV
-                        </button>
                         <button
                             onClick={() => setShowImportModal(true)}
                             className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"

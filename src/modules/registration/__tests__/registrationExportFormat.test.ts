@@ -4,6 +4,7 @@ import {
   registrationExportHeaders,
   registrationExportPermission,
   spreadsheetSafe,
+  summarizeAffiliateCodes,
   type RegistrationExportRow,
 } from '@/modules/registration/registrationExportFormat';
 
@@ -63,6 +64,20 @@ describe('registration export', () => {
     const csv = registrationExportCsv('brand', [row({ businessName: '=cmd', liveProductCount: 0, referralCode: null })]);
     expect(csv).toContain(`"'=cmd"`);
     expect(csv).not.toContain('"=cmd"');
+  });
+
+  it('counts customers, suppliers, and brands per code', () => {
+    const summary = summarizeAffiliateCodes([
+      { referralCode: 'A-0005', accountType: 'customer' },
+      { referralCode: 'A-0005', accountType: 'vendor' },
+      { referralCode: 'A-0005', accountType: 'brand' },
+      { referralCode: 'A-0006', accountType: 'customer' },
+    ]);
+    expect(summary.totalRegistrations).toBe(4);
+    expect(summary.codes).toEqual([
+      { code: 'A-0005', customers: 1, suppliers: 1, brands: 1 },
+      { code: 'A-0006', customers: 1, suppliers: 0, brands: 0 },
+    ]);
   });
 
   it('maps each export to the existing view permission', () => {
