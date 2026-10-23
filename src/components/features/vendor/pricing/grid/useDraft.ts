@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { DraftCell } from '../types';
 
 const storageKey = (vendorKey: string) => `h1-pricing-draft:${vendorKey}`;
+const LEGACY_KEY = 'h1-pricing-draft:me';
 
 export function useDraft(vendorKey: string | null, baseVersion: string | null) {
   const [dirty, setDirty] = useState<Record<string, DraftCell>>({});
@@ -12,6 +13,11 @@ export function useDraft(vendorKey: string | null, baseVersion: string | null) {
     dirty: Record<string, DraftCell>;
     baseVersion: string | null;
   } | null>(null);
+
+  // Drop the shared legacy `:me` key so Admin View does not bleed drafts across suppliers.
+  useEffect(() => {
+    try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (!vendorKey) return;

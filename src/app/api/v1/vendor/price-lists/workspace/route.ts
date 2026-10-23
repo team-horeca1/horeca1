@@ -236,6 +236,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     return NextResponse.json({
       success: true,
       data: {
+        vendorId,
         baseVersion,
         priceLists: priceLists.map((l) => ({
           id: l.id,

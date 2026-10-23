@@ -57,19 +57,6 @@ export interface ProductRow {
 
 export type DraftCell = (Partial<PriceListItemData> & { added?: boolean }) | null;
 
-export function isMember(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
-  if (isPercentList(col)) return true;
-  const key = cellKey(row.id, col.id);
-  if (key in dirty) {
-    const d = dirty[key];
-    if (d === null) return false;
-    if (d.added) return true;
-    if (d.price != null || d.isExcluded) return true;
-    return !!row.cells[col.id];
-  }
-  return !!row.cells[col.id];
-}
-
 export interface CustomerTarget {
   userId: string;
   label: string;
@@ -102,6 +89,18 @@ export function listKind(col: PriceListCol): 'selected' | 'percent' {
 
 export function isPercentList(col: PriceListCol): boolean {
   return listKind(col) === 'percent';
+}
+
+/** Chip / column subtitle: "Default: Base · 11 custom · 0 hidden" */
+export function listRuleLabel(col: PriceListCol): string {
+  if (isPercentList(col)) return `−${Number(col.discountPercent)}%`;
+  return 'Base';
+}
+
+export function listSubtitle(col: PriceListCol, customCount?: number): string {
+  const custom = customCount ?? col.counts?.priced ?? 0;
+  const hidden = col.counts?.excluded ?? 0;
+  return `Default: ${listRuleLabel(col)} · ${custom} custom · ${hidden} hidden`;
 }
 
 export function effective(
@@ -140,6 +139,38 @@ export function hasCustomOverride(
   const cell = row.cells[col.id];
   if (!cell || cell.isExcluded) return false;
   return cell.price != null;
+}
+
+/**
+ * Unified cell source — every cell is exactly one of:
+ *   custom → frozen override
+ *   list   → list default −N% (tracks base)
+ *   base   → no rule / no override (equals base price)
+ */
+export type PriceSource = 'custom' | 'list' | 'base';
+
+export function priceSource(
+  row: ProductRow,
+  col: PriceListCol,
+  dirty: Record<string, DraftCell>,
+): PriceSource {
+  if (hasCustomOverride(row, col, dirty)) return 'custom';
+  if (isPercentList(col)) return 'list';
+  return 'base';
+}
+
+/** @deprecated Prefer hasCustomOverride / priceSource — kept for callers that still filter "members". */
+export function isMember(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
+  if (isPercentList(col)) return true;
+  return hasCustomOverride(row, col, dirty) || isExcluded(row, col, dirty);
+}
+
+/** Tooltip for the unified Reset control. */
+export function resetTooltip(col: PriceListCol): string {
+  if (isPercentList(col)) {
+    return `Clear the custom price and use the list −${Number(col.discountPercent)}% again`;
+  }
+  return 'Remove this product’s custom price — it goes back to Base (or the next list the customer is on)';
 }
 
 export function isExcluded(

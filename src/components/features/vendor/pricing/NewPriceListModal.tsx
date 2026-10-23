@@ -98,19 +98,19 @@ export function NewPriceListModal({ open, onClose, onCreated, existingLists }: P
 
         {!cloneFromId && (
           <div className="space-y-2">
-            <span className="text-[12px] font-medium text-[#7C7C7C]">What kind of list?</span>
+            <span className="text-[12px] font-medium text-[#7C7C7C]">Default price for products you do not set?</span>
             <label className="flex items-start gap-2 p-3 rounded-[12px] border border-[#E9E3DD] cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-[#F8E8EC]/40">
               <input type="radio" name="list-kind" checked={kind === 'selected'} onChange={() => setKind('selected')} className="mt-0.5" />
               <span>
-                <span className="block text-[13px] font-bold text-[#181725]">Selected products</span>
-                <span className="block text-[12px] text-[#7C7C7C]">You add products and set each price. Everything else stays at Base price. (Recommended)</span>
+                <span className="block text-[13px] font-bold text-[#181725]">Base price</span>
+                <span className="block text-[12px] text-[#7C7C7C]">Unset products stay at Base. Set custom prices where you need them. (Recommended)</span>
               </span>
             </label>
             <label className="flex items-start gap-2 p-3 rounded-[12px] border border-[#E9E3DD] cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-[#F8E8EC]/40">
               <input type="radio" name="list-kind" checked={kind === 'percent'} onChange={() => setKind('percent')} className="mt-0.5" />
               <span>
-                <span className="block text-[13px] font-bold text-[#181725]">All products − %</span>
-                <span className="block text-[12px] text-[#7C7C7C]">Every product gets the same % off Base. You can still override single products later.</span>
+                <span className="block text-[13px] font-bold text-[#181725]">Base minus %</span>
+                <span className="block text-[12px] text-[#7C7C7C]">Unset products get the same % off Base. Override any product later.</span>
               </span>
             </label>
           </div>
@@ -118,7 +118,7 @@ export function NewPriceListModal({ open, onClose, onCreated, existingLists }: P
 
         {kind === 'percent' && !cloneFromId && (
           <div>
-            <label className="text-[12px] font-medium text-[#7C7C7C]">Discount off Base for every product (%)</label>
+            <label className="text-[12px] font-medium text-[#7C7C7C]">Default discount off Base (%)</label>
             <input
               type="number"
               min={0}

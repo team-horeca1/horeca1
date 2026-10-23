@@ -14,7 +14,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { effective, isMember, isPercentList, type PriceListCol, type ProductRow } from './types';
+import {
+  effective,
+  hasCustomOverride,
+  isPercentList,
+  listSubtitle,
+  type PriceListCol,
+  type ProductRow,
+} from './types';
 import { useDraft } from './grid/useDraft';
 import { PriceGrid } from './grid/PriceGrid';
 import { ReviewPublishDrawer } from './ReviewPublishDrawer';
@@ -30,6 +37,7 @@ export function PricingWorkspace() {
   const [cols, setCols] = useState<PriceListCol[]>([]);
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [baseVersion, setBaseVersion] = useState<string | null>(null);
+  const [vendorId, setVendorId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -39,7 +47,7 @@ export function PricingWorkspace() {
 
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
-  /** Single-list view: show every catalogue product (add/remove inline) or only members. */
+  /** Single-list view: all catalogue products, or only those with a custom override. */
   const [showAll, setShowAll] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -79,7 +87,7 @@ export function PricingWorkspace() {
     restorePrompt,
     restoreDraft,
     discardRestore,
-  } = useDraft('me', baseVersion);
+  } = useDraft(vendorId, baseVersion);
 
   useEffect(() => {
     if (changeCount === 0) return;
@@ -119,6 +127,7 @@ export function PricingWorkspace() {
         setCols(newCols);
         if (!activeListRef.current && newCols.length > 0) setActiveListId(newCols[0].id);
         setBaseVersion(json.data.baseVersion ?? null);
+        if (typeof json.data.vendorId === 'string') setVendorId(json.data.vendorId);
         if (typeof json.data.catalogueTotal === 'number') setCatalogueTotal(json.data.catalogueTotal);
         setRows((prev) => (reset ? json.data.products : [...prev, ...json.data.products]));
         setNextCursor(json.data.pagination?.nextCursor ?? null);
@@ -273,13 +282,12 @@ export function PricingWorkspace() {
 
   const activeCol = cols.find((c) => c.id === activeListId) ?? cols[0] ?? null;
   const displayCols = compare ? cols : activeCol ? [activeCol] : cols;
-  const activeIsPercent = !!activeCol && isPercentList(activeCol);
   const displayRows = (() => {
-    if (compare || !activeCol || showAll || activeIsPercent) return rows;
-    return rows.filter((r) => isMember(r, activeCol, dirty));
+    if (compare || !activeCol || showAll) return rows;
+    return rows.filter((r) => hasCustomOverride(r, activeCol, dirty));
   })();
-  // Server priced count (visible products only) + draft add/remove delta.
-  const memberCount = (() => {
+  // Custom-override count = server priced + draft add/remove delta.
+  const customCount = (() => {
     if (!activeCol) return 0;
     const rowById = new Map(rows.map((r) => [r.id, r]));
     let delta = 0;
@@ -287,15 +295,13 @@ export function PricingWorkspace() {
       const [productId, listId] = key.split(':');
       if (listId !== activeCol.id) continue;
       const row = rowById.get(productId);
-      let wasMember: boolean;
-      if (row) wasMember = !!row.cells[activeCol.id];
-      else if (d === null) wasMember = true;
-      else if (d.added) wasMember = false;
-      else wasMember = true;
+      const wasCustom = row ? !!row.cells[activeCol.id] && row.cells[activeCol.id]!.price != null && !row.cells[activeCol.id]!.isExcluded : false;
       if (d === null) {
-        if (wasMember) delta -= 1;
-      } else if (!wasMember && (d.added || d.price != null || d.isExcluded)) {
+        if (wasCustom) delta -= 1;
+      } else if (d.price != null && !wasCustom) {
         delta += 1;
+      } else if ((d.price === null || d.isExcluded) && wasCustom) {
+        delta -= 1;
       }
     }
     return Math.max(0, (activeCol.counts?.priced ?? 0) + delta);
@@ -434,24 +440,26 @@ export function PricingWorkspace() {
       {tab === 'prices' && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            {!compare && cols.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setActiveListId(c.id)}
-                className={cn(
-                  'px-3 py-2 rounded-full border text-[12px] font-bold',
-                  activeCol?.id === c.id ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]',
-                )}
-              >
-                {c.name}
-                <span className={cn('ml-1.5 font-semibold', activeCol?.id === c.id ? 'text-white/80' : 'text-[#7C7C7C]')}>
-                  {isPercentList(c)
-                    ? `All · −${Number(c.discountPercent)}%`
-                    : `${c.id === activeCol?.id ? memberCount : (c.counts?.priced ?? 0)} products`}
-                </span>
-              </button>
-            ))}
+            {!compare && cols.map((c) => {
+              const count = c.id === activeCol?.id ? customCount : (c.counts?.priced ?? 0);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setActiveListId(c.id)}
+                  title={listSubtitle(c, count)}
+                  className={cn(
+                    'px-3 py-2 rounded-full border text-[12px] font-bold max-w-[280px]',
+                    activeCol?.id === c.id ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]',
+                  )}
+                >
+                  <span className="truncate">{c.name}</span>
+                  <span className={cn('ml-1.5 font-semibold', activeCol?.id === c.id ? 'text-white/80' : 'text-[#7C7C7C]')}>
+                    {isPercentList(c) ? `−${Number(c.discountPercent)}%` : 'Base'} · {count} custom
+                  </span>
+                </button>
+              );
+            })}
             <button
               type="button"
               onClick={() => setCompare((v) => !v)}
@@ -459,19 +467,14 @@ export function PricingWorkspace() {
             >
               Compare lists
             </button>
-            {!compare && activeCol && !activeIsPercent && (
+            {!compare && activeCol && (
               <span className="inline-flex rounded-full border border-[#E9E3DD] bg-white p-0.5" role="group" aria-label="Show products">
                 <button type="button" onClick={() => setShowAll(true)} className={cn('px-3 py-1.5 rounded-full text-[12px] font-bold', showAll ? 'bg-primary text-white' : 'text-[#181725]')}>
                   All products ({catalogueTotal})
                 </button>
                 <button type="button" onClick={() => setShowAll(false)} className={cn('px-3 py-1.5 rounded-full text-[12px] font-bold', !showAll ? 'bg-primary text-white' : 'text-[#181725]')}>
-                  In this list ({memberCount})
+                  Custom only ({customCount})
                 </button>
-              </span>
-            )}
-            {!compare && activeCol && activeIsPercent && (
-              <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]">
-                This list gives −{Number(activeCol.discountPercent)}% on every product automatically. Custom prices override that until you clear them.
               </span>
             )}
             {compare && (
@@ -482,10 +485,8 @@ export function PricingWorkspace() {
           </div>
           <p className="text-[12px] text-[#667085]">
             {compare
-              ? 'Each column is one list. “Not in list” = that product stays at Base price in that list.'
-              : activeIsPercent
-                ? 'Click a price to set a custom override · Back to list −% restores the automatic discount · ⋮ on a product = hide or edit. Nothing is live until Review & publish.'
-                : 'In the list below: click a price to change it · press + Add to put a product in this list · ✕ removes it · ⋮ on a product = hide or edit the product itself. Nothing is live until Review & publish.'}
+              ? 'Each column is one list. Badge = Custom (override), List −% (tracks base), or Base. Reset clears an override.'
+              : 'Click a price to set a custom override · Reset clears it back to the list default · Exclude hides a product for this list’s customers. Nothing is live until Review & publish.'}
           </p>
           <div className="relative max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
@@ -522,17 +523,6 @@ export function PricingWorkspace() {
               selectedProductIds={selectedProductIds}
               onSelectedProductIdsChange={setSelectedProductIds}
               compareMode={compare}
-              onAddToList={(row, col) => {
-                const key = `${row.id}:${col.id}`;
-                // Re-adding a product removed earlier in this same draft
-                // restores its original cell (not a blank "new" entry).
-                if (key in dirty && dirty[key] === null && row.cells[col.id]) {
-                  const orig = row.cells[col.id]!;
-                  setCell(key, { price: orig.price, isExcluded: orig.isExcluded, isLocked: orig.isLocked });
-                  return;
-                }
-                setCell(key, { price: null, added: true, isExcluded: false });
-              }}
             />
           )}
         </>

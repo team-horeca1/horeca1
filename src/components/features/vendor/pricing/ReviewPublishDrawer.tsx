@@ -107,7 +107,21 @@ export function ReviewPublishDrawer({ open, onClose, dirty, baseVersion, onPubli
       }
       const publishId = json.data?.publishId as string | undefined;
       setLastPublishId(publishId ?? null);
-      toast.success(`Published ${json.data?.upserted ?? cells.length} price updates`);
+      const upserted = Number(json.data?.upserted ?? 0);
+      const cleared = Number(json.data?.cleared ?? 0);
+      const skipped = Number(json.data?.skipped ?? 0);
+      if (upserted + cleared === 0) {
+        toast.message(
+          skipped > 0
+            ? `Nothing published (${skipped} change(s) skipped — e.g. locked or unpriced)`
+            : 'Nothing published — set a price on added rows, or discard empty changes',
+        );
+      } else {
+        const parts: string[] = [];
+        if (upserted > 0) parts.push(`${upserted} updated`);
+        if (cleared > 0) parts.push(`${cleared} cleared`);
+        toast.success(`Published ${parts.join(', ')}`);
+      }
       onPublished(publishId);
       onClose();
     } catch (e) {
