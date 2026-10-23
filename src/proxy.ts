@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import {
+  AFFILIATE_REFERRAL_COOKIE,
+  affiliateCookieOptions,
+  decideAffiliateReferral,
+} from '@/lib/affiliateReferral';
 
 const CUSTOMER_PROTECTED_PREFIXES = [
   '/checkout',
@@ -34,7 +39,7 @@ type TokenUser = {
   availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
 };
 
-export async function proxy(req: NextRequest) {
+async function enforceAccess(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
   const isAdminRoute = pathname.startsWith('/admin');
@@ -99,6 +104,31 @@ export async function proxy(req: NextRequest) {
   }
 
   return NextResponse.next();
+}
+
+function withAffiliateCookie(res: NextResponse, code: string | null, secure: boolean): NextResponse {
+  if (!code) return res;
+  res.cookies.set(AFFILIATE_REFERRAL_COOKIE, code, affiliateCookieOptions(secure));
+  return res;
+}
+
+export async function proxy(req: NextRequest) {
+  const secure = req.nextUrl.protocol === 'https:';
+  const decision = decideAffiliateReferral({
+    pathname: req.nextUrl.pathname,
+    refQuery: req.nextUrl.searchParams.get('ref'),
+    existingCookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
+  });
+
+  if (decision.kind === 'redirect-home') {
+    const url = req.nextUrl.clone();
+    url.pathname = '/';
+    url.search = '';
+    return withAffiliateCookie(NextResponse.redirect(url), decision.setCookie, secure);
+  }
+
+  const res = await enforceAccess(req);
+  return withAffiliateCookie(res, decision.setCookie, secure);
 }
 
 export const config = {

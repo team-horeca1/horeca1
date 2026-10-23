@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { mapToBusinessAccount, mapToPrimaryOutlet } from '@/lib/customerProfileMapper';
 import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
 import type { CustomerProfileInput } from '@/lib/validators/customer-profile';
+import { cleanReferral } from '@/lib/affiliateReferral';
 
 export type AccountKind = 'customer' | 'vendor' | 'brand';
 
@@ -19,6 +20,8 @@ interface ProvisionInput extends Omit<CustomerProfileInput, 'fullName' | 'busine
   businessName?: string | null;
   fullName?: string | null;
   gstNumber?: string | null;
+  /** Already normalized, or raw form input. Invalid values are stored as null. */
+  referralCode?: string | null;
 }
 
 interface ProvisionResult {
@@ -137,6 +140,7 @@ export async function provisionDefaultAccount(
       status: 'active',
       mobilePhone: (baData as { mobilePhone?: string | null }).mobilePhone ?? user?.phone ?? null,
       workPhone: (baData as { workPhone?: string | null }).workPhone ?? user?.phone ?? null,
+      referralCode: cleanReferral(input.referralCode),
     },
   });
 

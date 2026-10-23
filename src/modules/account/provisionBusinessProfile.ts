@@ -19,6 +19,7 @@ import {
   legacyScalarsFromSelections,
 } from '@/lib/constants/vendorProfile';
 import type { PrimaryOutletInput, VendorDetailsInput } from '@/lib/validators/vendor-kyc';
+import { cleanReferral } from '@/lib/affiliateReferral';
 
 export type DbClient = Pick<
   PrismaClient,
@@ -62,6 +63,8 @@ export interface ProvisionBusinessProfileInput {
   vendorTypeSelections?: Prisma.InputJsonValue;
   primaryOutlet: PrimaryOutletInput;
   vendorDetails?: VendorDetailsInput | null;
+  /** Optional Earnchilada code. Invalid or empty values are stored as null. */
+  referralCode?: string | null;
   brand?: {
     productCategories?: string[];
     businessSize?: string | null;
@@ -166,6 +169,7 @@ export async function provisionBusinessProfile(
       workPhone: input.workPhone || null,
       mobilePhone: input.mobilePhone || null,
       vendorTypeSelections: input.vendorTypeSelections,
+      referralCode: cleanReferral(input.referralCode),
       isCustomer: flags.isCustomer,
       isVendor: flags.isVendor,
       isBrand: flags.isBrand,

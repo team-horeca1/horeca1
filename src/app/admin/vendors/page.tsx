@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Store,
   LayoutDashboard,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -163,15 +164,24 @@ export default function SuppliersPage() {
         title="Suppliers"
         subtitle="Supplier → Business → Online Store. Impersonate a Supplier to open their portal, then drill into a store."
         actions={
-          canWriteSettings ? (
+          <>
             <button
-              onClick={() => setShowCreate(true)}
-              className="h-[44px] px-5 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] active:scale-95 transition-all shadow-md shadow-[#6B1D2E]/10 flex items-center gap-2 shrink-0"
+              type="button"
+              onClick={() => { window.location.assign('/api/v1/admin/registrations/export?kind=vendor&format=csv'); }}
+              className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
             >
-              <Plus size={16} />
-              Add Supplier
+              <Download size={16} /> Export CSV
             </button>
-          ) : undefined
+            {canWriteSettings ? (
+              <button
+                onClick={() => setShowCreate(true)}
+                className="h-[44px] px-5 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] active:scale-95 transition-all shadow-md shadow-[#6B1D2E]/10 flex items-center gap-2 shrink-0"
+              >
+                <Plus size={16} />
+                Add Supplier
+              </button>
+            ) : null}
+          </>
         }
       />
 

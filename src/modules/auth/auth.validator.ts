@@ -13,6 +13,8 @@ export const signupSchema = z.object({
   pincode: z.string().regex(/^\d{6}$/, 'Invalid pincode').optional(),
   businessName: z.string().optional(),
   gstNumber: z.string().optional(),
+  // Invalid codes are ignored later. Presence must not fail signup.
+  referralCode: z.string().nullable().optional(),
 });
 
 export const loginSchema = z.object({

@@ -19,6 +19,7 @@ import {
     Mail,
     Phone,
     Building2,
+    Download,
 } from 'lucide-react';
 import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -229,7 +230,15 @@ export default function AdminBrandsPage() {
                 title="Brands Registry"
                 subtitle="Review brand applications, manage storefronts, and audit catalog mappings"
                 actions={
-                    canCreateBrand ? (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => { window.location.assign('/api/v1/admin/registrations/export?kind=brand&format=csv'); }}
+                            className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
+                        >
+                            <Download size={16} /> Export CSV
+                        </button>
+                        {canCreateBrand ? (
                             <button
                                 onClick={() => setShowCreate(true)}
                                 className="h-[44px] px-5 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] active:scale-95 transition-all shadow-md shadow-[#6B1D2E]/10 flex items-center gap-2 shrink-0"
@@ -237,7 +246,8 @@ export default function AdminBrandsPage() {
                                 <Plus size={16} />
                                 Add Brand
                             </button>
-                    ) : undefined
+                        ) : null}
+                    </>
                 }
             />
 

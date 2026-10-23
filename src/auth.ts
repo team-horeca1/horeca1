@@ -22,6 +22,7 @@ import type { Role } from '@prisma/client';
 import { backfillAdminPasswordCipherIfMissing } from '@/lib/adminPasswordCipher';
 import { emitEvent } from '@/events/emitter';
 import { REFERRAL_COOKIE } from '@/lib/referralCookie';
+import { AFFILIATE_REFERRAL_COOKIE, resolveRegistrationReferral } from '@/lib/affiliateReferral';
 
 function vendorSlug(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -82,6 +83,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         latitude: {},
         longitude: {},
         placeId: {},
+        referralCode: {},
+        referralCodeSubmitted: {},
       },
       async authorize(credentials) {
         const phone = normalizePhone(String(credentials?.phone ?? ''));
@@ -187,9 +190,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
 
           // V2.2: provision the user's BusinessAccount + primary Outlet + Owner UserRole.
+          let affiliateCookie: string | undefined;
+          try {
+            const { cookies } = await import('next/headers');
+            affiliateCookie = (await cookies()).get(AFFILIATE_REFERRAL_COOKIE)?.value;
+          } catch {
+            // authorize() can run outside a request cookie store
+          }
+          const referralCode = resolveRegistrationReferral({
+            submitted: credentials?.referralCode,
+            submittedPresent: credentials?.referralCodeSubmitted === '1' || credentials?.referralCodeSubmitted === true,
+            cookie: affiliateCookie,
+          });
+
           const provision = await provisionDefaultAccount({
             userId: user.id,
             kind: role === 'vendor' ? 'vendor' : role === 'brand' ? 'brand' : 'customer',
+            referralCode,
             businessName,
             fullName,
             gstNumber,

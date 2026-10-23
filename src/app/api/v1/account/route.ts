@@ -22,6 +22,12 @@ import { VENDOR_ID_COOKIE } from '@/lib/adminImpersonationCookies';
 import { businessFacingName, storeDisplayName } from '@/modules/supplier/foundation.service';
 import { kindFromFlags, type BusinessKind } from '@/lib/businessCapability';
 import { provisionBusinessProfile } from '@/modules/account/provisionBusinessProfile';
+import {
+  AFFILIATE_REFERRAL_COOKIE,
+  hasReferralField,
+  referralFieldValue,
+  resolveRegistrationReferral,
+} from '@/lib/affiliateReferral';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -190,8 +196,14 @@ function kindFromBody(body: { isVendor?: boolean; isBrand?: boolean }): Business
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const relaxedContact = isRegisterEmailOtpEnabled();
-    const body = createAccountBodySchema(relaxedContact).parse(await req.json());
+    const raw = await req.json();
+    const body = createAccountBodySchema(relaxedContact).parse(raw);
     const kind = kindFromBody(body);
+    const referralCode = resolveRegistrationReferral({
+      submitted: referralFieldValue(raw),
+      submittedPresent: hasReferralField(raw),
+      cookie: ctx.role === 'admin' ? undefined : req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
+    });
 
     const result = await prisma.$transaction(async (tx) => {
       return provisionBusinessProfile({
@@ -218,6 +230,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         designation: body.designation || null,
         workPhone: body.workPhone || null,
         mobilePhone: body.mobilePhone || null,
+        referralCode,
         primaryOutlet: body.primaryOutlet,
         vendorDetails: body.vendorDetails ?? null,
         brand: kind === 'brand' ? {

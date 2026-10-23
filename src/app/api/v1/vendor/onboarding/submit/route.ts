@@ -24,6 +24,12 @@ import {
   legacyScalarsFromSelections,
   type VendorTypeSelection,
 } from '@/lib/constants/vendorProfile';
+import {
+  AFFILIATE_REFERRAL_COOKIE,
+  hasReferralField,
+  referralFieldValue,
+  resolveRegistrationReferral,
+} from '@/lib/affiliateReferral';
 
 const PHONE_RE = /^\d{10}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -160,7 +166,13 @@ function parseBody(raw: unknown) {
 
 async function postHandler(req: NextRequest) {
   try {
-    const input = parseBody(await req.json());
+    const raw = await req.json();
+    const input = parseBody(raw);
+    const referralCode = resolveRegistrationReferral({
+      submitted: referralFieldValue(raw),
+      submittedPresent: hasReferralField(raw),
+      cookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
+    });
     const phone = input.phone || null;
     const email = input.email;
     const verifyEmail = input.verifiedEmail;
@@ -224,6 +236,7 @@ async function postHandler(req: NextRequest) {
         firstName: input.firstName || null,
         lastName: input.lastName || null,
         designation: input.designation || null,
+        referralCode,
         vendorTypeSelections: input.vendorTypeSelections as unknown as Prisma.InputJsonValue,
         billingAddressLine: input.billingAddress.addressLine,
         billingCity: input.billingAddress.city,

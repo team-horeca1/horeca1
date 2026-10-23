@@ -8,6 +8,12 @@ import { signupSchema } from '@/modules/auth/auth.validator';
 import { errorResponse } from '@/middleware/errorHandler';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getClientIp } from '@/lib/utils';
+import {
+  AFFILIATE_REFERRAL_COOKIE,
+  hasReferralField,
+  referralFieldValue,
+  resolveRegistrationReferral,
+} from '@/lib/affiliateReferral';
 
 const authService = new AuthService();
 
@@ -32,12 +38,18 @@ export async function POST(req: NextRequest) {
     //    This checks: valid email format, password >= 8 chars, valid phone format, etc.
     const body = await req.json();
     const input = signupSchema.parse(body);
+    const referralCode = resolveRegistrationReferral({
+      submitted: referralFieldValue(body),
+      submittedPresent: hasReferralField(body),
+      cookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
+    });
 
     // 2. Create the user (service handles duplicate check + password hashing)
     const { readReferralTokenFromRequest } = await import('@/lib/referralCookie');
     const user = await authService.signup({
       ...input,
       referralToken: readReferralTokenFromRequest(req),
+      referralCode,
     });
 
     // 3. Return the new user profile (no password included)

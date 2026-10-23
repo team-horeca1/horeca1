@@ -2209,6 +2209,9 @@ model BusinessAccount {
   mobilePhone          String?               @map("mobile_phone") @db.VarChar(20)
   remarks              String?               @db.Text
   customFields         Json                  @default("{}") @map("custom_fields")
+  // Earnchilada affiliate code (A-0001 / optional H1- prefix). Null when absent or invalid.
+  // Existing rows stay null. Not a commission record — matching happens outside this app.
+  referralCode         String?               @map("referral_code") @db.VarChar(12)
   isCustomer           Boolean               @default(true) @map("is_customer")
   isVendor             Boolean               @default(false) @map("is_vendor")
   isBrand              Boolean               @default(false) @map("is_brand")
@@ -2234,6 +2237,7 @@ model BusinessAccount {
 
   @@index([isVendor])
   @@index([isBrand])
+  @@index([referralCode])
   @@map("business_accounts")
 }
 

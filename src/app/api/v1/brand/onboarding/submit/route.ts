@@ -20,6 +20,12 @@ import {
   mapToBusinessAccount,
   mapToBrandFields,
 } from '@/lib/brandProfileMapper';
+import {
+  AFFILIATE_REFERRAL_COOKIE,
+  hasReferralField,
+  referralFieldValue,
+  resolveRegistrationReferral,
+} from '@/lib/affiliateReferral';
 
 const PHONE_RE = /^\d{10}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -77,7 +83,13 @@ function parseBody(raw: unknown) {
 
 async function postHandler(req: NextRequest) {
   try {
-    const input = parseBody(await req.json());
+    const raw = await req.json();
+    const input = parseBody(raw);
+    const referralCode = resolveRegistrationReferral({
+      submitted: referralFieldValue(raw),
+      submittedPresent: hasReferralField(raw),
+      cookie: req.cookies.get(AFFILIATE_REFERRAL_COOKIE)?.value,
+    });
 
     const validation = validateBrandProfile(
       { ...input, email: input.email ?? undefined },
@@ -147,6 +159,7 @@ async function postHandler(req: NextRequest) {
         pan: null,
         businessType: input.brandType || null,
         subType: input.subType || null,
+        referralCode,
         billingAddressLine: (baData as { billingAddressLine?: string | null }).billingAddressLine ?? null,
         billingCity: (baData as { billingCity?: string | null }).billingCity ?? null,
         billingState: (baData as { billingState?: string | null }).billingState ?? null,

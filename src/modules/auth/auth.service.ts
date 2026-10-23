@@ -18,6 +18,7 @@ interface SignupInput {
   businessName?: string;
   gstNumber?: string;
   referralToken?: string;
+  referralCode?: string | null;
 }
 
 export class AuthService {
@@ -77,6 +78,7 @@ export class AuthService {
     const provision = await provisionDefaultAccount({
       userId: user.id,
       kind,
+      referralCode: input.referralCode,
       businessName: input.businessName,
       fullName: input.fullName,
       gstNumber: input.gstNumber,
