@@ -72,7 +72,7 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['GET'], pattern: /^vendor\/products(?:\/|$)/, permission: 'products.view' },
   { methods: ['GET'], pattern: /^vendor\/price-lists(?:\/|$)/, permission: 'priceLists.view' },
   { methods: ['POST'], pattern: /^vendor\/price-lists$/, permission: 'priceLists.create' },
-  { methods: ['POST', 'PATCH', 'DELETE'], pattern: /^vendor\/price-lists(?:\/|$)/, permission: 'priceLists.edit' },
+  { methods: ['POST', 'PATCH', 'PUT', 'DELETE'], pattern: /^vendor\/price-lists(?:\/|$)/, permission: 'priceLists.edit' },
   { methods: ['GET'], pattern: /^vendor\/price-history(?:\/|$)/, permission: 'priceLists.view' },
   { methods: ['GET'], pattern: /^vendor\/customer-groups(?:\/|$)/, permission: 'customers.view' },
   { methods: ['GET'], pattern: /^vendor\/customer-tasks(?:\/|$)/, permission: 'customers.view' },

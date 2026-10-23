@@ -1,7 +1,7 @@
 // GET    /api/v1/vendor/price-lists/:id — Get price list with items + assignments
 // PATCH  /api/v1/vendor/price-lists/:id — Update name / discountPercent /
 //                                          isActive / items / assignments
-// DELETE /api/v1/vendor/price-lists/:id — Soft-delete (isActive = false)
+// DELETE /api/v1/vendor/price-lists/:id — Hard-delete (removes list + cascaded items/assignments)
 // PROTECTED: Vendor only
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,6 +12,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { logPriceHistory, type PriceHistoryEntry } from '@/lib/priceHistory';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { saveAssignments } from '@/modules/pricing/pricelist-assignment.service';
 
 function extractId(req: NextRequest) {
@@ -374,19 +375,34 @@ export const DELETE = vendorOnly(async (req: NextRequest, ctx) => {
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
 
-    const existing = await prisma.priceList.findFirst({ where: { id, vendorId } });
+    const existing = await prisma.priceList.findFirst({
+      where: { id, vendorId },
+      select: { id: true, name: true, _count: { select: { items: true, assignments: true } } },
+    });
     if (!existing) throw Errors.notFound('Price list');
 
-    // Soft delete — unassign any legacy VendorCustomer pricelist mapping;
-    // PriceListAssignment rows cascade automatically via FK so they're
-    // cleaned up when isActive flips and the list disappears from listings.
+    // Hard delete — null out VendorCustomer links (FK has no onDelete),
+    // then delete the list. Items + assignments cascade. PriceHistory
+    // SetNulls. OrderItem.priceListId is a snapshot with no FK.
     await prisma.$transaction([
       prisma.vendorCustomer.updateMany({
         where: { priceListId: id },
         data: { priceListId: null },
       }),
-      prisma.priceList.update({ where: { id }, data: { isActive: false } }),
+      prisma.priceList.delete({ where: { id } }),
     ]);
+
+    void logAction(ctx, req, {
+      action: AUDIT_ACTIONS.priceListDelete,
+      entity: 'price_list',
+      entityId: id,
+      before: {
+        name: existing.name,
+        itemCount: existing._count.items,
+        assignmentCount: existing._count.assignments,
+      },
+      metadata: { vendorId },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

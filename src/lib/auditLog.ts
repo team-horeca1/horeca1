@@ -60,6 +60,8 @@ export const AUDIT_ACTIONS = {
   productBulkUpdate: 'product.bulk_update',
   inventoryBulkUpdate: 'inventory.bulk_update',
   priceListBulkApply: 'price_list.bulk_apply',
+  priceListSyncProducts: 'price_list.sync_products',
+  priceListDelete: 'price_list.delete',
   comboCreate: 'combo.create',
   userPasswordReset: 'user.password_reset',
   collectionCreate: 'collection.create',

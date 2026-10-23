@@ -91,16 +91,37 @@ export function isPercentList(col: PriceListCol): boolean {
   return listKind(col) === 'percent';
 }
 
-/** Chip / column subtitle: "Default: Base · 11 custom · 0 hidden" */
+/** Chip / column subtitle helper for legacy percent lists. */
 export function listRuleLabel(col: PriceListCol): string {
   if (isPercentList(col)) return `−${Number(col.discountPercent)}%`;
   return 'Base';
 }
 
+/** "N products · M custom" — product count = priced members on the list. */
 export function listSubtitle(col: PriceListCol, customCount?: number): string {
-  const custom = customCount ?? col.counts?.priced ?? 0;
-  const hidden = col.counts?.excluded ?? 0;
-  return `Default: ${listRuleLabel(col)} · ${custom} custom · ${hidden} hidden`;
+  const products = col.counts?.priced ?? 0;
+  const custom = customCount ?? products;
+  if (isPercentList(col)) {
+    return `Legacy −${Number(col.discountPercent)}% · ${custom} custom`;
+  }
+  return `${products} products · ${custom} custom`;
+}
+
+/**
+ * True when the product has a PriceListItem on this list (or a draft add).
+ * Legacy percent lists treat every product as in-list until converted via the picker.
+ */
+export function isInList(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
+  const key = cellKey(row.id, col.id);
+  if (key in dirty) {
+    const d = dirty[key];
+    if (d === null) return false;
+    if (d.added) return true;
+    if (d.isExcluded) return true;
+    if (d.price != null) return true;
+  }
+  if (isPercentList(col)) return true;
+  return row.cells[col.id] != null;
 }
 
 export function effective(

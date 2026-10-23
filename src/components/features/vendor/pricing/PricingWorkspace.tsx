@@ -11,12 +11,12 @@ import {
   RotateCcw,
   X,
   FileDown,
+  ListChecks,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   effective,
-  hasCustomOverride,
   isPercentList,
   listSubtitle,
   type PriceListCol,
@@ -28,6 +28,7 @@ import { ReviewPublishDrawer } from './ReviewPublishDrawer';
 import { PublishHistoryTab } from './PublishHistoryTab';
 import { WhyThisPriceDrawer } from './WhyThisPriceDrawer';
 import { NewPriceListModal } from './NewPriceListModal';
+import { ProductPickerModal } from './ProductPickerModal';
 import { AssignmentMatrix } from './assignments/AssignmentMatrix';
 
 type TabId = 'prices' | 'assignments' | 'history';
@@ -42,13 +43,8 @@ export function PricingWorkspace() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  /** Sellable catalogue size (same filter as the grid) — not the loaded page length. */
-  const [catalogueTotal, setCatalogueTotal] = useState(0);
-
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
-  /** Single-list view: all catalogue products, or only those with a custom override. */
-  const [showAll, setShowAll] = useState(true);
 
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -56,6 +52,7 @@ export function PricingWorkspace() {
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [newListOpen, setNewListOpen] = useState(false);
+  const [picker, setPicker] = useState<{ listId: string; listName: string } | null>(null);
   const [explainOpen, setExplainOpen] = useState(false);
   const [explainCustomerId, setExplainCustomerId] = useState<string | null>(null);
   const [explainProductId, setExplainProductId] = useState<string | null>(null);
@@ -110,12 +107,11 @@ export function PricingWorkspace() {
         if (debounced) qs.set('search', debounced);
         if (cursor) qs.set('cursor', cursor);
         qs.set('limit', '50');
+        // Grid shows only products that belong to the active list (or the
+        // union across lists in compare). Membership is managed via the picker.
+        qs.set('membersOnly', '1');
         const actId = activeListRef.current;
-        if (compareRef.current) {
-          qs.set('membersOnly', '1');
-        } else if (actId) {
-          // Single list: load ALL products so add/remove happens inline in
-          // the grid (no separate Add-products dialog).
+        if (!compareRef.current && actId) {
           qs.set('listId', actId);
         }
 
@@ -126,9 +122,12 @@ export function PricingWorkspace() {
         const newCols = json.data.priceLists as PriceListCol[];
         setCols(newCols);
         if (!activeListRef.current && newCols.length > 0) setActiveListId(newCols[0].id);
+        // If the active list was hard-deleted, fall back to the first remaining list.
+        if (activeListRef.current && !newCols.some((c) => c.id === activeListRef.current)) {
+          setActiveListId(newCols[0]?.id ?? null);
+        }
         setBaseVersion(json.data.baseVersion ?? null);
         if (typeof json.data.vendorId === 'string') setVendorId(json.data.vendorId);
-        if (typeof json.data.catalogueTotal === 'number') setCatalogueTotal(json.data.catalogueTotal);
         setRows((prev) => (reset ? json.data.products : [...prev, ...json.data.products]));
         setNextCursor(json.data.pagination?.nextCursor ?? null);
         setHasMore(!!json.data.pagination?.hasMore);
@@ -282,30 +281,9 @@ export function PricingWorkspace() {
 
   const activeCol = cols.find((c) => c.id === activeListId) ?? cols[0] ?? null;
   const displayCols = compare ? cols : activeCol ? [activeCol] : cols;
-  const displayRows = (() => {
-    if (compare || !activeCol || showAll) return rows;
-    return rows.filter((r) => hasCustomOverride(r, activeCol, dirty));
-  })();
-  // Custom-override count = server priced + draft add/remove delta.
-  const customCount = (() => {
-    if (!activeCol) return 0;
-    const rowById = new Map(rows.map((r) => [r.id, r]));
-    let delta = 0;
-    for (const [key, d] of Object.entries(dirty)) {
-      const [productId, listId] = key.split(':');
-      if (listId !== activeCol.id) continue;
-      const row = rowById.get(productId);
-      const wasCustom = row ? !!row.cells[activeCol.id] && row.cells[activeCol.id]!.price != null && !row.cells[activeCol.id]!.isExcluded : false;
-      if (d === null) {
-        if (wasCustom) delta -= 1;
-      } else if (d.price != null && !wasCustom) {
-        delta += 1;
-      } else if ((d.price === null || d.isExcluded) && wasCustom) {
-        delta -= 1;
-      }
-    }
-    return Math.max(0, (activeCol.counts?.priced ?? 0) + delta);
-  })();
+  const openPicker = (list: { id: string; name: string }) => {
+    setPicker({ listId: list.id, listName: list.name });
+  };
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'prices', label: 'Prices' },
@@ -441,21 +419,21 @@ export function PricingWorkspace() {
         <>
           <div className="flex flex-wrap items-center gap-2">
             {!compare && cols.map((c) => {
-              const count = c.id === activeCol?.id ? customCount : (c.counts?.priced ?? 0);
+              const count = c.counts?.priced ?? 0;
               return (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setActiveListId(c.id)}
-                  title={listSubtitle(c, count)}
+                  title={listSubtitle(c)}
                   className={cn(
                     'px-3 py-2 rounded-full border text-[12px] font-bold max-w-[280px]',
                     activeCol?.id === c.id ? 'bg-primary text-white border-primary' : 'bg-white border-[#E9E3DD] text-[#181725]',
                   )}
                 >
                   <span className="truncate">{c.name}</span>
-                  <span className={cn('ml-1.5 font-semibold', activeCol?.id === c.id ? 'text-white/80' : 'text-[#7C7C7C]')}>
-                    {isPercentList(c) ? `−${Number(c.discountPercent)}%` : 'Base'} · {count} custom
+                  <span className={cn('ml-1.5 font-semibold tabular-nums', activeCol?.id === c.id ? 'text-white/80' : 'text-[#7C7C7C]')}>
+                    {isPercentList(c) ? `−${Number(c.discountPercent)}% · ` : ''}{count} products
                   </span>
                 </button>
               );
@@ -468,14 +446,13 @@ export function PricingWorkspace() {
               Compare lists
             </button>
             {!compare && activeCol && (
-              <span className="inline-flex rounded-full border border-[#E9E3DD] bg-white p-0.5" role="group" aria-label="Show products">
-                <button type="button" onClick={() => setShowAll(true)} className={cn('px-3 py-1.5 rounded-full text-[12px] font-bold', showAll ? 'bg-primary text-white' : 'text-[#181725]')}>
-                  All products ({catalogueTotal})
-                </button>
-                <button type="button" onClick={() => setShowAll(false)} className={cn('px-3 py-1.5 rounded-full text-[12px] font-bold', !showAll ? 'bg-primary text-white' : 'text-[#181725]')}>
-                  Custom only ({customCount})
-                </button>
-              </span>
+              <button
+                type="button"
+                onClick={() => openPicker({ id: activeCol.id, name: activeCol.name })}
+                className="px-3 py-2 rounded-full border border-[#E9E3DD] bg-white text-[12px] font-bold text-[#181725] flex items-center gap-1.5"
+              >
+                <ListChecks size={14} /> Edit products
+              </button>
             )}
             {compare && (
               <span className="px-3 py-2 rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[12px] font-semibold text-[#7C7C7C]">
@@ -485,8 +462,8 @@ export function PricingWorkspace() {
           </div>
           <p className="text-[12px] text-[#667085]">
             {compare
-              ? 'Each column is one list. Badge = Custom (override), List −% (tracks base), or Base. Reset clears an override.'
-              : 'Click a price to set a custom override · Reset clears it back to the list default · Exclude hides a product for this list’s customers. Nothing is live until Review & publish.'}
+              ? 'Each column is one list. A dash means the product is not in that list. Badge = Custom / List −% / Base.'
+              : 'Only ticked products are in this list. Edit products to add or remove · click a price to override · Review & publish to go live.'}
           </p>
           <div className="relative max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7C7C7C]" />
@@ -509,9 +486,25 @@ export function PricingWorkspace() {
                 Create your first list
               </button>
             </div>
+          ) : !compare && activeCol && !loading && rows.length === 0 ? (
+            <div className="p-10 text-center rounded-[12px] border border-[#E9E3DD] bg-white">
+              <p className="text-[#181725] font-semibold">No products in this list yet</p>
+              <p className="text-[13px] text-[#7C7C7C] mt-1 text-pretty">
+                {isPercentList(activeCol)
+                  ? `This is a legacy “all products −${Number(activeCol.discountPercent)}%” list. Pick products to convert it.`
+                  : 'Tick the products that belong here. Unticked products stay at Base.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => openPicker({ id: activeCol.id, name: activeCol.name })}
+                className="mt-3 h-11 min-h-[48px] px-5 rounded-[12px] bg-primary text-white font-semibold inline-flex items-center gap-2"
+              >
+                <ListChecks size={16} /> Add products
+              </button>
+            </div>
           ) : (
             <PriceGrid
-              rows={displayRows}
+              rows={rows}
               cols={displayCols}
               dirty={dirty}
               setCell={setCell}
@@ -520,6 +513,11 @@ export function PricingWorkspace() {
               hasMore={hasMore}
               onLoadMore={() => nextCursor && void loadWorkspace(false, nextCursor)}
               onListsChanged={() => void loadWorkspace(true)}
+              onEditProducts={
+                activeCol && !compare
+                  ? () => openPicker({ id: activeCol.id, name: activeCol.name })
+                  : undefined
+              }
               selectedProductIds={selectedProductIds}
               onSelectedProductIdsChange={setSelectedProductIds}
               compareMode={compare}
@@ -600,8 +598,25 @@ export function PricingWorkspace() {
       <NewPriceListModal
         open={newListOpen}
         onClose={() => setNewListOpen(false)}
-        onCreated={() => void loadWorkspace(true)}
+        onCreated={(list) => {
+          setActiveListId(list.id);
+          void loadWorkspace(true);
+          // Cloned lists already have products; still open picker so the
+          // vendor can tweak membership. Empty lists need the picker.
+          setPicker({ listId: list.id, listName: list.name });
+        }}
         existingLists={cols}
+      />
+
+      <ProductPickerModal
+        open={!!picker}
+        listId={picker?.listId ?? null}
+        listName={picker?.listName ?? ''}
+        onClose={() => setPicker(null)}
+        onSaved={() => {
+          setPicker(null);
+          void loadWorkspace(true);
+        }}
       />
 
       <WhyThisPriceDrawer

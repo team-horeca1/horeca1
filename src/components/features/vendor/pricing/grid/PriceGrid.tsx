@@ -9,12 +9,13 @@ import {
   Loader2,
   Pencil,
   Copy,
-  PowerOff,
+  Trash2,
   EyeOff,
   Eye,
   Percent,
   RotateCcw,
   ExternalLink,
+  ListChecks,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,7 @@ import {
   inr,
   isDirty,
   isExcluded,
+  isInList,
   isPercentList,
   listSubtitle,
   priceSource,
@@ -44,6 +46,7 @@ interface Props {
   hasMore?: boolean;
   onLoadMore?: () => void;
   onListsChanged?: () => void;
+  onEditProducts?: () => void;
   selectedProductIds?: Set<string>;
   onSelectedProductIdsChange?: (ids: Set<string>) => void;
   compareMode?: boolean;
@@ -69,6 +72,7 @@ export function PriceGrid({
   hasMore,
   onLoadMore,
   onListsChanged,
+  onEditProducts,
   selectedProductIds,
   onSelectedProductIdsChange,
   compareMode,
@@ -92,7 +96,7 @@ export function PriceGrid({
   const [bulkRounding, setBulkRounding] = useState<'none' | '1' | '5' | '10'>('none');
   const [bulkScope, setBulkScope] = useState<'all' | 'selected'>('all');
   const [floorEdit, setFloorEdit] = useState<{ id: string; value: string } | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string; count: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Close overlays on Escape / scroll / resize so they never stick or clip.
@@ -105,7 +109,6 @@ export function PriceGrid({
       setFormulaCol(null);
       setRename(null);
       setFloorEdit(null);
-      setConfirmDeactivate(null);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeAll(); };
     window.addEventListener('keydown', onKey);
@@ -370,22 +373,18 @@ export function PriceGrid({
     }
   };
 
-  const deactivateList = async (id: string) => {
-    setConfirmDeactivate(null);
+  const deleteList = async (id: string) => {
+    setConfirmDelete(null);
     setColBusy(id);
     setColMenu(null);
     try {
-      const res = await fetch(`/api/v1/vendor/price-lists/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: false }),
-      });
+      const res = await fetch(`/api/v1/vendor/price-lists/${id}`, { method: 'DELETE' });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message || 'Failed');
-      toast.success('List deactivated');
+      if (!json.success) throw new Error(json.error?.message || 'Failed to delete list');
+      toast.success('List deleted');
       onListsChanged?.();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed');
+      toast.error(e instanceof Error ? e.message : 'Failed to delete list');
     } finally {
       setColBusy(null);
     }
@@ -638,16 +637,20 @@ export function PriceGrid({
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={3 + cols.length} className="p-12 text-center">
-                  <p className="text-[13px] font-bold text-[#AEAEAE]">No products to show</p>
-                  <p className="text-[12px] text-[#AEAEAE] mt-1">
+                  <p className="text-[13px] font-bold text-[#AEAEAE]">No products in this list</p>
+                  <p className="text-[12px] text-[#AEAEAE] mt-1 text-pretty">
                     {compareMode
-                      ? 'No products to compare. Switch off Compare and open a list, or create products on the Products page.'
-                      : 'Nothing here. Switch to “All products” above, or create the product first on the Products page.'}
+                      ? 'No products to compare. Switch off Compare and add products to a list.'
+                      : 'Tick the products that belong here.'}
                   </p>
-                  {!compareMode && (
-                    <a href="/vendor/products?action=add" target="_blank" rel="noreferrer" className="inline-block mt-3 h-10 px-4 leading-10 rounded-[12px] bg-primary text-white font-semibold text-[13px]">
-                      Create a new product
-                    </a>
+                  {!compareMode && onEditProducts && (
+                    <button
+                      type="button"
+                      onClick={onEditProducts}
+                      className="inline-flex items-center gap-2 mt-3 h-10 px-4 rounded-[12px] bg-primary text-white font-semibold text-[13px]"
+                    >
+                      <ListChecks size={15} /> Add products
+                    </button>
                   )}
                 </td>
               </tr>
@@ -698,6 +701,7 @@ export function PriceGrid({
                   </td>
                   {cols.map((col, ci) => {
                     const dirtyCell = isDirty(row, col, dirty);
+                    const member = isInList(row, col, dirty);
                     const excluded = isExcluded(row, col, dirty);
                     const locked = cellLocked(row, col, dirty);
                     const price = effective(row, col, dirty);
@@ -709,6 +713,19 @@ export function PriceGrid({
                     const deltaPct = row.basePrice > 0
                       ? Math.round((price / row.basePrice - 1) * 100)
                       : 0;
+
+                    if (compareMode && !member) {
+                      return (
+                        <td
+                          key={col.id}
+                          className="p-0 border-b border-l border-[#E9E3DD] text-right tabular-nums"
+                        >
+                          <div className="px-2 py-2 min-h-[36px] flex items-center justify-end text-[#AEAEAE]" title="Not in this list">
+                            —
+                          </div>
+                        </td>
+                      );
+                    }
 
                     return (
                       <td
@@ -962,25 +979,62 @@ export function PriceGrid({
             >
               Advanced editor →
             </Link>
-            {confirmDeactivate === colMenu.id ? (
-              <div className="px-3 py-2 bg-red-50">
-                <p className="text-[12px] text-red-800 font-medium">Hide this list from the workspace?</p>
-                <div className="flex gap-2 mt-2">
-                  <button type="button" className="h-8 px-3 rounded-lg bg-red-600 text-white font-semibold" onClick={() => void deactivateList(colMenu.id)}>Yes, deactivate</button>
-                  <button type="button" className="h-8 px-3 rounded-lg border bg-white font-semibold" onClick={() => setConfirmDeactivate(null)}>Keep</button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="w-full px-3 py-2 text-left hover:bg-red-50 text-red-700 flex items-center gap-2"
-                onClick={() => setConfirmDeactivate(colMenu.id)}
-              >
-                <PowerOff size={14} /> Deactivate
-              </button>
-            )}
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-red-50 text-red-700 flex items-center gap-2"
+              onClick={() => {
+                const col = cols.find((c) => c.id === colMenu.id);
+                if (!col) return;
+                setColMenu(null);
+                setConfirmDelete({
+                  id: col.id,
+                  name: col.name,
+                  count: col.counts?.priced ?? 0,
+                });
+              }}
+            >
+              <Trash2 size={14} /> Delete list
+            </button>
           </div>
         </>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDelete(null)} aria-hidden />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-list-title"
+            aria-describedby="delete-list-desc"
+            className="relative bg-white rounded-[16px] shadow-xl w-full max-w-md p-6 space-y-4"
+          >
+            <h2 id="delete-list-title" className="text-[17px] font-bold text-[#181725]">
+              Delete {confirmDelete.name}?
+            </h2>
+            <p id="delete-list-desc" className="text-[13px] text-[#667085] text-pretty">
+              This permanently removes the list, its{' '}
+              <span className="tabular-nums font-semibold text-[#181725]">{confirmDelete.count}</span>
+              {' '}price{confirmDelete.count === 1 ? '' : 's'}, and customer assignments. This cannot be undone.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 h-11 rounded-[12px] border border-[#E9E3DD] font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteList(confirmDelete.id)}
+                className="flex-1 h-11 min-h-[48px] rounded-[12px] bg-red-600 text-white font-semibold"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {rename && (

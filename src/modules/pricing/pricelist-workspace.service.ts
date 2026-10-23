@@ -576,6 +576,16 @@ export async function rollbackPublish(args: {
     after: CellState | null;
   }>;
 
+  // Skip cells whose list was hard-deleted — otherwise FK upserts fail.
+  const listIdsInChanges = [...new Set(changes.map((c) => c.priceListId))];
+  const existingLists = listIdsInChanges.length
+    ? await prisma.priceList.findMany({
+        where: { id: { in: listIdsInChanges }, vendorId: args.vendorId },
+        select: { id: true },
+      })
+    : [];
+  const existingListIds = new Set(existingLists.map((l) => l.id));
+
   const historyEntries: PriceHistoryEntry[] = [];
   let restored = 0;
 
@@ -583,6 +593,8 @@ export async function rollbackPublish(args: {
     const rollbackChanges: typeof changes = [];
 
     for (const ch of changes) {
+      if (!existingListIds.has(ch.priceListId)) continue;
+
       const current = await tx.priceListItem.findUnique({
         where: { priceListId_productId: { priceListId: ch.priceListId, productId: ch.productId } },
       });
@@ -685,6 +697,195 @@ export async function rollbackPublish(args: {
   });
 
   return { publishId: newId, restored };
+}
+
+const VISIBLE_PRODUCT_FILTER = {
+  isActive: true as const,
+  approvalStatus: 'approved' as const,
+  listingStatus: 'submitted' as const,
+  slug: { not: { startsWith: '_deleted_' } },
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Sync list membership to exactly `productIds`.
+ * - Removes items not in the set
+ * - Creates items for newly added products at Base × (1 − discountPercent/100)
+ * - Leaves existing items' prices untouched
+ * - Forces list.discountPercent = 0 (converts legacy "all products −%" lists)
+ */
+export async function syncListProducts(args: {
+  vendorId: string;
+  actorId: string;
+  listId: string;
+  productIds: string[];
+  discountPercent: number;
+}): Promise<{ added: number; removed: number; kept: number }> {
+  const list = await prisma.priceList.findFirst({
+    where: { id: args.listId, vendorId: args.vendorId },
+    select: { id: true },
+  });
+  if (!list) throw Errors.notFound('Price list');
+
+  const uniqueIds = [...new Set(args.productIds)];
+  const discount = Math.min(90, Math.max(0, args.discountPercent));
+
+  const [visibleProducts, existingItems] = await Promise.all([
+    uniqueIds.length
+      ? prisma.product.findMany({
+          where: { id: { in: uniqueIds }, vendorId: args.vendorId, ...VISIBLE_PRODUCT_FILTER },
+          select: { id: true, basePrice: true },
+        })
+      : Promise.resolve([] as Array<{ id: string; basePrice: Prisma.Decimal }>),
+    prisma.priceListItem.findMany({
+      where: { priceListId: args.listId },
+      select: { productId: true, customPrice: true, discountPercent: true },
+    }),
+  ]);
+
+  const visibleIdSet = new Set(visibleProducts.map((p) => p.id));
+  const keepIds = uniqueIds.filter((id) => visibleIdSet.has(id));
+  const keepSet = new Set(keepIds);
+  const existingByProduct = new Map(existingItems.map((e) => [e.productId, e]));
+
+  const toRemove = existingItems.filter((e) => !keepSet.has(e.productId));
+  const toAdd = visibleProducts.filter((p) => !existingByProduct.has(p.id));
+  const kept = keepIds.filter((id) => existingByProduct.has(id)).length;
+
+  const historyEntries: PriceHistoryEntry[] = [];
+
+  await prisma.$transaction(async (tx) => {
+    await tx.priceList.update({
+      where: { id: args.listId },
+      data: { discountPercent: 0 },
+    });
+
+    if (toRemove.length > 0) {
+      for (const r of toRemove) {
+        if (r.customPrice != null) {
+          historyEntries.push({
+            vendorId: args.vendorId,
+            productId: r.productId,
+            priceListId: args.listId,
+            field: 'customPrice',
+            oldValue: Number(r.customPrice),
+            newValue: null,
+            source: 'pricelist',
+            changedBy: args.actorId,
+          });
+        }
+        if (r.discountPercent != null) {
+          historyEntries.push({
+            vendorId: args.vendorId,
+            productId: r.productId,
+            priceListId: args.listId,
+            field: 'discountPercent',
+            oldValue: Number(r.discountPercent),
+            newValue: null,
+            source: 'pricelist',
+            changedBy: args.actorId,
+          });
+        }
+      }
+      await tx.priceListItem.deleteMany({
+        where: {
+          priceListId: args.listId,
+          productId: { in: toRemove.map((r) => r.productId) },
+        },
+      });
+    }
+
+    if (toAdd.length > 0) {
+      const createData = toAdd.map((p) => {
+        const customPrice = Math.max(
+          0.01,
+          round2(Number(p.basePrice) * (1 - discount / 100)),
+        );
+        historyEntries.push({
+          vendorId: args.vendorId,
+          productId: p.id,
+          priceListId: args.listId,
+          field: 'customPrice',
+          oldValue: null,
+          newValue: customPrice,
+          source: 'pricelist',
+          changedBy: args.actorId,
+        });
+        return {
+          priceListId: args.listId,
+          productId: p.id,
+          customPrice,
+          pricingType: 'fixed' as const,
+          discountPercent: null,
+        };
+      });
+      await tx.priceListItem.createMany({ data: createData });
+    }
+
+    if (historyEntries.length > 0) {
+      await logPriceHistory(historyEntries, tx);
+    }
+  });
+
+  return { added: toAdd.length, removed: toRemove.length, kept };
+}
+
+export async function listCatalogueForPicker(args: {
+  vendorId: string;
+  listId: string;
+}): Promise<
+  Array<{
+    id: string;
+    name: string;
+    sku: string | null;
+    packSize: string | null;
+    unit: string | null;
+    basePrice: number;
+    imageUrl: string | null;
+    inList: boolean;
+    customPrice: number | null;
+  }>
+> {
+  const list = await prisma.priceList.findFirst({
+    where: { id: args.listId, vendorId: args.vendorId },
+    select: { id: true },
+  });
+  if (!list) throw Errors.notFound('Price list');
+
+  const products = await prisma.product.findMany({
+    where: { vendorId: args.vendorId, ...VISIBLE_PRODUCT_FILTER },
+    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      packSize: true,
+      unit: true,
+      basePrice: true,
+      imageUrl: true,
+      priceListItems: {
+        where: { priceListId: args.listId },
+        select: { customPrice: true, isExcluded: true },
+        take: 1,
+      },
+    },
+  });
+
+  return products.map((p) => {
+    const item = p.priceListItems[0];
+    return {
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      packSize: p.packSize,
+      unit: p.unit,
+      basePrice: Number(p.basePrice),
+      imageUrl: p.imageUrl,
+      inList: !!item,
+      customPrice: item?.customPrice != null && !item.isExcluded ? Number(item.customPrice) : null,
+    };
+  });
 }
 
 export async function clonePriceList(args: {
