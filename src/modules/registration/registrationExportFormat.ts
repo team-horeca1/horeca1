@@ -50,6 +50,25 @@ export interface RegistrationExportRow {
   /** Null when the column does not apply (customers). */
   liveProductCount: number | null;
   referralCode: string | null;
+  /** Owner user id — admin customer detail uses /admin/customers/[userId]. */
+  userId?: string | null;
+  /** Primary vendor id — admin supplier detail uses /admin/vendors/[vendorId]. */
+  vendorId?: string | null;
+  /** Brand id — admin brand detail uses /admin/brands/[brandId]. */
+  brandId?: string | null;
+}
+
+/** Super Admin deep-link for an attributed registration. */
+export function affiliateDetailHref(row: {
+  accountType: AffiliateAccountType;
+  userId?: string | null;
+  vendorId?: string | null;
+  brandId?: string | null;
+}): string | null {
+  if (row.accountType === 'customer' && row.userId) return `/admin/customers/${row.userId}`;
+  if (row.accountType === 'vendor' && row.vendorId) return `/admin/vendors/${row.vendorId}`;
+  if (row.accountType === 'brand' && row.brandId) return `/admin/brands/${row.brandId}`;
+  return null;
 }
 
 export function registrationExportPermission(kind: RegistrationExportKind): 'customers.view' | 'vendors.view' | 'brands.view' {

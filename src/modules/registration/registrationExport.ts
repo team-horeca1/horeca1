@@ -195,9 +195,12 @@ export async function loadAffiliateRegistrations(filters: AffiliateListFilters):
       members: {
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         take: 1,
-        select: { user: { select: { email: true, phone: true } } },
+        select: { user: { select: { id: true, email: true, phone: true } } },
       },
-      vendors: { select: { id: true, gstNumber: true, fssaiNumber: true } },
+      vendors: {
+        orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
+        select: { id: true, gstNumber: true, fssaiNumber: true },
+      },
       brand: { select: { id: true } },
     },
   });
@@ -230,6 +233,7 @@ export async function loadAffiliateRegistrations(filters: AffiliateListFilters):
     const accountType = accountTypeOf(account);
     if (!filters.kinds.includes(accountType)) return [];
     const member = account.members[0]?.user;
+    const primaryVendor = account.vendors[0] ?? null;
     const vendorGst = account.vendors.find((vendor) => vendor.gstNumber)?.gstNumber ?? null;
     const vendorFssai = account.vendors.find((vendor) => vendor.fssaiNumber)?.fssaiNumber ?? null;
     let liveProductCount: number | null = null;
@@ -249,6 +253,9 @@ export async function loadAffiliateRegistrations(filters: AffiliateListFilters):
       liveProductCount,
       referralCode: account.referralCode,
       accountType,
+      userId: member?.id ?? null,
+      vendorId: primaryVendor?.id ?? null,
+      brandId: account.brand?.id ?? null,
     }];
   });
 }

@@ -1,10 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
-import { AdminRegistryPageHeader } from '@/components/features/admin/entity';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Download, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  AdminRegistryPageHeader,
+  AdminRegistryTableBody,
+  AdminRegistryTableHead,
+  AdminRegistryTableShell,
+  AdminStatusBadge,
+} from '@/components/features/admin/entity';
+import {
+  affiliateAccountTypeLabel,
+  affiliateDetailHref,
+  type AffiliateAccountType,
+} from '@/modules/registration/registrationExportFormat';
 
 interface AffiliatePerson {
   accountId: string;
@@ -12,21 +23,25 @@ interface AffiliatePerson {
   mobile: string | null;
   email: string | null;
   createdAt: string;
-  accountType: 'customer' | 'vendor' | 'brand';
+  accountType: AffiliateAccountType;
   gstin: string | null;
   fssai: string | null;
   liveProductCount: number | null;
   referralCode: string | null;
+  userId?: string | null;
+  vendorId?: string | null;
+  brandId?: string | null;
 }
 
-const TYPE_LABEL: Record<AffiliatePerson['accountType'], string> = {
-  customer: 'Customer',
-  vendor: 'Supplier',
-  brand: 'Brand',
+const TYPE_BADGE: Record<AffiliateAccountType, 'active' | 'pending' | 'verified'> = {
+  customer: 'active',
+  vendor: 'pending',
+  brand: 'verified',
 };
 
 export default function AdminAffiliateCodePage() {
   const params = useParams<{ code: string }>();
+  const router = useRouter();
   const code = decodeURIComponent(params.code ?? '');
   const [kind, setKind] = useState('');
   const [from, setFrom] = useState('');
@@ -61,6 +76,12 @@ export default function AdminAffiliateCodePage() {
     return () => { cancelled = true; };
   }, [code, kind, from, to, q]);
 
+  const counts = useMemo(() => ({
+    customers: rows.filter((r) => r.accountType === 'customer').length,
+    suppliers: rows.filter((r) => r.accountType === 'vendor').length,
+    brands: rows.filter((r) => r.accountType === 'brand').length,
+  }), [rows]);
+
   function exportHref(format: 'csv' | 'xlsx') {
     const query = new URLSearchParams({ code, format });
     if (kind) query.set('kind', kind);
@@ -68,6 +89,11 @@ export default function AdminAffiliateCodePage() {
     if (to) query.set('to', to);
     if (q.trim()) query.set('q', q.trim());
     return `/api/v1/admin/affiliates/export?${query.toString()}`;
+  }
+
+  function openDetail(row: AffiliatePerson) {
+    const href = affiliateDetailHref(row);
+    if (href) router.push(href);
   }
 
   return (
@@ -97,6 +123,21 @@ export default function AdminAffiliateCodePage() {
           </>
         }
       />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total', value: rows.length },
+          { label: 'Customers', value: counts.customers },
+          { label: 'Suppliers', value: counts.suppliers },
+          { label: 'Brands', value: counts.brands },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-[16px] border border-[#E9E3DD] bg-white px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085]">{stat.label}</p>
+            <p className="mt-1 text-[22px] font-bold tabular-nums text-[#1C1C1C]">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-3">
         <input
           value={q}
@@ -117,37 +158,74 @@ export default function AdminAffiliateCodePage() {
       {loading ? (
         <div className="flex items-center gap-2 text-[13px] text-[#667085]"><Loader2 className="animate-spin" size={16} /> Loading registrations...</div>
       ) : (
-        <div className="bg-white rounded-[16px] border border-[#E9E3DD] overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
-            <thead className="bg-[#FAF7F2] text-[#667085]">
+        <AdminRegistryTableShell minWidth="960px">
+          <AdminRegistryTableHead>
+            <th className="px-4 py-3 whitespace-nowrap">Business</th>
+            <th className="px-4 py-3 whitespace-nowrap">Type</th>
+            <th className="px-4 py-3 whitespace-nowrap">Mobile</th>
+            <th className="px-4 py-3 whitespace-nowrap">Email</th>
+            <th className="px-4 py-3 whitespace-nowrap">Registered</th>
+            <th className="px-4 py-3 whitespace-nowrap">GSTIN</th>
+            <th className="px-4 py-3 whitespace-nowrap">FSSAI</th>
+            <th className="px-4 py-3 whitespace-nowrap">Live products</th>
+            <th className="px-4 py-3 whitespace-nowrap text-right">Open</th>
+          </AdminRegistryTableHead>
+          <AdminRegistryTableBody>
+            {rows.length === 0 ? (
               <tr>
-                {['Business', 'Mobile', 'Email', 'Registered', 'Type', 'GSTIN', 'FSSAI', 'Live products', 'Code'].map((label) => (
-                  <th key={label} className="px-3 py-3 font-semibold whitespace-nowrap">{label}</th>
-                ))}
+                <td colSpan={9} className="px-4 py-10 text-center text-[#667085]">No registrations for this code.</td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-[#667085]">No registrations for this code.</td></tr>
-              ) : rows.map((row) => (
-                <tr key={row.accountId} className="border-t border-[#E9E3DD]">
-                  <td className="px-3 py-3">
-                    <div className="font-semibold text-[#111827]">{row.businessName}</div>
-                    <div className="text-[11px] text-[#667085]">{row.accountId}</div>
+            ) : rows.map((row) => {
+              const href = affiliateDetailHref(row);
+              return (
+                <tr
+                  key={row.accountId}
+                  className={href ? 'hover:bg-[#FAF7F2] cursor-pointer transition-colors' : undefined}
+                  onClick={() => openDetail(row)}
+                  onKeyDown={(event) => {
+                    if ((event.key === 'Enter' || event.key === ' ') && href) {
+                      event.preventDefault();
+                      openDetail(row);
+                    }
+                  }}
+                  tabIndex={href ? 0 : undefined}
+                  role={href ? 'link' : undefined}
+                >
+                  <td className="px-4 py-3.5">
+                    <div className="font-semibold text-[#1C1C1C]">{row.businessName}</div>
+                    <div className="text-[11px] text-[#667085] font-mono">{row.accountId.slice(0, 8)}…</div>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">{row.mobile || '—'}</td>
-                  <td className="px-3 py-3">{row.email || '—'}</td>
-                  <td className="px-3 py-3 whitespace-nowrap tabular-nums">{new Date(row.createdAt).toLocaleString()}</td>
-                  <td className="px-3 py-3">{TYPE_LABEL[row.accountType]}</td>
-                  <td className="px-3 py-3">{row.gstin || '—'}</td>
-                  <td className="px-3 py-3">{row.fssai || '—'}</td>
-                  <td className="px-3 py-3 tabular-nums">{row.accountType === 'customer' ? '—' : row.liveProductCount ?? 0}</td>
-                  <td className="px-3 py-3">{row.referralCode}</td>
+                  <td className="px-4 py-3.5">
+                    <AdminStatusBadge variant={TYPE_BADGE[row.accountType]} label={affiliateAccountTypeLabel(row.accountType)} />
+                  </td>
+                  <td className="px-4 py-3.5 whitespace-nowrap tabular-nums">{row.mobile || '—'}</td>
+                  <td className="px-4 py-3.5 max-w-[200px] truncate">{row.email || '—'}</td>
+                  <td className="px-4 py-3.5 whitespace-nowrap tabular-nums text-[#667085]">
+                    {new Date(row.createdAt).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3.5 font-mono text-[12px]">{row.gstin || '—'}</td>
+                  <td className="px-4 py-3.5 font-mono text-[12px]">{row.fssai || '—'}</td>
+                  <td className="px-4 py-3.5 tabular-nums">
+                    {row.accountType === 'customer' ? '—' : row.liveProductCount ?? 0}
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    {href ? (
+                      <Link
+                        href={href}
+                        onClick={(event) => event.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#6B1D2E] hover:underline"
+                      >
+                        Detail <ExternalLink size={12} />
+                      </Link>
+                    ) : (
+                      <span className="text-[12px] text-[#667085]">—</span>
+                    )}
+                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </AdminRegistryTableBody>
+        </AdminRegistryTableShell>
       )}
     </div>
   );

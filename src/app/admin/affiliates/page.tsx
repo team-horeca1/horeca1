@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Share2, Users } from 'lucide-react';
+import { ChevronRight, Share2, Users } from 'lucide-react';
 import {
+  AdminRegistryEmptyState,
   AdminRegistryFilterBar,
   AdminRegistryLoadingState,
   AdminRegistryPageHeader,
   AdminRegistryStatsGrid,
+  AdminRegistryTableBody,
+  AdminRegistryTableHead,
+  AdminRegistryTableShell,
 } from '@/components/features/admin/entity';
 
 interface AffiliateCodeRow {
@@ -71,36 +75,53 @@ export default function AdminAffiliatesPage() {
         onSearchChange={setSearch}
         searchPlaceholder="Search referral code..."
       />
-      <div className="bg-white rounded-[16px] border border-[#E9E3DD] overflow-x-auto">
-        <table className="w-full text-left text-[13px]">
-          <thead className="bg-[#FAF7F2] text-[#667085]">
-            <tr>
-              <th className="px-4 py-3 font-semibold">Referral code</th>
-              <th className="px-4 py-3 font-semibold tabular-nums">Customers</th>
-              <th className="px-4 py-3 font-semibold tabular-nums">Suppliers</th>
-              <th className="px-4 py-3 font-semibold tabular-nums">Brands</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-[#667085]">No referral codes yet.</td>
-              </tr>
-            ) : visible.map((row) => (
-              <tr key={row.code} className="border-t border-[#E9E3DD]">
-                <td className="px-4 py-3">
-                  <Link href={`/admin/affiliates/${encodeURIComponent(row.code)}`} className="font-semibold text-[#6B1D2E] hover:underline">
-                    {row.code}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 tabular-nums">{row.customers}</td>
-                <td className="px-4 py-3 tabular-nums">{row.suppliers}</td>
-                <td className="px-4 py-3 tabular-nums">{row.brands}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {visible.length === 0 ? (
+        <AdminRegistryEmptyState
+          icon={Share2}
+          title="No referral codes yet"
+          subtitle="Codes appear here after someone registers through an affiliate link."
+        />
+      ) : (
+        <AdminRegistryTableShell minWidth="720px">
+          <AdminRegistryTableHead>
+            <th className="px-4 py-3">Referral code</th>
+            <th className="px-4 py-3 tabular-nums text-right">Customers</th>
+            <th className="px-4 py-3 tabular-nums text-right">Suppliers</th>
+            <th className="px-4 py-3 tabular-nums text-right">Brands</th>
+            <th className="px-4 py-3 tabular-nums text-right">Total</th>
+            <th className="px-4 py-3" />
+          </AdminRegistryTableHead>
+          <AdminRegistryTableBody>
+            {visible.map((row) => {
+              const totalForCode = row.customers + row.suppliers + row.brands;
+              return (
+                <tr key={row.code} className="hover:bg-[#FAF7F2] transition-colors">
+                  <td className="px-4 py-3.5">
+                    <Link
+                      href={`/admin/affiliates/${encodeURIComponent(row.code)}`}
+                      className="inline-flex items-center gap-2 font-bold text-[#6B1D2E] hover:underline"
+                    >
+                      <span className="font-mono tracking-wide">{row.code}</span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3.5 tabular-nums text-right font-semibold text-[#1C1C1C]">{row.customers}</td>
+                  <td className="px-4 py-3.5 tabular-nums text-right font-semibold text-[#1C1C1C]">{row.suppliers}</td>
+                  <td className="px-4 py-3.5 tabular-nums text-right font-semibold text-[#1C1C1C]">{row.brands}</td>
+                  <td className="px-4 py-3.5 tabular-nums text-right font-bold text-[#6B1D2E]">{totalForCode}</td>
+                  <td className="px-4 py-3.5 text-right">
+                    <Link
+                      href={`/admin/affiliates/${encodeURIComponent(row.code)}`}
+                      className="inline-flex items-center gap-1 text-[12px] font-bold text-[#667085] hover:text-[#6B1D2E]"
+                    >
+                      View <ChevronRight size={14} />
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </AdminRegistryTableBody>
+        </AdminRegistryTableShell>
+      )}
     </div>
   );
 }

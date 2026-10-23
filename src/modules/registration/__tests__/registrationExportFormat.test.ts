@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  affiliateDetailHref,
   registrationExportCsv,
   registrationExportHeaders,
   registrationExportPermission,
@@ -84,5 +85,13 @@ describe('registration export', () => {
     expect(registrationExportPermission('customer')).toBe('customers.view');
     expect(registrationExportPermission('vendor')).toBe('vendors.view');
     expect(registrationExportPermission('brand')).toBe('brands.view');
+  });
+
+  it('builds admin detail deep-links per account type', () => {
+    expect(affiliateDetailHref({ accountType: 'customer', userId: 'user-1' })).toBe('/admin/customers/user-1');
+    expect(affiliateDetailHref({ accountType: 'vendor', vendorId: 'vendor-1' })).toBe('/admin/vendors/vendor-1');
+    expect(affiliateDetailHref({ accountType: 'brand', brandId: 'brand-1' })).toBe('/admin/brands/brand-1');
+    expect(affiliateDetailHref({ accountType: 'customer' })).toBeNull();
+    expect(affiliateDetailHref({ accountType: 'vendor', userId: 'user-1' })).toBeNull();
   });
 });
