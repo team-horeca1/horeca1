@@ -186,12 +186,12 @@ export function isMember(row: ProductRow, col: PriceListCol, dirty: Record<strin
   return hasCustomOverride(row, col, dirty) || isExcluded(row, col, dirty);
 }
 
-/** Tooltip for the unified Reset control. */
+/** Tooltip for the cell remove / reset control. */
 export function resetTooltip(col: PriceListCol): string {
   if (isPercentList(col)) {
     return `Clear the custom price and use the list −${Number(col.discountPercent)}% again`;
   }
-  return 'Remove this product’s custom price — it goes back to Base (or the next list the customer is on)';
+  return 'Remove this product from the list — customers on this list will pay Base';
 }
 
 export function isExcluded(

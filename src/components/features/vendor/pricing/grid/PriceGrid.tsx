@@ -14,6 +14,7 @@ import {
   Eye,
   Percent,
   RotateCcw,
+  X,
   ExternalLink,
   ListChecks,
 } from 'lucide-react';
@@ -497,17 +498,25 @@ export function PriceGrid({
           >
             <Percent size={13} /> Base +5%
           </button>
-          {selectionHasCustom && (
+          {(selectionHasCustom || !isPercentList(cols[active.c])) && (
             <button
               type="button"
-              className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
+              className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5 text-red-700"
               title={resetTooltip(cols[active.c])}
               onClick={() => applyToSelection((r, c) => {
                 if (cellLocked(r, c, dirty)) return;
-                if (hasCustomOverride(r, c, dirty)) resetCell(r, c);
+                if (isPercentList(c)) {
+                  if (hasCustomOverride(r, c, dirty)) resetCell(r, c);
+                } else {
+                  resetCell(r, c);
+                }
               })}
             >
-              <RotateCcw size={13} /> Reset
+              {isPercentList(cols[active.c]) ? (
+                <><RotateCcw size={13} /> Reset</>
+              ) : (
+                <><X size={14} strokeWidth={2.5} /> Remove</>
+              )}
             </button>
           )}
           <button
@@ -792,12 +801,21 @@ export function PriceGrid({
                             {isActiveCell && !locked && (
                               <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} title="Edit price" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
                             )}
-                            {!locked && customOverride && (
+                            {!locked && (isPercentList(col) ? customOverride : true) && (
                               <button
                                 type="button"
-                                aria-label={`Reset ${row.name} in ${col.name}`}
+                                aria-label={
+                                  isPercentList(col)
+                                    ? `Reset ${row.name} in ${col.name}`
+                                    : `Remove ${row.name} from ${col.name}`
+                                }
                                 title={resetTooltip(col)}
-                                className="w-5 h-5 rounded-full border border-[#E9E3DD] bg-white text-[#6B1D2E] text-[11px] font-bold leading-none flex items-center justify-center shrink-0 hover:bg-[#F8E8EC]"
+                                className={cn(
+                                  'w-5 h-5 rounded-full border bg-white text-[11px] font-bold leading-none flex items-center justify-center shrink-0',
+                                  isPercentList(col)
+                                    ? 'border-[#E9E3DD] text-[#6B1D2E] hover:bg-[#F8E8EC]'
+                                    : 'border-red-200 text-red-600 hover:bg-red-50',
+                                )}
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -805,11 +823,11 @@ export function PriceGrid({
                                   toast.success(
                                     isPercentList(col)
                                       ? `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`
-                                      : `${row.name} reset to Base (draft) — Review & publish to apply`,
+                                      : `${row.name} removed from list (draft) — Review & publish to apply`,
                                   );
                                 }}
                               >
-                                <RotateCcw size={11} />
+                                {isPercentList(col) ? <RotateCcw size={11} /> : <X size={12} strokeWidth={2.5} />}
                               </button>
                             )}
                           </div>
@@ -875,10 +893,13 @@ export function PriceGrid({
               <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); setActive({ r: rowMenu.r, c: 0 }); startEdit(rowMenu.r, 0); }}>
                 <Pencil size={14} /> Edit price
               </button>
-              {custom && (
+              {(isPercentList(col) ? custom : true) && (
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40"
+                  className={cn(
+                    'w-full px-3 py-2 text-left flex items-center gap-2 disabled:opacity-40',
+                    isPercentList(col) ? 'hover:bg-[#FAF7F2]' : 'hover:bg-red-50 text-red-700',
+                  )}
                   disabled={locked}
                   onClick={() => {
                     setRowMenu(null);
@@ -886,11 +907,15 @@ export function PriceGrid({
                     toast.success(
                       isPercentList(col)
                         ? `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`
-                        : `${row.name} reset to Base (draft) — Review & publish to apply`,
+                        : `${row.name} removed from list (draft) — Review & publish to apply`,
                     );
                   }}
                 >
-                  <RotateCcw size={14} /> Reset
+                  {isPercentList(col) ? (
+                    <><RotateCcw size={14} /> Reset</>
+                  ) : (
+                    <><X size={14} strokeWidth={2.5} /> Remove from list</>
+                  )}
                 </button>
               )}
               <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); mergeCellFields(row.id, col.id, { isExcluded: !excluded }); }}>
