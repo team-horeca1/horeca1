@@ -58,26 +58,40 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       getLatestPublishId(vendorId),
     ]);
 
-    // Per-list cell counts (priced / excluded / locked / scheduled)
+    // Per-list cell counts — only products the grid can show (same filter as rows).
+    const visibleProductFilter = {
+      vendorId,
+      isActive: true as const,
+      approvalStatus: 'approved' as const,
+      listingStatus: 'submitted' as const,
+      ...NOT_TOMBSTONED,
+    };
     const listIds = priceLists.map((l) => l.id);
-    const itemAgg = listIds.length
-      ? await prisma.priceListItem.groupBy({
-          by: ['priceListId', 'isExcluded', 'isLocked'],
-          where: { priceListId: { in: listIds } },
-          _count: { _all: true },
-        })
-      : [];
-    const scheduledCounts = listIds.length
-      ? await prisma.priceListItem.groupBy({
-          by: ['priceListId'],
-          where: {
-            priceListId: { in: listIds },
-            scheduledPrice: { not: null },
-            scheduledFrom: { not: null },
-          },
-          _count: { _all: true },
-        })
-      : [];
+    const [itemAgg, scheduledCounts, catalogueTotal] = await Promise.all([
+      listIds.length
+        ? prisma.priceListItem.groupBy({
+            by: ['priceListId', 'isExcluded', 'isLocked'],
+            where: {
+              priceListId: { in: listIds },
+              product: visibleProductFilter,
+            },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+      listIds.length
+        ? prisma.priceListItem.groupBy({
+            by: ['priceListId'],
+            where: {
+              priceListId: { in: listIds },
+              scheduledPrice: { not: null },
+              scheduledFrom: { not: null },
+              product: visibleProductFilter,
+            },
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
+      prisma.product.count({ where: visibleProductFilter }),
+    ]);
 
     const countsByList = new Map<string, { priced: number; excluded: number; locked: number; scheduled: number }>();
     for (const id of listIds) {
@@ -95,11 +109,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     }
 
     const where: Prisma.ProductWhereInput = {
-      vendorId,
-      isActive: true,
-      approvalStatus: 'approved',
-      listingStatus: 'submitted',
-      ...NOT_TOMBSTONED,
+      ...visibleProductFilter,
       ...(categoryId ? { categoryId } : {}),
       ...(brandId
         ? { brandMappings: { some: { brandId, status: { in: ['verified', 'auto_mapped'] } } } }
@@ -242,6 +252,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           assignmentCount: l._count.assignments,
         })),
         products: rows,
+        catalogueTotal,
         pagination: { nextCursor: hasMore ? rows[rows.length - 1]?.id : null, hasMore },
       },
     });

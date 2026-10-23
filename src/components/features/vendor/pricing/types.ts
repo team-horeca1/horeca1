@@ -58,7 +58,7 @@ export interface ProductRow {
 export type DraftCell = (Partial<PriceListItemData> & { added?: boolean }) | null;
 
 export function isMember(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
-  if ((col.kind ?? (col.discountPercent > 0 ? 'percent' : 'selected')) === 'percent') return true;
+  if (isPercentList(col)) return true;
   const key = cellKey(row.id, col.id);
   if (key in dirty) {
     const d = dirty[key];
@@ -96,6 +96,14 @@ export function cellKey(productId: string, listId: string) {
   return `${productId}:${listId}`;
 }
 
+export function listKind(col: PriceListCol): 'selected' | 'percent' {
+  return col.kind ?? (col.discountPercent > 0 ? 'percent' : 'selected');
+}
+
+export function isPercentList(col: PriceListCol): boolean {
+  return listKind(col) === 'percent';
+}
+
 export function effective(
   row: ProductRow,
   col: PriceListCol,
@@ -106,11 +114,32 @@ export function effective(
     const d = dirty[key];
     if (d === null) return fallbackPrice(row, col);
     if (d.isExcluded) return fallbackPrice(row, col);
-    if (d.price !== undefined && d.price !== null) return d.price;
+    // Explicit null = clear override → list % / base (do not fall through to stored cell).
+    if (d.price === null) return fallbackPrice(row, col);
+    if (d.price !== undefined) return d.price;
   }
   const cell = row.cells[col.id];
   if (cell?.isExcluded) return fallbackPrice(row, col);
   return cell?.price != null ? cell.price : fallbackPrice(row, col);
+}
+
+/** True when the cell has a frozen custom price (not the list −% / base fallback). */
+export function hasCustomOverride(
+  row: ProductRow,
+  col: PriceListCol,
+  dirty: Record<string, DraftCell>,
+): boolean {
+  const key = cellKey(row.id, col.id);
+  if (key in dirty) {
+    const d = dirty[key];
+    if (d === null) return false;
+    if (d.isExcluded) return false;
+    if (d.price === null) return false;
+    if (d.price !== undefined) return true;
+  }
+  const cell = row.cells[col.id];
+  if (!cell || cell.isExcluded) return false;
+  return cell.price != null;
 }
 
 export function isExcluded(

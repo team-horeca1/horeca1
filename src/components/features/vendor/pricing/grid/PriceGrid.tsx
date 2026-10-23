@@ -25,10 +25,12 @@ import type { DraftCell, PriceListCol, ProductRow } from '../types';
 import {
   cellKey,
   effective,
+  hasCustomOverride,
   inr,
   isDirty,
   isExcluded,
   isMember,
+  isPercentList,
 } from '../types';
 
 interface Props {
@@ -175,7 +177,9 @@ export function PriceGrid({
     }
     const trimmed = editVal.trim();
     if (trimmed === '') {
-      setCellFields(row.id, col.id, null);
+      // Percent list: empty = back to list −%; selected list: empty = remove from list.
+      if (isPercentList(col)) mergeCellFields(row.id, col.id, { price: null, isExcluded: false });
+      else setCellFields(row.id, col.id, null);
     } else {
       const num = parseFloat(trimmed);
       if (!Number.isNaN(num) && num >= 0) {
@@ -406,7 +410,9 @@ export function PriceGrid({
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        if (!cellLocked(row, col, dirty)) setCellFields(row.id, col.id, null);
+        if (cellLocked(row, col, dirty)) return;
+        if (isPercentList(col)) mergeCellFields(row.id, col.id, { price: null, isExcluded: false });
+        else setCellFields(row.id, col.id, null);
         return;
       }
       if (e.key === 'x' && !e.ctrlKey && !e.metaKey) {
@@ -462,20 +468,43 @@ export function PriceGrid({
               <Pencil size={13} /> Edit price
             </button>
           )}
-          <button type="button" className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1" onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) { const p = effective(r, c, dirty); mergeCellFields(r.id, c.id, { price: Math.round(p * 0.95 * 100) / 100, isExcluded: false }); } })}>
+          <button
+            type="button"
+            className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1"
+            title={isPercentList(cols[active.c]) ? 'Set a custom price at Base −5% (does not compound the list discount)' : 'Reduce the current price by 5%'}
+            onClick={() => applyToSelection((r, c) => {
+              if (cellLocked(r, c, dirty)) return;
+              // Percent lists: adjust from Base so −5% does not compound list −% into ~−10%.
+              const base = isPercentList(c) ? r.basePrice : effective(r, c, dirty);
+              mergeCellFields(r.id, c.id, { price: Math.round(base * 0.95 * 100) / 100, isExcluded: false });
+            })}
+          >
             <Percent size={13} /> −5%
           </button>
-          <button type="button" className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1" onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) { const p = effective(r, c, dirty); mergeCellFields(r.id, c.id, { price: Math.round(p * 1.05 * 100) / 100, isExcluded: false }); } })}>
+          <button
+            type="button"
+            className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1"
+            title={isPercentList(cols[active.c]) ? 'Set a custom price at Base +5%' : 'Increase the current price by 5%'}
+            onClick={() => applyToSelection((r, c) => {
+              if (cellLocked(r, c, dirty)) return;
+              const base = isPercentList(c) ? r.basePrice : effective(r, c, dirty);
+              mergeCellFields(r.id, c.id, { price: Math.round(base * 1.05 * 100) / 100, isExcluded: false });
+            })}
+          >
             <Percent size={13} /> +5%
           </button>
-          {cols[active.c].discountPercent > 0 ? (
+          {isPercentList(cols[active.c]) ? (
             <button
               type="button"
               className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5"
-              title="Set the price to exactly the Base price (ignores the list default discount)"
-              onClick={() => applyToSelection((r, c) => { if (!cellLocked(r, c, dirty)) mergeCellFields(r.id, c.id, { price: r.basePrice, isExcluded: false }); })}
+              title={`Clear the custom price and use the list −${Number(cols[active.c].discountPercent)}% again`}
+              onClick={() => applyToSelection((r, c) => {
+                if (cellLocked(r, c, dirty)) return;
+                // Explicit null → publish deletes the override; effective falls back to list %.
+                mergeCellFields(r.id, c.id, { price: null, isExcluded: false });
+              })}
             >
-              <RotateCcw size={13} /> Use Base price
+              <RotateCcw size={13} /> Back to list −{Number(cols[active.c].discountPercent)}%
             </button>
           ) : (
             <button
@@ -550,7 +579,7 @@ export function PriceGrid({
                         {col.name}
                       </div>
                       <div className="text-[10px] text-[#7C7C7C] tabular-nums">
-                        {(col.kind ?? (col.discountPercent > 0 ? 'percent' : 'selected')) === 'percent'
+                        {isPercentList(col)
                           ? `All products · −${Number(col.discountPercent)}%`
                           : `${col.counts?.priced ?? 0} products · ${col.counts?.excluded ?? 0} hidden`}
                       </div>
@@ -675,6 +704,8 @@ export function PriceGrid({
                     const member = isMember(row, col, dirty);
                     const dirtyForCell = dirty[cellKey(row.id, col.id)];
                     const addedNew = !!dirtyForCell && dirtyForCell !== null && !!dirtyForCell.added && dirtyForCell.price == null && !row.cells[col.id];
+                    const percentCol = isPercentList(col);
+                    const customOverride = hasCustomOverride(row, col, dirty);
 
                     return (
                       <td
@@ -745,16 +776,28 @@ export function PriceGrid({
                           >
                             {locked && <span title="Locked — bulk adjust will skip this price"><Lock size={11} className="text-[#7C7C7C] shrink-0" /></span>}
                             <span>{inr(price)}</span>
-                            {!baseFb && row.basePrice > 0 && (
-                              <span className={cn('text-[9px] font-bold px-1 py-px rounded-full', price < row.basePrice ? 'bg-green-50 text-green-700' : price > row.basePrice ? 'bg-amber-50 text-amber-700' : 'bg-[#FAF7F2] text-[#7C7C7C]')}>
-                                {price === row.basePrice ? 'Base' : `${price < row.basePrice ? '−' : '+'}${Math.abs(Math.round((price / row.basePrice - 1) * 100))}%`}
-                              </span>
+                            {percentCol ? (
+                              customOverride ? (
+                                <span className="text-[9px] font-bold px-1 py-px rounded-full bg-amber-50 text-amber-800 border border-amber-200">Custom</span>
+                              ) : (
+                                <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">
+                                  List −{Number(col.discountPercent)}%
+                                </span>
+                              )
+                            ) : (
+                              <>
+                                {!baseFb && row.basePrice > 0 && (
+                                  <span className={cn('text-[9px] font-bold px-1 py-px rounded-full', price < row.basePrice ? 'bg-green-50 text-green-700' : price > row.basePrice ? 'bg-amber-50 text-amber-700' : 'bg-[#FAF7F2] text-[#7C7C7C]')}>
+                                    {price === row.basePrice ? 'Base' : `${price < row.basePrice ? '−' : '+'}${Math.abs(Math.round((price / row.basePrice - 1) * 100))}%`}
+                                  </span>
+                                )}
+                                {baseFb && <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">Base</span>}
+                              </>
                             )}
-                            {baseFb && <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">{col.discountPercent > 0 && price !== row.basePrice ? `List −${Number(col.discountPercent)}%` : 'Base'}</span>}
                             {isActiveCell && !locked && (
                               <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} title="Edit price" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
                             )}
-                            {!locked && Number(col.discountPercent) === 0 && (
+                            {!locked && !percentCol && (
                               <button
                                 type="button"
                                 aria-label={`Remove ${row.name} from ${col.name}`}
@@ -797,7 +840,8 @@ export function PriceGrid({
         if (!col) return null;
         const locked = cellLocked(row, col, dirty);
         const excluded = isExcluded(row, col, dirty);
-        const isPercent = Number(col.discountPercent) > 0;
+        const isPercent = isPercentList(col);
+        const custom = hasCustomOverride(row, col, dirty);
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
@@ -811,7 +855,22 @@ export function PriceGrid({
               <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); setActive({ r: rowMenu.r, c: ci }); startEdit(rowMenu.r, ci); }}>
                 <Pencil size={14} /> Edit price
               </button>
-              {!isPercent && (
+              {isPercent ? (
+                custom && (
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40"
+                    disabled={locked}
+                    onClick={() => {
+                      setRowMenu(null);
+                      mergeCellFields(row.id, col.id, { price: null, isExcluded: false });
+                      toast.success(`${row.name} back to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`);
+                    }}
+                  >
+                    <RotateCcw size={14} /> Back to list −{Number(col.discountPercent)}%
+                  </button>
+                )
+              ) : (
                 <button type="button" className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2 disabled:opacity-40" disabled={locked} onClick={() => { setRowMenu(null); setCellFields(row.id, col.id, null); toast.success(`${row.name} removed from ${col.name} (draft) — Review & publish to apply`); }}>
                   <Trash2 size={14} /> Remove from list
                 </button>
@@ -868,6 +927,31 @@ export function PriceGrid({
             >
               <Percent size={14} /> Price floor guard
             </button>
+            {(() => {
+              const menuCol = cols.find((x) => x.id === colMenu.id);
+              if (!menuCol || !isPercentList(menuCol)) return null;
+              const overrideCount = rows.filter((r) => hasCustomOverride(r, menuCol, dirty) && !cellLocked(r, menuCol, dirty)).length;
+              if (overrideCount === 0) return null;
+              return (
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left hover:bg-[#FAF7F2] flex items-center gap-2"
+                  onClick={() => {
+                    let n = 0;
+                    for (const r of rows) {
+                      if (cellLocked(r, menuCol, dirty)) continue;
+                      if (!hasCustomOverride(r, menuCol, dirty)) continue;
+                      mergeCellFields(r.id, menuCol.id, { price: null, isExcluded: false });
+                      n += 1;
+                    }
+                    setColMenu(null);
+                    toast.success(`${n} custom price${n === 1 ? '' : 's'} cleared → list −${Number(menuCol.discountPercent)}% (draft) — Review & publish to apply`);
+                  }}
+                >
+                  <RotateCcw size={14} /> Clear custom prices ({overrideCount})
+                </button>
+              );
+            })()}
             <Link
               href={`/vendor/price-lists/${colMenu.id}`}
               className="w-full px-3 py-2 hover:bg-[#FAF7F2] flex items-center gap-2"
