@@ -98,6 +98,10 @@ export function PriceGrid({
   const [bulkScope, setBulkScope] = useState<'all' | 'selected'>('all');
   const [floorEdit, setFloorEdit] = useState<{ id: string; value: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string; count: number } | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{
+    items: Array<{ row: ProductRow; col: PriceListCol }>;
+    listName: string;
+  } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Close overlays on Escape / scroll / resize so they never stick or clip.
@@ -173,6 +177,47 @@ export function PriceGrid({
     },
     [setCellFields],
   );
+
+  /** Ask before removing membership (selected lists). Percent-list Reset stays instant. */
+  const requestRemoveFromList = useCallback(
+    (items: Array<{ row: ProductRow; col: PriceListCol }>) => {
+      const unlocked = items.filter(({ row, col }) => !cellLocked(row, col, dirty));
+      if (unlocked.length === 0) {
+        toast.warning('Cell is locked');
+        return;
+      }
+      const listName = unlocked[0]?.col.name ?? 'this list';
+      setConfirmRemove({ items: unlocked, listName });
+    },
+    [dirty],
+  );
+
+  const applyConfirmedRemove = useCallback(() => {
+    if (!confirmRemove) return;
+    const { items } = confirmRemove;
+    for (const { row, col } of items) {
+      resetCell(row, col);
+    }
+    setConfirmRemove(null);
+    const n = items.length;
+    const name = items[0]?.row.name ?? 'Product';
+    toast.success(
+      n === 1
+        ? `${name} removed from list (draft) — Review & publish to apply`
+        : `${n} products removed from list (draft) — Review & publish to apply`,
+    );
+  }, [confirmRemove, resetCell]);
+
+  useEffect(() => {
+    if (!confirmRemove && !confirmDelete) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setConfirmRemove(null);
+      setConfirmDelete(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmRemove, confirmDelete]);
 
   const commitEdit = (r: number, c: number) => {
     const row = rows[r];
@@ -503,14 +548,24 @@ export function PriceGrid({
               type="button"
               className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1.5 text-red-700"
               title={resetTooltip(cols[active.c])}
-              onClick={() => applyToSelection((r, c) => {
-                if (cellLocked(r, c, dirty)) return;
-                if (isPercentList(c)) {
-                  if (hasCustomOverride(r, c, dirty)) resetCell(r, c);
-                } else {
-                  resetCell(r, c);
+              onClick={() => {
+                const col = cols[active.c];
+                if (isPercentList(col)) {
+                  applyToSelection((r, c) => {
+                    if (cellLocked(r, c, dirty)) return;
+                    if (hasCustomOverride(r, c, dirty)) resetCell(r, c);
+                  });
+                  return;
                 }
-              })}
+                const items: Array<{ row: ProductRow; col: PriceListCol }> = [];
+                selection.forEach((key) => {
+                  const [rs, cs] = key.split(':').map(Number);
+                  const row = rows[rs];
+                  const c = cols[cs];
+                  if (row && c && !isPercentList(c)) items.push({ row, col: c });
+                });
+                requestRemoveFromList(items);
+              }}
             >
               {isPercentList(cols[active.c]) ? (
                 <><RotateCcw size={13} /> Reset</>
@@ -819,12 +874,14 @@ export function PriceGrid({
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  resetCell(row, col);
-                                  toast.success(
-                                    isPercentList(col)
-                                      ? `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`
-                                      : `${row.name} removed from list (draft) — Review & publish to apply`,
-                                  );
+                                  if (isPercentList(col)) {
+                                    resetCell(row, col);
+                                    toast.success(
+                                      `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`,
+                                    );
+                                    return;
+                                  }
+                                  requestRemoveFromList([{ row, col }]);
                                 }}
                               >
                                 {isPercentList(col) ? <RotateCcw size={11} /> : <X size={12} strokeWidth={2.5} />}
@@ -903,12 +960,14 @@ export function PriceGrid({
                   disabled={locked}
                   onClick={() => {
                     setRowMenu(null);
-                    resetCell(row, col);
-                    toast.success(
-                      isPercentList(col)
-                        ? `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`
-                        : `${row.name} removed from list (draft) — Review & publish to apply`,
-                    );
+                    if (isPercentList(col)) {
+                      resetCell(row, col);
+                      toast.success(
+                        `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`,
+                      );
+                      return;
+                    }
+                    requestRemoveFromList([{ row, col }]);
                   }}
                 >
                   {isPercentList(col) ? (
@@ -1056,6 +1115,46 @@ export function PriceGrid({
                 className="flex-1 h-11 min-h-[48px] rounded-[12px] bg-red-600 text-white font-semibold"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmRemove(null)} aria-hidden />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-product-title"
+            aria-describedby="remove-product-desc"
+            className="relative bg-white rounded-[16px] shadow-xl w-full max-w-md p-6 space-y-4"
+          >
+            <h2 id="remove-product-title" className="text-[17px] font-bold text-[#181725]">
+              {confirmRemove.items.length === 1
+                ? `Remove ${confirmRemove.items[0].row.name} from ${confirmRemove.listName}?`
+                : `Remove ${confirmRemove.items.length} products from ${confirmRemove.listName}?`}
+            </h2>
+            <p id="remove-product-desc" className="text-[13px] text-[#667085] text-pretty">
+              {confirmRemove.items.length === 1
+                ? 'It leaves this list. Customers on this list will pay Base for this product. Review & publish to apply.'
+                : 'They leave this list. Customers on this list will pay Base for those products. Review & publish to apply.'}
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 h-11 rounded-[12px] border border-[#E9E3DD] font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyConfirmedRemove}
+                className="flex-1 h-11 min-h-[48px] rounded-[12px] bg-red-600 text-white font-semibold"
+              >
+                Remove
               </button>
             </div>
           </div>
