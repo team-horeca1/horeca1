@@ -193,7 +193,7 @@ export default async function VoiceStoryPage({ params }: { params: Promise<{ slu
 
             {/* Featured Hero Photo */}
             {story.photoUrl && (
-              <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden bg-ivory shadow-xs mb-6 border border-divider/60">
+              <div className="relative w-full aspect-[16/10] rounded-2xl overflow-hidden bg-ivory shadow-xs mb-6 border border-divider/60">
                 <Image
                   src={story.photoUrl}
                   alt={story.name}
