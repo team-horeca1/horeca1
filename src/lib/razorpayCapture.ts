@@ -30,6 +30,11 @@ export const RAZORPAY_AUTOMATIC_EXPIRY_MINUTES = 3 * 24 * 60;
  */
 export function razorpayOrderCaptureFields() {
   return {
+    // Legacy Orders API boolean — Razorpay support / older tooling still flags
+    // this as null when only the nested `payment.capture` block is sent.
+    payment_capture: true,
+    // Current capture-settings API (overrides dashboard):
+    // https://razorpay.com/docs/payments/payments/capture-settings/api/
     payment: {
       capture: 'automatic' as const,
       capture_options: {
