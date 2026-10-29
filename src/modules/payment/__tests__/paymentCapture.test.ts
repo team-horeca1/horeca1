@@ -18,6 +18,7 @@ const ordersCreate = vi.fn();
 const walletRepaymentFindMany = vi.fn();
 const walletRepaymentFindFirst = vi.fn();
 const applyRepayment = vi.fn();
+const reverseRepayment = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -73,7 +74,10 @@ vi.mock('@/modules/promotion/promotion.service', () => ({
 }));
 
 vi.mock('@/modules/credit/creditWallet.service', () => ({
-  creditWalletService: { applyRepayment: (...args: unknown[]) => applyRepayment(...args) },
+  creditWalletService: {
+    applyRepayment: (...args: unknown[]) => applyRepayment(...args),
+    reverseRazorpayRepayment: (...args: unknown[]) => reverseRepayment(...args),
+  },
 }));
 
 import { PaymentService } from '@/modules/payment/payment.service';
@@ -286,6 +290,23 @@ describe('razorpay capture', () => {
       return data?.status === 'failed';
     });
     expect(failed).toHaveLength(0);
+  });
+
+  it('payment.failed does not abandon an authorized payment', async () => {
+    paymentFindMany.mockResolvedValue([checkoutPayment({ status: 'authorized', razorpayPaymentId: PAYMENT_ID })]);
+    const { body, signature } = webhook('payment.failed', {
+      payment: { entity: { id: 'pay_failed', order_id: ORDER_ID, amount: 100000, status: 'failed' } },
+    });
+
+    const result = await service.handleWebhook(body, signature);
+
+    expect(result.processed).toBe(true);
+    expect(markPaymentAbandoned).not.toHaveBeenCalled();
+    const failedWrites = paymentUpdateMany.mock.calls.filter((call) => {
+      const data = (call[0] as { data?: { status?: string } })?.data;
+      return data?.status === 'failed';
+    });
+    expect(failedWrites).toHaveLength(0);
   });
 
   it('rejects a payment whose currency is not INR and does not capture it', async () => {
