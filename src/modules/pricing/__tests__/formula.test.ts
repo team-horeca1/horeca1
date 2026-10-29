@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyFormula,
+  grossFromExGst,
   normalizeListKey,
   parseFormula,
   roundMoney,
@@ -72,5 +73,13 @@ describe('roundMoney / roundToStep', () => {
 
   it('normalises list keys', () => {
     expect(normalizeListKey('COD Pricing')).toBe('CODPRICING');
+  });
+});
+
+describe('grossFromExGst', () => {
+  it('adds product GST for display', () => {
+    expect(grossFromExGst(100, 5)).toBe(105);
+    expect(grossFromExGst(120.28, 0)).toBe(120.28);
+    expect(grossFromExGst(100, 18)).toBe(118);
   });
 });

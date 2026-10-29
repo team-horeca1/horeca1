@@ -63,6 +63,13 @@ export function roundMoney(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/** Display-only gross: ex-GST × (1 + tax%). Checkout still adds GST once. */
+export function grossFromExGst(exGst: number, taxPercent: number): number {
+  if (!Number.isFinite(exGst) || exGst < 0) return NaN;
+  const tax = Number.isFinite(taxPercent) && taxPercent > 0 ? taxPercent : 0;
+  return roundMoney(exGst * (1 + tax / 100));
+}
+
 /**
  * Round to a supplier-chosen step (0.05 / 0.50 / 1) for bulk ±% / ±₹.
  * Uses HALF_UP to the nearest multiple of `step`.

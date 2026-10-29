@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { applyFormula, normalizeListKey, parseFormula } from '@/modules/pricing/formula';
+import { applyFormula, grossFromExGst, normalizeListKey, parseFormula } from '@/modules/pricing/formula';
 import type { DraftCell, PriceListCol, ProductRow } from '../types';
 import {
   cellKey,
@@ -96,6 +96,7 @@ export function PriceGrid({
   const [bulkValue, setBulkValue] = useState('3');
   const [bulkRounding, setBulkRounding] = useState<'none' | '1' | '5' | '10'>('none');
   const [bulkScope, setBulkScope] = useState<'all' | 'selected'>('all');
+  const [quickPct, setQuickPct] = useState('5');
   const [floorEdit, setFloorEdit] = useState<{ id: string; value: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string; count: number } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{
@@ -104,13 +105,17 @@ export function PriceGrid({
   } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Close overlays on Escape / scroll / resize so they never stick or clip.
+  // Close menus on Escape / scroll / resize. Modals (bulk adjust, rename, floor)
+  // stay open while their body scrolls — only Escape / backdrop / resize dismiss them.
   useEffect(() => {
     const anyOpen = !!(colMenu || rowMenu || formulaCol || rename || floorEdit);
     if (!anyOpen) return;
-    const closeAll = () => {
+    const closeMenus = () => {
       setColMenu(null);
       setRowMenu(null);
+    };
+    const closeAll = () => {
+      closeMenus();
       setFormulaCol(null);
       setRename(null);
       setFloorEdit(null);
@@ -118,11 +123,12 @@ export function PriceGrid({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeAll(); };
     window.addEventListener('keydown', onKey);
     window.addEventListener('resize', closeAll);
-    window.addEventListener('scroll', closeAll, true);
+    // Capture scroll closes floating menus only — not centered dialogs.
+    window.addEventListener('scroll', closeMenus, true);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', closeAll);
-      window.removeEventListener('scroll', closeAll, true);
+      window.removeEventListener('scroll', closeMenus, true);
     };
   }, [colMenu, rowMenu, formulaCol, rename, floorEdit]);
 
@@ -281,7 +287,7 @@ export function PriceGrid({
   };
 
   const bulkPreviewRows = useMemo(() => {
-    if (!formulaCol) return [] as Array<{ name: string; from: number; to: number }>;
+    if (!formulaCol) return [] as Array<{ name: string; from: number; to: number; taxPercent: number }>;
     const targetCol = cols.find((c) => c.id === formulaCol);
     if (!targetCol) return [];
     const text = formulaMode === 'simple' ? buildSimpleFormulaText() : formulaText;
@@ -299,7 +305,12 @@ export function PriceGrid({
       }
       let to = sourcePrice;
       try { to = applyRounding(applyFormula(sourcePrice, parsed)); } catch { /* keep */ }
-      return { name: row.name, from: effective(row, targetCol, dirty), to };
+      return {
+        name: row.name,
+        from: effective(row, targetCol, dirty),
+        to,
+        taxPercent: row.taxPercent,
+      };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formulaCol, formulaMode, bulkSource, bulkOp, bulkValue, bulkRounding, bulkScope, formulaText, cols, rows, dirty, selectedProductIds]);
@@ -521,27 +532,61 @@ export function PriceGrid({
               <Pencil size={13} /> Edit price
             </button>
           )}
+          <label className="flex items-center gap-1.5 h-9 px-2 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold" title="Percent of Base for ± buttons">
+            <Percent size={13} className="text-[#7C7C7C] shrink-0" />
+            <span className="sr-only">Percent of Base</span>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={quickPct}
+              onChange={(e) => setQuickPct(e.target.value)}
+              className="w-12 h-7 px-1 border-0 bg-transparent tabular-nums text-[12px] font-semibold outline-none"
+              aria-label="Percent of Base"
+            />
+            <span className="text-[#7C7C7C]">%</span>
+          </label>
           <button
             type="button"
             className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1"
-            title="Set a custom price at Base −5% (does not compound)"
-            onClick={() => applyToSelection((r, c) => {
-              if (cellLocked(r, c, dirty)) return;
-              mergeCellFields(r.id, c.id, { price: Math.round(r.basePrice * 0.95 * 100) / 100, isExcluded: false });
-            })}
+            title={`Set a custom price at Base −${quickPct || '0'}% (does not compound)`}
+            onClick={() => {
+              const pct = Number(quickPct);
+              if (!Number.isFinite(pct) || pct < 0) {
+                toast.error('Enter a valid percent (0 or more)');
+                return;
+              }
+              applyToSelection((r, c) => {
+                if (cellLocked(r, c, dirty)) return;
+                mergeCellFields(r.id, c.id, {
+                  price: Math.round(r.basePrice * (1 - pct / 100) * 100) / 100,
+                  isExcluded: false,
+                });
+              });
+            }}
           >
-            <Percent size={13} /> Base −5%
+            Base −%
           </button>
           <button
             type="button"
             className="h-9 px-3 rounded-[10px] border border-[#E9E3DD] bg-white font-semibold flex items-center gap-1"
-            title="Set a custom price at Base +5%"
-            onClick={() => applyToSelection((r, c) => {
-              if (cellLocked(r, c, dirty)) return;
-              mergeCellFields(r.id, c.id, { price: Math.round(r.basePrice * 1.05 * 100) / 100, isExcluded: false });
-            })}
+            title={`Set a custom price at Base +${quickPct || '0'}%`}
+            onClick={() => {
+              const pct = Number(quickPct);
+              if (!Number.isFinite(pct) || pct < 0) {
+                toast.error('Enter a valid percent (0 or more)');
+                return;
+              }
+              applyToSelection((r, c) => {
+                if (cellLocked(r, c, dirty)) return;
+                mergeCellFields(r.id, c.id, {
+                  price: Math.round(r.basePrice * (1 + pct / 100) * 100) / 100,
+                  isExcluded: false,
+                });
+              });
+            }}
           >
-            <Percent size={13} /> Base +5%
+            Base +%
           </button>
           {(selectionHasCustom || !isPercentList(cols[active.c])) && (
             <button
@@ -637,6 +682,9 @@ export function PriceGrid({
               <th className="sticky left-[388px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[72px] text-right tabular-nums">
                 Base
               </th>
+              <th className="sticky left-[460px] z-40 bg-[#FAF7F2] p-2 border-b border-l border-[#E9E3DD] min-w-[80px] text-right tabular-nums" title="Base + product GST (display only)">
+                Gross
+              </th>
               {cols.map((col) => (
                 <th
                   key={col.id}
@@ -647,8 +695,25 @@ export function PriceGrid({
                       <div className="font-bold text-[#181725] truncate" title={col.name}>
                         {col.name}
                       </div>
-                      <div className="text-[10px] text-[#7C7C7C] tabular-nums" title={listSubtitle(col)}>
-                        {listSubtitle(col)}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[10px] text-[#7C7C7C] tabular-nums truncate" title={listSubtitle(col)}>
+                          {listSubtitle(col)}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-[10px] text-primary font-semibold flex items-center gap-0.5 shrink-0"
+                          onClick={() => {
+                            setFormulaCol(col.id);
+                            setFormulaText('=BASE-3%');
+                            setFormulaMode('simple');
+                            setBulkSource('BASE');
+                            setBulkOp('discountPct');
+                            setBulkValue('3');
+                            setBulkScope(selectedProductIds && selectedProductIds.size > 0 ? 'selected' : 'all');
+                          }}
+                        >
+                          <FunctionSquare size={11} /> Adjust
+                        </button>
                       </div>
                     </div>
                     <button
@@ -672,21 +737,6 @@ export function PriceGrid({
                       )}
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    className="mt-1 text-[10px] text-primary font-semibold flex items-center gap-0.5"
-                    onClick={() => {
-                      setFormulaCol(col.id);
-                      setFormulaText('=BASE-3%');
-                      setFormulaMode('simple');
-                      setBulkSource('BASE');
-                      setBulkOp('discountPct');
-                      setBulkValue('3');
-                      setBulkScope(selectedProductIds && selectedProductIds.size > 0 ? 'selected' : 'all');
-                    }}
-                  >
-                    <FunctionSquare size={11} /> Bulk adjust
-                  </button>
                 </th>
               ))}
             </tr>
@@ -694,13 +744,13 @@ export function PriceGrid({
           <tbody>
             {loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={3 + cols.length} className="p-12 text-center text-[#7C7C7C]">
+                <td colSpan={4 + cols.length} className="p-12 text-center text-[#7C7C7C]">
                   <Loader2 className="inline animate-spin mr-2" size={18} /> Loading products…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={3 + cols.length} className="p-12 text-center">
+                <td colSpan={4 + cols.length} className="p-12 text-center">
                   <p className="text-[13px] font-bold text-[#AEAEAE]">No products in this list</p>
                   <p className="text-[12px] text-[#AEAEAE] mt-1 text-pretty">
                     {compareMode
@@ -763,12 +813,19 @@ export function PriceGrid({
                   <td className="sticky left-[388px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-right tabular-nums text-[#7C7C7C]">
                     {inr(row.basePrice)}
                   </td>
+                  <td
+                    className="sticky left-[460px] z-20 bg-white p-2 border-b border-l border-[#E9E3DD] text-right tabular-nums text-[#7C7C7C]"
+                    title={`Incl. ${row.taxPercent || 0}% GST`}
+                  >
+                    {inr(grossFromExGst(row.basePrice, row.taxPercent))}
+                  </td>
                   {cols.map((col, ci) => {
                     const dirtyCell = isDirty(row, col, dirty);
                     const member = isInList(row, col, dirty);
                     const excluded = isExcluded(row, col, dirty);
                     const locked = cellLocked(row, col, dirty);
                     const price = effective(row, col, dirty);
+                    const priceGross = grossFromExGst(price, row.taxPercent);
                     const source = priceSource(row, col, dirty);
                     const isActiveCell = active?.r === ri && active?.c === ci;
                     const inSel = selection.has(`${ri}:${ci}`);
@@ -837,6 +894,7 @@ export function PriceGrid({
                               source === 'custom' && 'text-[#181725] font-semibold',
                               dirtyCell && 'border-l-2 border-l-primary bg-[#F8E8EC]/40',
                             )}
+                            title={`${inr(price)} ex-GST · ${inr(priceGross)} incl. ${row.taxPercent || 0}% GST`}
                           >
                             {locked && <span title="Locked — bulk adjust will skip this price"><Lock size={11} className="text-[#7C7C7C] shrink-0" /></span>}
                             <span>{inr(price)}</span>
@@ -1207,69 +1265,81 @@ export function PriceGrid({
       {formulaCol && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setFormulaCol(null)} />
-          <div className="relative bg-white rounded-[16px] p-5 w-full max-w-md space-y-4 max-h-[90vh] overflow-auto">
-            <div>
-              <h3 className="font-bold text-[#181725] text-[16px]">Bulk adjust prices</h3>
-              <p className="text-[12px] text-[#7C7C7C] mt-0.5">Set prices for <strong className="text-[#181725]">{cols.find((c) => c.id === formulaCol)?.name}</strong> in one go. Nothing goes live until you Review &amp; publish.</p>
+          <div className="relative bg-white rounded-[16px] w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="shrink-0 p-5 pb-3 space-y-3 border-b border-[#E9E3DD]">
+              <div>
+                <h3 className="font-bold text-[#181725] text-[16px]">Bulk adjust prices</h3>
+                <p className="text-[12px] text-[#7C7C7C] mt-0.5">Set prices for <strong className="text-[#181725]">{cols.find((c) => c.id === formulaCol)?.name}</strong> in one go. Nothing goes live until you Review &amp; publish.</p>
+              </div>
+              <div className="flex gap-1 p-1 bg-[#FAF7F2] border border-[#E9E3DD] rounded-[12px]">
+                <button type="button" onClick={() => setFormulaMode('simple')} className={cn('flex-1 h-9 rounded-[10px] text-[12px] font-bold', formulaMode === 'simple' ? 'bg-primary text-white' : 'text-[#7C7C7C]')}>Easy adjust</button>
+                <button type="button" onClick={() => setFormulaMode('advanced')} className={cn('flex-1 h-9 rounded-[10px] text-[12px] font-bold', formulaMode === 'advanced' ? 'bg-primary text-white' : 'text-[#7C7C7C]')}>Formula (advanced)</button>
+              </div>
             </div>
-            <div className="flex gap-1 p-1 bg-[#FAF7F2] border border-[#E9E3DD] rounded-[12px]">
-              <button type="button" onClick={() => setFormulaMode('simple')} className={cn('flex-1 h-9 rounded-[10px] text-[12px] font-bold', formulaMode === 'simple' ? 'bg-primary text-white' : 'text-[#7C7C7C]')}>Easy adjust</button>
-              <button type="button" onClick={() => setFormulaMode('advanced')} className={cn('flex-1 h-9 rounded-[10px] text-[12px] font-bold', formulaMode === 'advanced' ? 'bg-primary text-white' : 'text-[#7C7C7C]')}>Formula (advanced)</button>
-            </div>
-            {formulaMode === 'simple' ? (
-              <div className="space-y-3">
-                <label className="block text-[12px] font-semibold text-[#181725]">Start from
-                  <select value={bulkSource} onChange={(e) => setBulkSource(e.target.value)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
-                    <option value="BASE">Base price</option>
-                    {cols.filter((c) => c.id !== formulaCol).map((c) => <option key={c.id} value={c.id}>{c.name} prices</option>)}
-                  </select>
-                </label>
-                <label className="block text-[12px] font-semibold text-[#181725]">Then
-                  <select value={bulkOp} onChange={(e) => setBulkOp(e.target.value as typeof bulkOp)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
-                    <option value="discountPct">Give discount (%)</option>
-                    <option value="markupPct">Add markup (%)</option>
-                    <option value="minusFlat">Reduce by flat ₹</option>
-                    <option value="plusFlat">Increase by flat ₹</option>
-                    <option value="copy">Copy exactly (no change)</option>
-                  </select>
-                </label>
-                {bulkOp !== 'copy' && (
-                  <label className="block text-[12px] font-semibold text-[#181725]">{bulkOp === 'discountPct' || bulkOp === 'markupPct' ? 'Percent (%)' : 'Amount (₹)'}
-                    <input type="number" min={0} value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] tabular-nums font-normal" />
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+              {formulaMode === 'simple' ? (
+                <div className="space-y-3">
+                  <label className="block text-[12px] font-semibold text-[#181725]">Start from
+                    <select value={bulkSource} onChange={(e) => setBulkSource(e.target.value)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
+                      <option value="BASE">Base price</option>
+                      {cols.filter((c) => c.id !== formulaCol).map((c) => <option key={c.id} value={c.id}>{c.name} prices</option>)}
+                    </select>
                   </label>
-                )}
-                <label className="block text-[12px] font-semibold text-[#181725]">Round final price to
-                  <select value={bulkRounding} onChange={(e) => setBulkRounding(e.target.value as typeof bulkRounding)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
-                    <option value="none">Exact (paise)</option><option value="1">Nearest ₹1</option><option value="5">Nearest ₹5</option><option value="10">Nearest ₹10</option>
-                  </select>
-                </label>
+                  <label className="block text-[12px] font-semibold text-[#181725]">Then
+                    <select value={bulkOp} onChange={(e) => setBulkOp(e.target.value as typeof bulkOp)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
+                      <option value="discountPct">Give discount (%)</option>
+                      <option value="markupPct">Add markup (%)</option>
+                      <option value="minusFlat">Reduce by flat ₹</option>
+                      <option value="plusFlat">Increase by flat ₹</option>
+                      <option value="copy">Copy exactly (no change)</option>
+                    </select>
+                  </label>
+                  {bulkOp !== 'copy' && (
+                    <label className="block text-[12px] font-semibold text-[#181725]">{bulkOp === 'discountPct' || bulkOp === 'markupPct' ? 'Percent (%)' : 'Amount (₹)'}
+                      <input type="number" min={0} value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] tabular-nums font-normal" />
+                    </label>
+                  )}
+                  <label className="block text-[12px] font-semibold text-[#181725]">Round final price to
+                    <select value={bulkRounding} onChange={(e) => setBulkRounding(e.target.value as typeof bulkRounding)} className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal">
+                      <option value="none">Exact (paise)</option><option value="1">Nearest ₹1</option><option value="5">Nearest ₹5</option><option value="10">Nearest ₹10</option>
+                    </select>
+                  </label>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[12px] text-[#7C7C7C]">Type a formula. Examples: <code className="font-mono">=BASE-3%</code> (3% off Base), <code className="font-mono">=BASE+10</code> (₹10 more), or use another list name instead of BASE.</p>
+                  <input aria-label="Formula" value={formulaText} onChange={(e) => setFormulaText(e.target.value)} className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-mono text-[13px]" />
+                </div>
+              )}
+              <div>
+                <p className="text-[12px] font-semibold text-[#181725] mb-1.5">Apply to</p>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Apply scope">
+                  <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 min-w-[9rem] min-h-9 h-auto py-2 px-2 rounded-[10px] border text-[11px] font-bold leading-snug', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>{compareMode ? 'All products shown' : 'All products in this list'}</button>
+                  <button type="button" disabled={!selectedProductIds || selectedProductIds.size === 0} onClick={() => setBulkScope('selected')} className={cn('flex-1 min-w-[9rem] min-h-9 h-auto py-2 px-2 rounded-[10px] border text-[11px] font-bold leading-snug disabled:opacity-40', bulkScope === 'selected' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>Only ticked rows ({selectedProductIds?.size ?? 0})</button>
+                </div>
+                {bulkScope === 'selected' && <p className="text-[11px] text-amber-700 mt-1.5">Only the ticked product rows will change — untick them on the grid for all products.</p>}
               </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-[12px] text-[#7C7C7C]">Type a formula. Examples: <code className="font-mono">=BASE-3%</code> (3% off Base), <code className="font-mono">=BASE+10</code> (₹10 more), or use another list name instead of BASE.</p>
-                <input aria-label="Formula" value={formulaText} onChange={(e) => setFormulaText(e.target.value)} className="w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-mono text-[13px]" />
-              </div>
-            )}
-            <div>
-              <p className="text-[12px] font-semibold text-[#181725] mb-1.5">Apply to</p>
-              <div className="flex gap-2" role="group" aria-label="Apply scope">
-                <button type="button" onClick={() => setBulkScope('all')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold', bulkScope === 'all' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>{compareMode ? 'All products shown' : 'All products in this list'}</button>
-                <button type="button" disabled={!selectedProductIds || selectedProductIds.size === 0} onClick={() => setBulkScope('selected')} className={cn('flex-1 h-10 rounded-[10px] border text-[12px] font-bold disabled:opacity-40', bulkScope === 'selected' ? 'border-primary text-primary bg-[#F8E8EC]' : 'border-[#E9E3DD]')}>Only ticked rows ({selectedProductIds?.size ?? 0})</button>
-              </div>
-              {bulkScope === 'selected' && <p className="text-[11px] text-amber-700 mt-1.5">Only the ticked product rows will change — untick them on the grid for all products.</p>}
+              {bulkPreviewRows.length > 0 && (
+                <div className="rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] p-3">
+                  <p className="text-[11px] font-bold text-[#181725] mb-1.5">Preview (first {bulkPreviewRows.length})</p>
+                  {bulkPreviewRows.map((p) => (
+                    <div key={p.name} className="py-1 border-b border-[#E9E3DD]/60 last:border-0">
+                      <div className="flex justify-between text-[12px] gap-2">
+                        <span className="truncate mr-1">{p.name}</span>
+                        <span className="tabular-nums font-semibold shrink-0">{inr(p.from)} → {inr(p.to)}</span>
+                      </div>
+                      <p className="text-[10px] text-[#7C7C7C] tabular-nums text-right mt-0.5">
+                        incl. GST {inr(grossFromExGst(p.from, p.taxPercent))} → {inr(grossFromExGst(p.to, p.taxPercent))}
+                      </p>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-[#7C7C7C] mt-1.5">Locked prices are skipped automatically. Adjustments use Base; GST is added for display.</p>
+                </div>
+              )}
             </div>
-            {bulkPreviewRows.length > 0 && (
-              <div className="rounded-[12px] bg-[#FAF7F2] border border-[#E9E3DD] p-3">
-                <p className="text-[11px] font-bold text-[#181725] mb-1.5">Preview (first {bulkPreviewRows.length})</p>
-                {bulkPreviewRows.map((p) => (
-                  <div key={p.name} className="flex justify-between text-[12px] py-0.5"><span className="truncate mr-3">{p.name}</span><span className="tabular-nums font-semibold">{inr(p.from)} → {inr(p.to)}</span></div>
-                ))}
-                <p className="text-[11px] text-[#7C7C7C] mt-1.5">Locked prices are skipped automatically.</p>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setFormulaCol(null)} className="flex-1 h-11 border rounded-[12px] font-semibold">Cancel</button>
-              <button type="button" onClick={applyFormulaToColumn} className="flex-1 h-11 bg-primary text-white rounded-[12px] font-semibold">Apply to draft</button>
+            <div className="shrink-0 flex gap-2 p-5 pt-3 border-t border-[#E9E3DD] bg-white">
+              <button type="button" onClick={() => setFormulaCol(null)} className="flex-1 h-11 min-h-[48px] border border-[#E9E3DD] rounded-[12px] font-semibold">Cancel</button>
+              <button type="button" onClick={applyFormulaToColumn} className="flex-1 h-11 min-h-[48px] bg-primary text-white rounded-[12px] font-semibold">Apply to draft</button>
             </div>
           </div>
         </div>
