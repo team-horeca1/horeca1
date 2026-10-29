@@ -14,6 +14,7 @@ import {
   computeAvailable,
   interestPeriods,
   isCreditUsageBlocked,
+  repaymentRestoreRupees,
   round2,
   validateLimitChange,
 } from '@/modules/credit/creditMath';
@@ -994,6 +995,67 @@ export class CreditWalletService {
         },
       });
       return updated;
+    });
+  }
+
+  /**
+   * Razorpay refunded a repayment that had already reduced what the customer owes.
+   * Put that amount back on the ledger. Idempotent on the Razorpay refund id.
+   * A partial refund restores only the refunded rupees. Does not change wallet
+   * status (a cleared-then-refunded account is not automatically re-blocked).
+   */
+  async reverseRazorpayRepayment(razorpayPaymentId: string, refundPaise: number, razorpayRefundId: string) {
+    if (!razorpayRefundId || refundPaise <= 0) return { reversed: false as const, reason: 'invalid' as const };
+    const marker = `rzp_refund:${razorpayRefundId}`;
+    return prisma.$transaction(async (tx) => {
+      const repayment = await tx.creditWalletRepayment.findUnique({ where: { razorpayPaymentId } });
+      if (!repayment || (repayment.status !== 'SUCCESS' && repayment.status !== 'PARTIAL_REFUND')) {
+        return { reversed: false as const, reason: 'not_applied' as const };
+      }
+      const dup = await tx.creditWalletTxn.findFirst({
+        where: { walletId: repayment.walletId, type: 'REVERSAL', note: { contains: marker } },
+      });
+      if (dup) return { reversed: false as const, reason: 'duplicate' as const };
+
+      const prior = await tx.creditWalletTxn.findMany({
+        where: { walletId: repayment.walletId, type: 'REVERSAL', referenceId: repayment.id },
+      });
+      const already = prior.reduce((sum, row) => sum + Number(row.amount), 0);
+      const restore = repaymentRestoreRupees(Number(repayment.amount), already, refundPaise / 100);
+      if (restore <= 0) return { reversed: false as const, reason: 'nothing_left' as const };
+
+      const wallet = await lockWallet(tx, repayment.walletId);
+      if (!wallet) return { reversed: false as const, reason: 'missing_wallet' as const };
+
+      const pay = D(restore);
+      const newOutstanding = wallet.outstandingAmount.plus(pay);
+      const newUsed = wallet.usedCredit.plus(pay);
+      const newAvailable = D(computeAvailable(num(wallet.creditLimit), num(newUsed)));
+      const fullyReversed = round2(already + restore) >= round2(Number(repayment.amount));
+
+      await tx.creditWallet.update({
+        where: { id: wallet.id },
+        data: {
+          outstandingAmount: newOutstanding,
+          usedCredit: newUsed,
+          availableCredit: newAvailable,
+        },
+      });
+      await tx.creditWalletRepayment.update({
+        where: { id: repayment.id },
+        data: { status: fullyReversed ? 'REFUNDED' : 'PARTIAL_REFUND' },
+      });
+      await tx.creditWalletTxn.create({
+        data: {
+          walletId: wallet.id,
+          type: 'REVERSAL',
+          amount: pay,
+          balanceAfterTxn: newAvailable,
+          referenceId: repayment.id,
+          note: `${marker} Razorpay refunded ₹${restore} of repayment ${repayment.id}`,
+        },
+      });
+      return { reversed: true as const, amount: restore, fullyReversed };
     });
   }
 

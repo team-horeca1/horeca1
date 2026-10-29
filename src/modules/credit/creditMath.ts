@@ -12,6 +12,16 @@ export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * How many rupees of a captured repayment to put back on the ledger when
+ * Razorpay refunds it. Never restores more than the amount still applied.
+ */
+export function repaymentRestoreRupees(applied: number, alreadyReversed: number, refundRupees: number): number {
+  const remaining = round2(applied - alreadyReversed);
+  if (remaining <= 0 || refundRupees <= 0) return 0;
+  return round2(Math.min(refundRupees, remaining));
+}
+
 /** Compound interest target over `periods` at ratePct percent per period. */
 export function compoundInterestTarget(principal: number, ratePct: number, periods: number): number {
   if (periods < 1 || ratePct <= 0 || principal <= 0) return 0;

@@ -33,11 +33,22 @@ export async function POST(req: NextRequest) {
 
     const event = JSON.parse(rawBody) as {
       event?: string;
-      payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number; status?: string } } };
+      payload?: {
+        payment?: { entity?: { id?: string; order_id?: string; amount?: number; status?: string } };
+        refund?: { entity?: { id?: string; payment_id?: string; amount?: number } };
+      };
     };
     const entity = event.payload?.payment?.entity;
     const razorpayOrderId = entity?.order_id;
     const razorpayPaymentId = entity?.id;
+
+    if (event.event === 'refund.processed') {
+      const refund = event.payload?.refund?.entity;
+      if (refund?.id && refund.payment_id && Number(refund.amount) > 0) {
+        await creditWalletService.reverseRazorpayRepayment(refund.payment_id, Number(refund.amount), refund.id);
+      }
+      return NextResponse.json({ success: true });
+    }
 
     if (
       (event.event === 'payment.authorized' || event.event === 'payment.captured')

@@ -157,12 +157,15 @@ async function reconcileWalletRepayments(windowStart: Date, tenMinutesAgo: Date)
   for (const row of pending) {
     const razorpayOrderId = row.razorpayOrderId;
     if (!razorpayOrderId) continue;
+    let expectedPaise = 0;
+    let gatewayId = '';
     try {
       const paymentsResponse = await getRazorpay().orders.fetchPayments(razorpayOrderId);
       const items = paymentsResponse.items ?? [];
       const gateway = items.find((p) => p.status === 'captured') ?? items.find((p) => p.status === 'authorized');
       if (!gateway) continue;
-      const expectedPaise = Math.round(Number(row.amount) * 100);
+      expectedPaise = Math.round(Number(row.amount) * 100);
+      gatewayId = gateway.id;
       const captured = await ensurePaymentCaptured(gateway.id, expectedPaise);
       await creditWalletService.applyRepayment(
         row.walletId,
@@ -175,6 +178,9 @@ async function reconcileWalletRepayments(windowStart: Date, tenMinutesAgo: Date)
     } catch (err) {
       if (err instanceof CapturePendingError) {
         console.log(`[Reconciliation] Wallet repayment ${row.id} still authorized.`);
+      } else if (err instanceof PaymentNotCapturedError && err.gatewayStatus === 'refunded' && gatewayId) {
+        await creditWalletService.reverseRazorpayRepayment(gatewayId, expectedPaise, `reconcile:${gatewayId}`);
+        console.log(`[Reconciliation] Wallet repayment ${row.id} refunded at Razorpay. Ledger restored.`);
       } else if (err instanceof PaymentNotCapturedError) {
         console.log(`[Reconciliation] Wallet repayment ${row.id} not applied: ${err.gatewayStatus}.`);
       } else {

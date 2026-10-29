@@ -5,6 +5,7 @@ import {
   interestPeriods,
   isCreditUsageBlocked,
   matchesCreditFilter,
+  repaymentRestoreRupees,
   validateLimitChange,
 } from '../creditMath';
 
@@ -23,6 +24,16 @@ describe('creditMath — available / limit', () => {
     const ok = validateLimitChange(10000, 7000, 500);
     expect(ok.ok).toBe(true);
     if (ok.ok) expect(ok.newAvailable).toBe(2500);
+  });
+});
+
+describe('creditMath — repayment refund restore', () => {
+  it('restores only what is still applied', () => {
+    expect(repaymentRestoreRupees(1000, 0, 1000)).toBe(1000);
+    expect(repaymentRestoreRupees(1000, 0, 400)).toBe(400);
+    expect(repaymentRestoreRupees(1000, 400, 700)).toBe(600);
+    expect(repaymentRestoreRupees(1000, 1000, 100)).toBe(0);
+    expect(repaymentRestoreRupees(1000, 0, 0)).toBe(0);
   });
 });
 
