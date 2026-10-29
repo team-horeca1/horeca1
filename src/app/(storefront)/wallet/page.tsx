@@ -133,6 +133,7 @@ async function startRepayment(
       },
       modal: { ondismiss: () => setBusy(false) },
       theme: { color: '#6B1D2E' },
+      display: { offers: false },
     });
     rzp.open();
   } catch (e) {
