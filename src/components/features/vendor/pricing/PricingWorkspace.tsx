@@ -14,6 +14,7 @@ import {
   ListChecks,
   ChevronDown,
   Columns2,
+  FunctionSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,7 @@ export function PricingWorkspace() {
   const [hasMore, setHasMore] = useState(false);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
+  const [bulkAdjustNonce, setBulkAdjustNonce] = useState(0);
 
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -473,6 +475,16 @@ export function PricingWorkspace() {
                   <ListChecks size={15} /> Edit products
                 </button>
               )}
+              {!compare && activeCol && (
+                <button
+                  type="button"
+                  onClick={() => setBulkAdjustNonce((n) => n + 1)}
+                  disabled={rows.length === 0}
+                  className="h-11 px-3.5 rounded-[12px] border border-[#E9E3DD] bg-white hover:bg-[#FAF7F2] text-[13px] font-semibold text-[#181725] inline-flex items-center gap-1.5 disabled:opacity-40"
+                >
+                  <FunctionSquare size={15} /> Bulk adjust
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setCompare((v) => !v)}
@@ -536,6 +548,7 @@ export function PricingWorkspace() {
                   ? () => openPicker({ id: activeCol.id, name: activeCol.name })
                   : undefined
               }
+              openBulkAdjustNonce={bulkAdjustNonce}
               selectedProductIds={selectedProductIds}
               onSelectedProductIdsChange={setSelectedProductIds}
               compareMode={compare}

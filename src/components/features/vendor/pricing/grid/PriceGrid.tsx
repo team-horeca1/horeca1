@@ -48,6 +48,8 @@ interface Props {
   onLoadMore?: () => void;
   onListsChanged?: () => void;
   onEditProducts?: () => void;
+  /** Increment from parent to open the bulk-adjust dialog for the first visible list column. */
+  openBulkAdjustNonce?: number;
   selectedProductIds?: Set<string>;
   onSelectedProductIdsChange?: (ids: Set<string>) => void;
   compareMode?: boolean;
@@ -74,6 +76,7 @@ export function PriceGrid({
   onLoadMore,
   onListsChanged,
   onEditProducts,
+  openBulkAdjustNonce = 0,
   selectedProductIds,
   onSelectedProductIdsChange,
   compareMode,
@@ -135,6 +138,25 @@ export function PriceGrid({
   useEffect(() => {
     if (editing) setTimeout(() => editRef.current?.select(), 0);
   }, [editing]);
+
+  const openBulkAdjustForCol = useCallback((colId: string) => {
+    setFormulaCol(colId);
+    setFormulaText('=BASE-3%');
+    setFormulaMode('simple');
+    setBulkSource('BASE');
+    setBulkOp('discountPct');
+    setBulkValue('3');
+    setBulkScope(selectedProductIds && selectedProductIds.size > 0 ? 'selected' : 'all');
+  }, [selectedProductIds]);
+
+  const lastBulkNonce = useRef(0);
+  useEffect(() => {
+    if (!openBulkAdjustNonce || openBulkAdjustNonce === lastBulkNonce.current) return;
+    lastBulkNonce.current = openBulkAdjustNonce;
+    const col = cols[0];
+    if (!col) return;
+    openBulkAdjustForCol(col.id);
+  }, [openBulkAdjustNonce, cols, openBulkAdjustForCol]);
 
   const selection = useMemo(() => {
     if (!active || !anchor) return new Set<string>();
@@ -695,25 +717,8 @@ export function PriceGrid({
                       <div className="font-bold text-[#181725] truncate" title={col.name}>
                         {col.name}
                       </div>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[10px] text-[#7C7C7C] tabular-nums truncate" title={listSubtitle(col)}>
-                          {listSubtitle(col)}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-[10px] text-primary font-semibold flex items-center gap-0.5 shrink-0"
-                          onClick={() => {
-                            setFormulaCol(col.id);
-                            setFormulaText('=BASE-3%');
-                            setFormulaMode('simple');
-                            setBulkSource('BASE');
-                            setBulkOp('discountPct');
-                            setBulkValue('3');
-                            setBulkScope(selectedProductIds && selectedProductIds.size > 0 ? 'selected' : 'all');
-                          }}
-                        >
-                          <FunctionSquare size={11} /> Adjust
-                        </button>
+                      <div className="text-[10px] text-[#7C7C7C] tabular-nums truncate" title={listSubtitle(col)}>
+                        {listSubtitle(col)}
                       </div>
                     </div>
                     <button
