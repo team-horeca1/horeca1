@@ -100,8 +100,10 @@ if ! migrate; then
   migrate
 fi
 
-echo "==> Restart app + worker + nginx"
-"${COMPOSE[@]}" up -d --force-recreate app worker
+echo "==> Restart app + worker + reconciliation + nginx"
+# reconciliation must start with the capture/refund safety net — compose defines
+# the service; omitting it here leaves authorized/refunded payments unrecovered.
+"${COMPOSE[@]}" up -d --force-recreate app worker reconciliation
 "${COMPOSE[@]}" restart nginx
 
 echo "==> Health check"
