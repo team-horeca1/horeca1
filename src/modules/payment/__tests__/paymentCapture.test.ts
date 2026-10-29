@@ -42,11 +42,14 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
+const paymentsFetchMultipleRefund = vi.fn();
+
 vi.mock('@/lib/razorpay', () => ({
   getRazorpay: () => ({
     payments: {
       fetch: (...args: unknown[]) => paymentsFetch(...args),
       capture: (...args: unknown[]) => paymentsCapture(...args),
+      fetchMultipleRefund: (...args: unknown[]) => paymentsFetchMultipleRefund(...args),
     },
     orders: {
       fetchPayments: (...args: unknown[]) => ordersFetchPayments(...args),
@@ -88,6 +91,7 @@ import {
   auditApplyRequested,
   auditMutation,
   razorpayOrderCaptureFields,
+  razorpayOrderOfferFields,
   RAZORPAY_AUTOMATIC_EXPIRY_MINUTES,
   RAZORPAY_MANUAL_EXPIRY_MINUTES,
 } from '@/lib/razorpayCapture';
@@ -135,6 +139,7 @@ describe('razorpay capture', () => {
     walletRepaymentFindMany.mockResolvedValue([]);
     walletRepaymentFindFirst.mockResolvedValue(null);
     applyRepayment.mockResolvedValue(null);
+    reverseRepayment.mockResolvedValue({ reversed: false, reason: 'not_applied' });
   });
 
   function gateway(status: string, overrides: Record<string, unknown> = {}) {
@@ -178,8 +183,11 @@ describe('razorpay capture', () => {
     expect(ordersCreate).toHaveBeenCalledWith(expect.objectContaining({
       amount: 100000,
       currency: 'INR',
+      offers: [],
       payment: { capture: 'automatic', capture_options: expect.objectContaining({ automatic_expiry_period: 4320, manual_expiry_period: 7200, refund_speed: 'optimum' }) },
     }));
+    // Partner Offers Engine only — not Horeca1 coupons/promotions.
+    expect(razorpayOrderOfferFields()).toEqual({ offers: [] });
   });
 
   it('captures an authorized payment before marking the order paid', async () => {
@@ -248,6 +256,7 @@ describe('razorpay capture', () => {
       paymentStatus: 'paid',
       paymentMethod: 'online',
     }]);
+    reverseRepayment.mockResolvedValue({ reversed: false, reason: 'not_applied' });
 
     const body = JSON.stringify({
       event: 'refund.processed',
@@ -267,6 +276,20 @@ describe('razorpay capture', () => {
     });
     expect(fulfillmentChange).toBe(false);
     expect(markPaymentAbandoned).not.toHaveBeenCalled();
+    expect(reverseRepayment).toHaveBeenCalledWith(PAYMENT_ID, 100000, 'rfnd_1');
+  });
+
+  it('checkout refund webhook also attempts wallet ledger reverse (idempotent no-op when not a repayment)', async () => {
+    paymentFindMany.mockResolvedValue([]);
+    reverseRepayment.mockResolvedValue({ reversed: true, amount: 500, fullyReversed: true });
+    const body = JSON.stringify({
+      event: 'refund.processed',
+      payload: { refund: { entity: { id: 'rfnd_wallet_bridge', payment_id: 'pay_wallet', amount: 50000 } } },
+    });
+    const signature = crypto.createHmac('sha256', 'whsec_test').update(body).digest('hex');
+    const result = await service.handleWebhook(body, signature);
+    expect(result.processed).toBe(false);
+    expect(reverseRepayment).toHaveBeenCalledWith('pay_wallet', 50000, 'rfnd_wallet_bridge');
   });
 
   it('reconciliation captures an authorized payment instead of failing the checkout', async () => {
@@ -290,6 +313,41 @@ describe('razorpay capture', () => {
       return data?.status === 'failed';
     });
     expect(failed).toHaveLength(0);
+  });
+
+  it('reconciliation restores wallet ledger when an applied repayment was refunded (mocked)', async () => {
+    paymentFindMany.mockResolvedValue([]);
+    walletRepaymentFindMany.mockImplementation(async (args: { where?: { status?: string | { in?: string[] } } }) => {
+      const status = args?.where?.status;
+      if (status === 'PENDING') return [];
+      if (typeof status === 'object' && status.in?.includes('SUCCESS')) {
+        return [{
+          id: 'rep-success',
+          walletId: 'wal-1',
+          amount: 500,
+          status: 'SUCCESS',
+          razorpayPaymentId: 'pay_refunded_wallet',
+          razorpayOrderId: 'order_wallet',
+          createdAt: new Date(Date.now() - 30 * 60 * 1000),
+        }];
+      }
+      return [];
+    });
+    paymentsFetch.mockResolvedValue({
+      id: 'pay_refunded_wallet',
+      status: 'refunded',
+      amount: 50000,
+      amount_refunded: 50000,
+    });
+    paymentsFetchMultipleRefund.mockResolvedValue({
+      items: [{ id: 'rfnd_missed', amount: 50000, status: 'processed' }],
+    });
+    reverseRepayment.mockResolvedValue({ reversed: true, amount: 500, fullyReversed: true });
+
+    await reconcilePayments();
+
+    expect(paymentsFetchMultipleRefund).toHaveBeenCalledWith('pay_refunded_wallet');
+    expect(reverseRepayment).toHaveBeenCalledWith('pay_refunded_wallet', 50000, 'rfnd_missed');
   });
 
   it('payment.failed does not abandon an authorized payment', async () => {
@@ -474,6 +532,65 @@ describe('razorpay capture', () => {
     });
     const refunded = await walletWebhook(refundedReq);
     expect(refunded.status).toBe(200);
+    expect(applyRepayment).not.toHaveBeenCalled();
+  });
+
+  it('reverses wallet ledger on refund.processed (mocked signed webhook)', async () => {
+    reverseRepayment.mockResolvedValue({ reversed: true, amount: 500, fullyReversed: true });
+    const { body, signature } = webhook('refund.processed', {
+      refund: { entity: { id: 'rfnd_wallet_1', payment_id: PAYMENT_ID, amount: 50000 } },
+    });
+    const req = new NextRequest('http://localhost/api/v1/wallet/razorpay-webhook', {
+      method: 'POST',
+      body,
+      headers: { 'x-razorpay-signature': signature },
+    });
+
+    const res = await walletWebhook(req);
+    expect(res.status).toBe(200);
+    expect(reverseRepayment).toHaveBeenCalledWith(PAYMENT_ID, 50000, 'rfnd_wallet_1');
+    expect(applyRepayment).not.toHaveBeenCalled();
+  });
+
+  it('does not reverse twice when the same refund webhook is delivered again', async () => {
+    reverseRepayment.mockResolvedValue({ reversed: false, reason: 'duplicate' });
+    const { body, signature } = webhook('refund.processed', {
+      refund: { entity: { id: 'rfnd_dup', payment_id: PAYMENT_ID, amount: 50000 } },
+    });
+    const req = () =>
+      new NextRequest('http://localhost/api/v1/wallet/razorpay-webhook', {
+        method: 'POST',
+        body,
+        headers: { 'x-razorpay-signature': signature },
+      });
+
+    expect((await walletWebhook(req())).status).toBe(200);
+    expect((await walletWebhook(req())).status).toBe(200);
+    expect(reverseRepayment).toHaveBeenCalledTimes(2);
+    expect(reverseRepayment).toHaveBeenNthCalledWith(1, PAYMENT_ID, 50000, 'rfnd_dup');
+    expect(reverseRepayment).toHaveBeenNthCalledWith(2, PAYMENT_ID, 50000, 'rfnd_dup');
+  });
+
+  it('does not apply credit when a delayed payment.captured arrives after refund', async () => {
+    walletRepaymentFindFirst.mockResolvedValue({
+      id: 'rep-1',
+      walletId: 'wal-1',
+      amount: 500,
+      status: 'REFUNDED',
+      razorpayOrderId: ORDER_ID,
+    });
+    paymentsFetch.mockResolvedValue(gateway('refunded', { amount: 50000 }));
+    const { body, signature } = webhook('payment.captured', {
+      payment: { entity: { id: PAYMENT_ID, order_id: ORDER_ID, amount: 50000, status: 'captured' } },
+    });
+    const req = new NextRequest('http://localhost/api/v1/wallet/razorpay-webhook', {
+      method: 'POST',
+      body,
+      headers: { 'x-razorpay-signature': signature },
+    });
+
+    const res = await walletWebhook(req);
+    expect(res.status).toBe(200);
     expect(applyRepayment).not.toHaveBeenCalled();
   });
 

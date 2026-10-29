@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { getRazorpay } from '@/lib/razorpay';
-import { razorpayOrderCaptureFields } from '@/lib/razorpayCapture';
+import { razorpayOrderCaptureFields, razorpayOrderOfferFields } from '@/lib/razorpayCapture';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
@@ -30,8 +30,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       amount: Math.round(amount * 100), // paise
       currency: 'INR',
       receipt: `wallet_repay_${walletId.slice(0, 8)}_${String(Date.now()).slice(-6)}`,
-      // Suppress Offers Engine partner cashback that breaks Test Mode payments.
-      offers: [],
+      ...razorpayOrderOfferFields(),
       ...razorpayOrderCaptureFields(),
     } as Parameters<ReturnType<typeof getRazorpay>['orders']['create']>[0]);
 

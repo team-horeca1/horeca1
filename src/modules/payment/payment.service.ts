@@ -10,6 +10,7 @@ import {
   PaymentNotCapturedError,
   ensurePaymentCaptured,
   razorpayOrderCaptureFields,
+  razorpayOrderOfferFields,
 } from '@/lib/razorpayCapture';
 import crypto from 'crypto';
 
@@ -121,14 +122,11 @@ export class PaymentService {
       ? orders[0].orderNumber
       : `multi-${orders[0].orderNumber}-${orders.length}`;
 
-    // `offers: []` is valid on Orders API but missing from razorpay@2.9.6 types.
-    // Empty list suppresses Offers Engine partner cashback (Cred etc.) that fails
-    // Test Mode with "Offers-engine external offer not found".
     const razorpayOrder = await getRazorpay().orders.create({
       amount: Math.round(totalAmount * 100), // paise
       currency: 'INR',
       receipt,
-      offers: [],
+      ...razorpayOrderOfferFields(),
       ...razorpayOrderCaptureFields(),
     } as Parameters<ReturnType<typeof getRazorpay>['orders']['create']>[0]);
 
@@ -546,12 +544,22 @@ export class PaymentService {
 
     // 6. Handle refund.processed — payment status and, when the order was
     // already marked paid, order.paymentStatus. Fulfillment status stays.
+    // Wallet repayments use a separate webhook URL; if Razorpay only delivers
+    // refund.processed here, still restore the DiSCCO ledger (idempotent).
     if (event === 'refund.processed') {
       const refundEntity = payload.refund?.entity;
       if (!refundEntity) return { processed: false, event };
 
       const refundPaise = Number((refundEntity as { amount?: number }).amount ?? 0);
       const result = await this.recordGatewayRefund(refundEntity.payment_id, refundPaise);
+      if (refundEntity.payment_id && refundEntity.id && refundPaise > 0) {
+        const { creditWalletService } = await import('@/modules/credit/creditWallet.service');
+        await creditWalletService.reverseRazorpayRepayment(
+          refundEntity.payment_id,
+          refundPaise,
+          refundEntity.id,
+        );
+      }
       return { processed: result.processed, event };
     }
 

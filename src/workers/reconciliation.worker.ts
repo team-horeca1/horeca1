@@ -143,6 +143,10 @@ export async function reconcilePayments() {
  * a customer who closes the browser after authorization never gets credit, and
  * Razorpay can still capture or later refund the payment. This pass applies
  * credit only after the live payment is captured, and never applies a refund.
+ *
+ * A second pass covers SUCCESS / PARTIAL_REFUND rows: if Razorpay later fully or
+ * partially refunds the payment and `refund.processed` was missed, restore the
+ * ledger from the live refunds list (idempotent on refund id).
  */
 async function reconcileWalletRepayments(windowStart: Date, tenMinutesAgo: Date) {
   const pending = await prisma.creditWalletRepayment.findMany({
@@ -186,6 +190,59 @@ async function reconcileWalletRepayments(windowStart: Date, tenMinutesAgo: Date)
       } else {
         console.error(`[Reconciliation] Wallet repayment ${row.id} failed:`, err);
       }
+    }
+  }
+
+  await reconcileRefundedWalletRepayments(windowStart, tenMinutesAgo);
+}
+
+/**
+ * Applied repayments whose Razorpay payment was later refunded, but the
+ * refund.processed webhook never reached /api/v1/wallet/razorpay-webhook.
+ */
+async function reconcileRefundedWalletRepayments(windowStart: Date, tenMinutesAgo: Date) {
+  const applied = await prisma.creditWalletRepayment.findMany({
+    where: {
+      status: { in: ['SUCCESS', 'PARTIAL_REFUND'] },
+      razorpayPaymentId: { not: null },
+      createdAt: { gte: windowStart, lte: tenMinutesAgo },
+    },
+  });
+  console.log(`[Reconciliation] Checking ${applied.length} applied wallet repayments for refunds.`);
+
+  for (const row of applied) {
+    const paymentId = row.razorpayPaymentId;
+    if (!paymentId) continue;
+    try {
+      const payment = await getRazorpay().payments.fetch(paymentId);
+      const refundedPaise = Number(payment.amount_refunded ?? 0);
+      if (refundedPaise <= 0 && payment.status !== 'refunded') continue;
+
+      const refundsResponse = await getRazorpay().payments.fetchMultipleRefund(paymentId);
+      const refunds = refundsResponse.items ?? [];
+      if (refunds.length === 0 && refundedPaise > 0) {
+        await creditWalletService.reverseRazorpayRepayment(
+          paymentId,
+          refundedPaise,
+          `reconcile-refund:${paymentId}:${refundedPaise}`,
+        );
+        console.log(`[Reconciliation] Wallet repayment ${row.id} restored from amount_refunded.`);
+        continue;
+      }
+
+      for (const refund of refunds) {
+        if (refund.status !== 'processed' && refund.status !== 'pending') continue;
+        const amount = Number(refund.amount ?? 0);
+        if (amount <= 0 || !refund.id) continue;
+        const result = await creditWalletService.reverseRazorpayRepayment(paymentId, amount, refund.id);
+        if (result.reversed) {
+          console.log(
+            `[Reconciliation] Wallet repayment ${row.id} reversed ₹${result.amount} from ${refund.id}.`,
+          );
+        }
+      }
+    } catch (err) {
+      console.error(`[Reconciliation] Wallet refund check failed for ${row.id}:`, err);
     }
   }
 }
