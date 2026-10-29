@@ -358,7 +358,12 @@ export function PricingWorkspace() {
               type="button"
               disabled={changeCount === 0}
               onClick={() => setReviewOpen(true)}
-              className="h-10 min-h-[48px] px-4 rounded-[12px] bg-primary text-white font-semibold text-[13px] disabled:opacity-50"
+              className={cn(
+                'h-10 min-h-[48px] px-4 rounded-[12px] font-semibold text-[13px]',
+                changeCount > 0
+                  ? 'bg-primary text-white'
+                  : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed',
+              )}
             >
               Review & publish {changeCount > 0 ? changeCount : ''} changes
             </button>
