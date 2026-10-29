@@ -197,6 +197,7 @@ export default function DisccoCreditDetailPage() {
         },
         modal: { ondismiss: () => setPaying(false) },
         theme: { color: '#6B1D2E' },
+        display: { offers: false },
       });
       rzp.open();
     } catch (e) {
