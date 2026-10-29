@@ -154,12 +154,13 @@ describe('razorpay capture', () => {
 
   it('puts automatic capture on every Razorpay order', async () => {
     expect(razorpayOrderCaptureFields()).toEqual({
+      payment_capture: true,
       payment: {
         capture: 'automatic',
         capture_options: {
-        automatic_expiry_period: RAZORPAY_AUTOMATIC_EXPIRY_MINUTES,
-        manual_expiry_period: RAZORPAY_MANUAL_EXPIRY_MINUTES,
-        refund_speed: 'optimum',
+          automatic_expiry_period: RAZORPAY_AUTOMATIC_EXPIRY_MINUTES,
+          manual_expiry_period: RAZORPAY_MANUAL_EXPIRY_MINUTES,
+          refund_speed: 'optimum',
         },
       },
     });
@@ -184,6 +185,7 @@ describe('razorpay capture', () => {
       amount: 100000,
       currency: 'INR',
       offers: [],
+      payment_capture: true,
       payment: { capture: 'automatic', capture_options: expect.objectContaining({ automatic_expiry_period: 4320, manual_expiry_period: 7200, refund_speed: 'optimum' }) },
     }));
     // Partner Offers Engine only — not Horeca1 coupons/promotions.
