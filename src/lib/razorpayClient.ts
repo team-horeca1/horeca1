@@ -10,6 +10,15 @@ export function isRazorpayUserCancel(err: unknown): boolean {
   return err instanceof Error && /cancelled|canceled|dismiss|closed/i.test(err.message);
 }
 
+/**
+ * Abandon the checkout only when verify failed for a reason that means the
+ * bank did not hold the money. CAPTURE_PENDING / PAYMENT_NOT_CAPTURED must
+ * stay pending so reconciliation can finish or record the refund.
+ */
+export function shouldAbandonAfterVerifyFailure(errorCode: string | undefined): boolean {
+  return errorCode !== 'CAPTURE_PENDING' && errorCode !== 'PAYMENT_NOT_CAPTURED';
+}
+
 export function loadRazorpayScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined') {

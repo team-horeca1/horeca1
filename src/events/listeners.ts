@@ -337,6 +337,23 @@ export function registerEventListeners(): void {
     }
   });
 
+  eventBus.on('PaymentRefunded', async (payload) => {
+    try {
+      const notifications = await getNotifications();
+      await notifications.send({
+        userId: payload.userId,
+        type: 'payment',
+        channel: 'in_app',
+        title: 'Payment refunded',
+        body: `₹${payload.amount.toLocaleString('en-IN')} for order ${payload.orderId} was refunded by Razorpay. ${payload.reason}`,
+        referenceId: payload.orderId,
+        referenceType: 'payment',
+      });
+    } catch (error) {
+      console.error('[Events] PaymentRefunded listener failed:', error);
+    }
+  });
+
   // ── User / Vendor onboarding ────────────────────────────────────
 
   eventBus.on('UserRegistered', async (payload) => {

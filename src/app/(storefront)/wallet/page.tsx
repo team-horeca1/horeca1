@@ -117,7 +117,13 @@ async function startRepayment(
             }),
           });
           const vj = await v.json();
-          if (!v.ok || !vj.success) throw new Error(vj.error?.message || 'Could not verify payment');
+          if (!v.ok || !vj.success) {
+            if (vj.error?.code === 'CAPTURE_PENDING') {
+              toast.message(vj.error.message || 'Payment is processing. Do not pay again.');
+              return;
+            }
+            throw new Error(vj.error?.message || 'Could not verify payment');
+          }
           toast.success('Payment received');
         } catch (e) {
           toast.error(e instanceof Error ? e.message : 'Payment verification failed');

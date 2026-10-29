@@ -482,7 +482,13 @@ export default function CartPage() {
                     }),
                 });
                 const verifyData = await verifyRes.json();
-                if (!verifyRes.ok) throw new Error(verifyData.error?.message || 'Payment verification failed');
+                if (!verifyRes.ok) {
+                    if (verifyData.error?.code === 'CAPTURE_PENDING') {
+                        setOrderError(verifyData.error?.message || 'Your payment is processing. We will confirm the order once Razorpay finishes collecting it. Do not pay again.');
+                        return;
+                    }
+                    throw new Error(verifyData.error?.message || 'Payment verification failed');
+                }
             }
 
             // Remove only the paid-for items so unpaid POs stay in cart for later.

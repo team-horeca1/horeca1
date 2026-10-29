@@ -30,7 +30,7 @@ import {
     CheckoutOffersPanel,
     type CheckoutOfferChoicesView,
 } from '@/components/features/promo/CheckoutOffersPanel';
-import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
+import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAbandonAfterVerifyFailure, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 
@@ -1028,11 +1028,18 @@ function CheckoutPageContent() {
                 });
                 const verifyData = await verifyRes.json();
                 if (!verifyRes.ok) {
-                    await fetch('/api/v1/payments/abandon', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ razorpay_order_id }),
-                    }).catch(() => { /* best-effort */ });
+                    const code = verifyData.error?.code as string | undefined;
+                    if (shouldAbandonAfterVerifyFailure(code)) {
+                        await fetch('/api/v1/payments/abandon', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ razorpay_order_id }),
+                        }).catch(() => { /* best-effort */ });
+                    }
+                    if (code === 'CAPTURE_PENDING') {
+                        setOrderError(verifyData.error?.message || 'Your payment is processing. We will confirm the order once Razorpay finishes collecting it. Do not pay again.');
+                        return;
+                    }
                     throw new Error(verifyData.error?.message || 'Payment verification failed');
                 }
             }

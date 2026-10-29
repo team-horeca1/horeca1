@@ -2,6 +2,11 @@ import { Prisma, CreditRepaymentMode, BillingModelType, CreditWalletStatus, Cred
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
+import {
+  CapturePendingError,
+  PaymentNotCapturedError,
+  ensurePaymentCaptured,
+} from '@/lib/razorpayCapture';
 import { SMS_TEMPLATES } from '@/lib/providers/smsTemplates';
 import type { NotificationService } from '@/modules/notification/notification.service';
 import {
@@ -998,7 +1003,7 @@ export class CreditWalletService {
    * order/payment/signature triplet the moment payment succeeds; we verify the
    * HMAC (order_id|payment_id with RAZORPAY_KEY_SECRET — the checkout signature,
    * NOT the webhook secret), confirm the pending repayment belongs to this user,
-   * then apply it. The webhook is only a server-to-server backup; relying on it
+   * then confirm Razorpay has captured it before applying it. The webhook is only a server-to-server backup; relying on it
    * alone meant a captured payment never reached the wallet in test mode / on
    * localhost, where Razorpay can't call back. Idempotent: `applyRepayment`
    * dedupes on razorpayPaymentId (unique index), so verify + webhook can't
@@ -1021,6 +1026,15 @@ export class CreditWalletService {
     });
     if (!repayment) throw Errors.notFound('Repayment');
     if (repayment.wallet.userId !== userId) throw Errors.forbidden('Not your repayment');
+
+    const expectedPaise = Math.round(Number(repayment.amount) * 100);
+    try {
+      await ensurePaymentCaptured(razorpayPaymentId, expectedPaise);
+    } catch (err) {
+      if (err instanceof CapturePendingError) throw Errors.capturePending();
+      if (err instanceof PaymentNotCapturedError) throw Errors.paymentNotCaptured(err.message);
+      throw err;
+    }
 
     const updated = await this.applyRepayment(
       repayment.walletId,

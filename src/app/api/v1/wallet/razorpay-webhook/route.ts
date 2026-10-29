@@ -1,11 +1,18 @@
-// POST /api/v1/wallet/razorpay-webhook — Razorpay payment.captured -> apply repayment.
+// POST /api/v1/wallet/razorpay-webhook — Razorpay capture -> apply repayment.
 // Public endpoint, but HMAC-signature verified + idempotent (applyRepayment dedupes
 // on razorpayPaymentId, backed by a unique index).
+// payment.authorized is captured here before credit is applied. A signature alone
+// is not enough — the repayment stays PENDING until Razorpay status is captured.
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { errorResponse } from '@/middleware/errorHandler';
+import {
+  CapturePendingError,
+  PaymentNotCapturedError,
+  ensurePaymentCaptured,
+} from '@/lib/razorpayCapture';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,23 +31,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 400 });
     }
 
-    const event = JSON.parse(rawBody);
-    if (event.event === 'payment.captured') {
-      const entity = event.payload?.payment?.entity;
-      const razorpayOrderId = entity?.order_id;
-      const razorpayPaymentId = entity?.id;
-      const amount = Number(entity?.amount ?? 0) / 100;
+    const event = JSON.parse(rawBody) as {
+      event?: string;
+      payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number; status?: string } } };
+    };
+    const entity = event.payload?.payment?.entity;
+    const razorpayOrderId = entity?.order_id;
+    const razorpayPaymentId = entity?.id;
 
-      if (razorpayOrderId && razorpayPaymentId) {
-        // Backup path: the client-driven /verify-repayment normally applies this
-        // first. applyRepayment finalizes the matching PENDING row to SUCCESS and
-        // is idempotent on razorpayPaymentId (unique index) — so a webhook that
-        // arrives after /verify (or a Razorpay replay) is a safe no-op.
-        const repayment = await prisma.creditWalletRepayment.findFirst({
-          where: { razorpayOrderId },
-        });
-        if (repayment) {
-          await creditWalletService.applyRepayment(repayment.walletId, amount || Number(repayment.amount), 'RAZORPAY', razorpayOrderId, razorpayPaymentId);
+    if (
+      (event.event === 'payment.authorized' || event.event === 'payment.captured')
+      && razorpayOrderId
+      && razorpayPaymentId
+    ) {
+      const repayment = await prisma.creditWalletRepayment.findFirst({
+        where: { razorpayOrderId },
+      });
+      if (repayment) {
+        const expectedPaise = Math.round(Number(repayment.amount) * 100);
+        try {
+          // Always read the live payment. A payment.captured payload can arrive
+          // after the payment was refunded, and a payment.authorized payload can
+          // describe an earlier state that is already captured.
+          await ensurePaymentCaptured(razorpayPaymentId, expectedPaise);
+          await creditWalletService.applyRepayment(
+            repayment.walletId,
+            Number(repayment.amount),
+            'RAZORPAY',
+            razorpayOrderId,
+            razorpayPaymentId,
+          );
+        } catch (err) {
+          if (err instanceof CapturePendingError || err instanceof PaymentNotCapturedError) {
+            return NextResponse.json({ success: true, applied: false });
+          }
+          throw err;
         }
       }
     }
