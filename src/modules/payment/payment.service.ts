@@ -121,12 +121,16 @@ export class PaymentService {
       ? orders[0].orderNumber
       : `multi-${orders[0].orderNumber}-${orders.length}`;
 
+    // `offers: []` is valid on Orders API but missing from razorpay@2.9.6 types.
+    // Empty list suppresses Offers Engine partner cashback (Cred etc.) that fails
+    // Test Mode with "Offers-engine external offer not found".
     const razorpayOrder = await getRazorpay().orders.create({
       amount: Math.round(totalAmount * 100), // paise
       currency: 'INR',
       receipt,
+      offers: [],
       ...razorpayOrderCaptureFields(),
-    });
+    } as Parameters<ReturnType<typeof getRazorpay>['orders']['create']>[0]);
 
     // One Payment row per horeca order — all linked to the same razorpayOrderId.
     await prisma.payment.createMany({

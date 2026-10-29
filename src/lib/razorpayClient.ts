@@ -58,6 +58,7 @@ export function openRazorpayPopup(opts: {
       theme: { color: CDL.primary },
       // Partner/dashboard offers (Cred UPI etc.) can fail checkout with
       // "Offers-engine external offer not found" — especially in Test Mode.
+      // Pair with order-level `offers: []` in payment.service.
       display: { offers: false },
       handler: (response: RazorpaySuccessPayload) => settle(() => resolve(response)),
       modal: {

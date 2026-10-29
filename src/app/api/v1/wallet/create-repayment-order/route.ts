@@ -30,8 +30,10 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       amount: Math.round(amount * 100), // paise
       currency: 'INR',
       receipt: `wallet_repay_${walletId.slice(0, 8)}_${String(Date.now()).slice(-6)}`,
+      // Suppress Offers Engine partner cashback that breaks Test Mode payments.
+      offers: [],
       ...razorpayOrderCaptureFields(),
-    });
+    } as Parameters<ReturnType<typeof getRazorpay>['orders']['create']>[0]);
 
     const repayment = await prisma.creditWalletRepayment.create({
       data: {
