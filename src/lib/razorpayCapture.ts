@@ -41,6 +41,17 @@ export function razorpayOrderCaptureFields() {
   };
 }
 
+/**
+ * Razorpay Offers Engine partner cashback (Cred / Amazon Pay etc.) auto-attaches
+ * when `offers` is omitted and can fail Test Mode with
+ * "Offers-engine external offer not found". An empty list suppresses those
+ * partner offers only. Horeca1 coupons / DiSCCO / store promotions are separate
+ * and are not controlled by this field.
+ */
+export function razorpayOrderOfferFields() {
+  return { offers: [] as string[] };
+}
+
 export function auditApplyRequested(argv: readonly string[]): boolean {
   return argv.includes('--apply');
 }

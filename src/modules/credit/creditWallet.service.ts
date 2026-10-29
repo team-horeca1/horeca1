@@ -953,9 +953,18 @@ export class CreditWalletService {
 
       // Finalize the existing PENDING record (Razorpay flow) instead of leaving an
       // orphan; else create one (cash/manual flow).
+      // Never re-apply after SUCCESS / PARTIAL_REFUND / REFUNDED for the same order —
+      // a delayed payment.captured after refund must not reduce outstanding again.
       let repayment = null;
       if (razorpayOrderId) {
-        const pending = await tx.creditWalletRepayment.findFirst({ where: { razorpayOrderId, status: 'PENDING' } });
+        const existing = await tx.creditWalletRepayment.findFirst({
+          where: { razorpayOrderId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (existing && existing.status !== 'PENDING') {
+          return tx.creditWallet.findUnique({ where: { id: walletId } });
+        }
+        const pending = existing?.status === 'PENDING' ? existing : null;
         if (pending) {
           repayment = await tx.creditWalletRepayment.update({
             where: { id: pending.id },
