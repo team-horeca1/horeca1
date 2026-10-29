@@ -334,14 +334,14 @@ export function PricingWorkspace() {
             <button
               type="button"
               onClick={openImport}
-              className="h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white font-semibold text-[13px] flex items-center gap-1.5"
+              className="hidden h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white font-semibold text-[13px] items-center gap-1.5"
             >
               <Upload size={15} /> Import
             </button>
             <button
               type="button"
               onClick={exportMatrix}
-              className="h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white font-semibold text-[13px] flex items-center gap-1.5"
+              className="hidden h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white font-semibold text-[13px] items-center gap-1.5"
             >
               <Download size={15} /> Export
             </button>
