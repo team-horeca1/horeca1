@@ -893,62 +893,67 @@ export function PriceGrid({
                         ) : (
                           <div
                             className={cn(
-                              'px-2 py-2 flex items-center justify-end gap-1.5 min-h-[36px] group/cell',
+                              'px-2 py-1.5 flex flex-col items-end justify-center gap-0.5 min-h-[44px] group/cell',
                               source !== 'custom' && 'text-[#7C7C7C]',
                               source === 'custom' && 'text-[#181725] font-semibold',
                               dirtyCell && 'border-l-2 border-l-primary bg-[#F8E8EC]/40',
                             )}
                             title={`${inr(price)} ex-GST · ${inr(priceGross)} incl. ${row.taxPercent || 0}% GST`}
                           >
-                            {locked && <span title="Locked — bulk adjust will skip this price"><Lock size={11} className="text-[#7C7C7C] shrink-0" /></span>}
-                            <span>{inr(price)}</span>
-                            {source === 'custom' && (
-                              <span className="text-[9px] font-bold px-1 py-px rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                                {deltaPct === 0 ? 'Custom' : `Custom ${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct)}%`}
-                              </span>
-                            )}
-                            {source === 'list' && (
-                              <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">
-                                List −{Number(col.discountPercent)}%
-                              </span>
-                            )}
-                            {source === 'base' && (
-                              <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">Base</span>
-                            )}
-                            {isActiveCell && !locked && (
-                              <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} title="Edit price" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
-                            )}
-                            {!locked && (isPercentList(col) ? customOverride : true) && (
-                              <button
-                                type="button"
-                                aria-label={
-                                  isPercentList(col)
-                                    ? `Reset ${row.name} in ${col.name}`
-                                    : `Remove ${row.name} from ${col.name}`
-                                }
-                                title={resetTooltip(col)}
-                                className={cn(
-                                  'w-5 h-5 rounded-full border bg-white text-[11px] font-bold leading-none flex items-center justify-center shrink-0',
-                                  isPercentList(col)
-                                    ? 'border-[#E9E3DD] text-[#6B1D2E] hover:bg-[#F8E8EC]'
-                                    : 'border-red-200 text-red-600 hover:bg-red-50',
-                                )}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isPercentList(col)) {
-                                    resetCell(row, col);
-                                    toast.success(
-                                      `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`,
-                                    );
-                                    return;
+                            <div className="flex items-center justify-end gap-1.5 w-full">
+                              {locked && <span title="Locked — bulk adjust will skip this price"><Lock size={11} className="text-[#7C7C7C] shrink-0" /></span>}
+                              <span className="tabular-nums">{inr(price)}</span>
+                              {source === 'custom' && (
+                                <span className="text-[9px] font-bold px-1 py-px rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                  {deltaPct === 0 ? 'Custom' : `Custom ${deltaPct < 0 ? '−' : '+'}${Math.abs(deltaPct)}%`}
+                                </span>
+                              )}
+                              {source === 'list' && (
+                                <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">
+                                  List −{Number(col.discountPercent)}%
+                                </span>
+                              )}
+                              {source === 'base' && (
+                                <span className="text-[9px] font-semibold px-1 py-px rounded-full bg-[#FAF7F2] border border-[#E9E3DD] text-[#7C7C7C]">Base</span>
+                              )}
+                              {isActiveCell && !locked && (
+                                <button type="button" aria-label={`Edit price for ${row.name} in ${col.name}`} title="Edit price" className="text-primary shrink-0" onClick={(e) => { e.stopPropagation(); startEdit(ri, ci); }}><Pencil size={12} /></button>
+                              )}
+                              {!locked && (isPercentList(col) ? customOverride : true) && (
+                                <button
+                                  type="button"
+                                  aria-label={
+                                    isPercentList(col)
+                                      ? `Reset ${row.name} in ${col.name}`
+                                      : `Remove ${row.name} from ${col.name}`
                                   }
-                                  requestRemoveFromList([{ row, col }]);
-                                }}
-                              >
-                                {isPercentList(col) ? <RotateCcw size={11} /> : <X size={12} strokeWidth={2.5} />}
-                              </button>
-                            )}
+                                  title={resetTooltip(col)}
+                                  className={cn(
+                                    'w-5 h-5 rounded-full border bg-white text-[11px] font-bold leading-none flex items-center justify-center shrink-0',
+                                    isPercentList(col)
+                                      ? 'border-[#E9E3DD] text-[#6B1D2E] hover:bg-[#F8E8EC]'
+                                      : 'border-red-200 text-red-600 hover:bg-red-50',
+                                  )}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isPercentList(col)) {
+                                      resetCell(row, col);
+                                      toast.success(
+                                        `${row.name} reset to list −${Number(col.discountPercent)}% (draft) — Review & publish to apply`,
+                                      );
+                                      return;
+                                    }
+                                    requestRemoveFromList([{ row, col }]);
+                                  }}
+                                >
+                                  {isPercentList(col) ? <RotateCcw size={11} /> : <X size={12} strokeWidth={2.5} />}
+                                </button>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-medium text-[#667085] tabular-nums">
+                              {inr(priceGross)} <span className="font-normal text-[#AEAEAE]">incl. GST</span>
+                            </span>
                           </div>
                         )}
                       </td>
