@@ -236,6 +236,15 @@ export const Errors = {
   conflict: (message: string) =>
     new ApiError('CONFLICT', message, 409),
 
+  /** Razorpay authorized the payment; capture has not finished. Do not abandon. */
+  capturePending: (
+    message = 'Payment is authorized and capture has not completed. We will confirm it shortly. Do not pay again.',
+  ) => new ApiError('CAPTURE_PENDING', message, 409),
+
+  /** Razorpay did not capture (failed, refunded, or amount mismatch). Do not mark paid. */
+  paymentNotCaptured: (message: string) =>
+    new ApiError('PAYMENT_NOT_CAPTURED', message, 409),
+
   badRequest: (message: string, details?: Record<string, unknown>) =>
     new ApiError('BAD_REQUEST', message, 400, details),
 

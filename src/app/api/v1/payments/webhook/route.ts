@@ -1,6 +1,8 @@
 // POST /api/v1/payments/webhook — Razorpay server-to-server webhook
 // WHY: Razorpay fires this even when the user closes the browser before /verify runs.
-//      It is the safety net that ensures payment.captured always marks the order as paid.
+//      payment.captured marks the order paid. payment.authorized is captured first;
+//      the order stays unpaid until Razorpay confirms captured. refund.processed
+//      marks a paid order's paymentStatus refunded without rewinding fulfillment.
 //
 // SECURITY NOTES:
 //   - No auth middleware — Razorpay calls this unauthenticated.

@@ -74,6 +74,7 @@ export const AUDIT_ACTIONS = {
   nominationUpdate: 'voice_nomination.update',
   nominationDelete: 'voice_nomination.delete',
   orderMarkPaid: 'order.mark_paid',
+  paymentRefunded: 'payment.refunded',
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];

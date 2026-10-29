@@ -68,6 +68,15 @@ export interface PaymentFailedPayload {
   reason: string;
 }
 
+export interface PaymentRefundedPayload {
+  orderId: string;
+  paymentId: string;
+  userId: string;
+  vendorId: string;
+  amount: number;
+  reason: string;
+}
+
 export interface StockUpdatedPayload {
   productId: string;
   vendorId: string;
@@ -252,6 +261,7 @@ export interface EventMap {
   OrderDeliveryOtp: OrderDeliveryOtpPayload;
   PaymentReceived: PaymentReceivedPayload;
   PaymentFailed: PaymentFailedPayload;
+  PaymentRefunded: PaymentRefundedPayload;
   StockUpdated: StockUpdatedPayload;
   CreditApplied: CreditAppliedPayload;
   CreditDue: CreditDuePayload;
