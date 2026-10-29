@@ -116,8 +116,8 @@ if [[ "$user_count" == "1" ]]; then
   fi
 fi
 
-echo "==> Restart demo app + worker"
-"${COMPOSE[@]}" up -d --force-recreate demo-app demo-worker
+echo "==> Restart demo app + notification worker + reconciliation"
+"${COMPOSE[@]}" up -d --force-recreate demo-app demo-worker demo-reconciliation
 
 # Reload nginx (prod compose) so demo upstream resolves after first bring-up.
 if docker ps --format '{{.Names}}' | grep -qx horeca1-nginx; then

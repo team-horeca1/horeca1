@@ -90,6 +90,26 @@ services:
     networks:
       - demo_net
 
+  demo-reconciliation:
+    image: ghcr.io/team-horeca1/horeca1-worker:${DEMO_DEPLOY_SHA:-latest}
+    container_name: horeca1-demo-reconciliation
+    restart: unless-stopped
+    command: ["npx", "tsx", "src/workers/reconciliation.scheduler.ts"]
+    environment:
+      - NODE_ENV=production
+      - APP_ENV=demo
+      - DATABASE_URL=postgresql://horeca1_demo:${DEMO_POSTGRES_PASSWORD}@demo-postgres:5432/horeca1_demo
+      - REDIS_URL=redis://demo-redis:6379/0
+    env_file:
+      - ../.env.demo
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+    networks:
+      - demo_net
+
 volumes:
   demo_pgdata:
   demo_redisdata:
