@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Lock,
@@ -47,12 +47,15 @@ interface Props {
   onLoadMore?: () => void;
   onListsChanged?: () => void;
   onEditProducts?: () => void;
-  /** Increment from parent to open the bulk-adjust dialog for the first visible list column. */
-  openBulkAdjustNonce?: number;
   selectedProductIds?: Set<string>;
   onSelectedProductIdsChange?: (ids: Set<string>) => void;
   compareMode?: boolean;
 }
+
+/** Imperative API so the toolbar opens bulk adjust only on an explicit click (not on remount). */
+export type PriceGridHandle = {
+  openBulkAdjust: () => void;
+};
 
 function cellLocked(row: ProductRow, col: PriceListCol, dirty: Record<string, DraftCell>): boolean {
   const key = cellKey(row.id, col.id);
@@ -64,7 +67,7 @@ function cellLocked(row: ProductRow, col: PriceListCol, dirty: Record<string, Dr
   return !!row.cells[col.id]?.isLocked;
 }
 
-export function PriceGrid({
+export const PriceGrid = forwardRef<PriceGridHandle, Props>(function PriceGrid({
   rows,
   cols,
   dirty,
@@ -75,11 +78,10 @@ export function PriceGrid({
   onLoadMore,
   onListsChanged,
   onEditProducts,
-  openBulkAdjustNonce = 0,
   selectedProductIds,
   onSelectedProductIdsChange,
   compareMode,
-}: Props) {
+}, ref) {
   const [active, setActive] = useState<{ r: number; c: number } | null>(null);
   const [anchor, setAnchor] = useState<{ r: number; c: number } | null>(null);
   const [editing, setEditing] = useState<{ r: number; c: number } | null>(null);
@@ -148,14 +150,16 @@ export function PriceGrid({
     setBulkScope(selectedProductIds && selectedProductIds.size > 0 ? 'selected' : 'all');
   }, [selectedProductIds]);
 
-  const lastBulkNonce = useRef(0);
-  useEffect(() => {
-    if (!openBulkAdjustNonce || openBulkAdjustNonce === lastBulkNonce.current) return;
-    lastBulkNonce.current = openBulkAdjustNonce;
-    const col = cols[0];
-    if (!col) return;
-    openBulkAdjustForCol(col.id);
-  }, [openBulkAdjustNonce, cols, openBulkAdjustForCol]);
+  useImperativeHandle(ref, () => ({
+    openBulkAdjust: () => {
+      const col = cols[0];
+      if (!col) {
+        toast.error('No price list to adjust');
+        return;
+      }
+      openBulkAdjustForCol(col.id);
+    },
+  }), [cols, openBulkAdjustForCol]);
 
   const selection = useMemo(() => {
     if (!active || !anchor) return new Set<string>();
@@ -709,7 +713,7 @@ export function PriceGrid({
               {cols.map((col) => (
                 <th
                   key={col.id}
-                  className="p-2 border-b border-l border-[#E9E3DD] min-w-[108px] align-top"
+                  className="p-2 border-b border-l border-[#E9E3DD] min-w-[148px] align-top"
                 >
                   <div className="flex items-start justify-between gap-1">
                     <div className="min-w-0">
@@ -1355,4 +1359,4 @@ export function PriceGrid({
       )}
     </div>
   );
-}
+});

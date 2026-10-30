@@ -26,7 +26,7 @@ import {
   type ProductRow,
 } from './types';
 import { useDraft } from './grid/useDraft';
-import { PriceGrid } from './grid/PriceGrid';
+import { PriceGrid, type PriceGridHandle } from './grid/PriceGrid';
 import { ReviewPublishDrawer } from './ReviewPublishDrawer';
 import { PublishHistoryTab } from './PublishHistoryTab';
 import { WhyThisPriceDrawer } from './WhyThisPriceDrawer';
@@ -48,7 +48,7 @@ export function PricingWorkspace() {
   const [hasMore, setHasMore] = useState(false);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
-  const [bulkAdjustNonce, setBulkAdjustNonce] = useState(0);
+  const priceGridRef = useRef<PriceGridHandle>(null);
 
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -483,7 +483,7 @@ export function PricingWorkspace() {
               {!compare && activeCol && (
                 <button
                   type="button"
-                  onClick={() => setBulkAdjustNonce((n) => n + 1)}
+                  onClick={() => priceGridRef.current?.openBulkAdjust()}
                   disabled={rows.length === 0}
                   className="h-11 px-3.5 rounded-[12px] border border-[#E9E3DD] bg-white hover:bg-[#FAF7F2] text-[13px] font-semibold text-[#181725] inline-flex items-center gap-1.5 disabled:opacity-40"
                 >
@@ -539,6 +539,7 @@ export function PricingWorkspace() {
             </div>
           ) : (
             <PriceGrid
+              ref={priceGridRef}
               rows={rows}
               cols={displayCols}
               dirty={dirty}
@@ -553,7 +554,6 @@ export function PricingWorkspace() {
                   ? () => openPicker({ id: activeCol.id, name: activeCol.name })
                   : undefined
               }
-              openBulkAdjustNonce={bulkAdjustNonce}
               selectedProductIds={selectedProductIds}
               onSelectedProductIdsChange={setSelectedProductIds}
               compareMode={compare}
