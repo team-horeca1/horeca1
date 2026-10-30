@@ -33,6 +33,7 @@ import {
 import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAbandonAfterVerifyFailure, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { isSyntheticOutletName } from '@/lib/constants/customerProfile';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
 
@@ -376,8 +377,13 @@ function CheckoutPageContent() {
         (selectedAddress?.fullAddress && selectedAddress.fullAddress.trim().length > 5),
     );
     const needsDeliveryAddress = !hasDeliverableAddress;
+    const needsOutletName = Boolean(
+        currentOutlet && isSyntheticOutletName(currentOutlet.name),
+    );
     const checkoutBlocked =
-        needsDeliveryAddress || (!!currentOutlet && currentOutlet.requiresAddressUpdate);
+        needsDeliveryAddress
+        || (!!currentOutlet && currentOutlet.requiresAddressUpdate)
+        || needsOutletName;
     const [step, setStep] = useState<CheckoutStep>('review');
     const [selectedPayment, setSelectedPayment] = useState('');
     const [orderSnapshot, setOrderSnapshot] = useState<{ groups: VendorCartGroup[], total: number, count: number } | null>(null);
@@ -925,6 +931,10 @@ function CheckoutPageContent() {
             setOrderError('Add a delivery address to this outlet before placing the order.');
             return;
         }
+        if (currentOutlet && isSyntheticOutletName(currentOutlet.name)) {
+            setOrderError('Enter a branch / outlet name for this delivery location before placing the order.');
+            return;
+        }
         const missingMode = selectedGroups.find((g) => !modeByVendor[g.vendorId]?.mode);
         if (missingMode) {
             setOrderError(`Choose a delivery mode for ${missingMode.vendorName}.`);
@@ -1425,6 +1435,22 @@ function CheckoutPageContent() {
                                             Add one now
                                         </Link>
                                     )} to continue.
+                                </div>
+                            </div>
+                        )}
+
+                        {needsOutletName && !currentOutlet?.requiresAddressUpdate && (
+                            <div className="text-[13px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
+                                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    This delivery location needs a real branch / outlet name. {activeBusinessAccountId && (
+                                        <Link
+                                            href={`/account/${activeBusinessAccountId}/outlets`}
+                                            className="underline font-bold hover:text-orange-800"
+                                        >
+                                            Edit the outlet
+                                        </Link>
+                                    )} before placing orders.
                                 </div>
                             </div>
                         )}

@@ -18,10 +18,9 @@ import {
 import {
   SALUTATIONS, GST_TREATMENTS, PAYMENT_TERMS, LANGUAGES, INDIAN_STATES,
   BUSINESS_SIZES, CUSTOMER_BUSINESS_TYPES,
-  subTypesForBusinessType, cuisinesForSubType, defaultOutletName,
+  subTypesForBusinessType, cuisinesForSubType,
 } from '@/lib/constants/customerProfile';
 import { validateFieldBlur, type CustomerProfileInput } from '@/lib/validators/customer-profile';
-import { derivedDisplayName, derivedLegalName } from '@/lib/validators/customer-profile';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 export interface ContactPerson {
@@ -174,8 +173,6 @@ export function CustomerProfileForm({
   };
 
   const handleAddressPick = (place: AddressPickPayload) => {
-    const legal = derivedLegalName(value);
-    const display = derivedDisplayName(value);
     const resolvedAddress = place.fullAddress || place.shortAddress || '';
     const patch: Partial<CustomerProfileValues> = {
       addressLine: resolvedAddress,
@@ -192,11 +189,7 @@ export function CustomerProfileForm({
       patch.billingState = place.state;
       patch.billingPincode = place.pincode;
     }
-    if (!value.outletName?.trim() && place.businessName) {
-      patch.outletName = `${place.businessName} Outlet`;
-    } else if (!value.outletName?.trim() && (display || legal)) {
-      patch.outletName = defaultOutletName(display, legal);
-    }
+    // Do not invent an outlet name from the place or display name — the user must type it.
     set(patch);
   };
 

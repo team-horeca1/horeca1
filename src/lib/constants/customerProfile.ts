@@ -123,6 +123,22 @@ export function defaultOutletName(displayName: string, legalName: string): strin
   return base ? `${base} — Main` : 'Primary Outlet';
 }
 
+/** Names the system used to invent — treat as not captured. */
+const SYNTHETIC_OUTLET_EXACT = new Set(['Primary Outlet', 'Branch Outlet']);
+
+/**
+ * True when the outlet name was never typed by the user (blank, or a legacy
+ * auto-generated "{display} — Main" / Primary Outlet / Branch Outlet).
+ */
+export function isSyntheticOutletName(name: string | null | undefined): boolean {
+  const n = (name ?? '').trim();
+  if (n.length < 2) return true;
+  if (SYNTHETIC_OUTLET_EXACT.has(n)) return true;
+  // defaultOutletName always ends with the em-dash + " Main" suffix.
+  if (n.endsWith(' — Main')) return true;
+  return false;
+}
+
 /**
  * addressLine stamped on a freshly-provisioned primary outlet that has no real
  * address yet. Used as the signal that the outlet is an empty placeholder the
