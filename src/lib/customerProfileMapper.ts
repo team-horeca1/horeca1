@@ -12,7 +12,7 @@ import {
   primaryPhoneDigits,
   resolvedAddressLine,
 } from '@/lib/validators/customer-profile';
-import { defaultOutletName, PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
+import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
 
 function str(v: string | undefined | null): string | null {
   const t = (v ?? '').trim();
@@ -141,13 +141,13 @@ export function mapToPrimaryOutlet(p: CustomerProfileInput): {
   placeId: string | null;
   requiresAddressUpdate: boolean;
 } {
-  const legalName = derivedLegalName(p);
-  const displayName = derivedDisplayName(p);
   const addressLine = resolvedAddressLine(p);
   const hasCoords = p.latitude != null && p.longitude != null;
 
+  // Do not invent "{display} — Main". Blank stays blank until the user types one.
+  // Prisma requires a non-null string; empty string means "not captured yet".
   return {
-    name: str(p.outletName) || defaultOutletName(displayName, legalName),
+    name: str(p.outletName) || '',
     addressLine: addressLine || PLACEHOLDER_OUTLET_ADDRESS,
     flatInfo: str(p.flatInfo),
     landmark: str(p.landmark),

@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { GST_RE, PAN_RE, PINCODE_RE } from '@/lib/validators/vendor-kyc';
+import { isSyntheticOutletName } from '@/lib/constants/customerProfile';
 import { mapToPrimaryOutlet } from '@/lib/customerProfileMapper';
 import type { CustomerProfileInput } from '@/lib/validators/customer-profile';
 
@@ -58,6 +59,7 @@ export async function completeCustomerProfile(
   const pan = trim(input.pan).toUpperCase();
   const pincode = trim(input.pincode || input.billingPincode);
   const password = trim(input.password);
+  const outletName = trim(input.outletName);
 
   if (gstin && !GST_RE.test(gstin)) throw Errors.badRequest('Invalid GSTIN');
   if (pan && !PAN_RE.test(pan)) throw Errors.badRequest('Invalid PAN');
@@ -67,6 +69,18 @@ export async function completeCustomerProfile(
   const addressLine = trim(input.addressLine || input.billingAddressLine);
   const hasAddress = !!addressLine || !!pincode;
   const outletId = member?.businessAccount.primaryOutletId ?? null;
+
+  if (hasAddress) {
+    if (isSyntheticOutletName(outletName)) {
+      throw Errors.badRequest('Enter a branch / outlet name before saving the address');
+    }
+    if (!addressLine || addressLine.length < 5) {
+      throw Errors.badRequest('Enter the full delivery address');
+    }
+    if (!pincode || !PINCODE_RE.test(pincode)) {
+      throw Errors.badRequest('Pincode must be 6 digits');
+    }
+  }
 
   const passwordHash = password ? await bcrypt.hash(password, 10) : null;
 
@@ -98,10 +112,19 @@ export async function completeCustomerProfile(
 
     if (hasAddress && outletId) {
       const outlet = mapToPrimaryOutlet(input);
+      const existing = await tx.outlet.findUnique({
+        where: { id: outletId },
+        select: { name: true },
+      });
+      // Never overwrite a real name with blank / synthetic; only write a typed name.
+      const nextName = !isSyntheticOutletName(outlet.name)
+        ? outlet.name
+        : (existing && !isSyntheticOutletName(existing.name) ? existing.name : outlet.name);
+
       await tx.outlet.update({
         where: { id: outletId },
         data: {
-          name: outlet.name,
+          name: nextName,
           addressLine: outlet.addressLine,
           flatInfo: outlet.flatInfo,
           landmark: outlet.landmark,

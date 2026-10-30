@@ -19,7 +19,7 @@
 
 import type { Prisma, Outlet } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
+import { isSyntheticOutletName, PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 
 export interface OutletAddressFields {
@@ -105,6 +105,24 @@ function locationDedupeKey(o: {
  * Must run inside a transaction so the caller can keep the linked SavedAddress
  * in sync atomically.
  */
+/**
+ * Resolve the name to persist on adopt/update.
+ * - Typed real name always wins (including over synthetic "{display} — Main").
+ * - Empty incoming name never wipes a real existing name.
+ * - Synthetic existing + empty incoming → leave existing (still synthetic) so
+ *   checkout can refuse until the user types a real branch name.
+ */
+function resolveOutletName(
+  incoming: string,
+  existingName: string | null | undefined,
+): string | undefined {
+  const next = incoming.trim();
+  if (!isSyntheticOutletName(next)) return next;
+  if (existingName != null && !isSyntheticOutletName(existingName)) return undefined;
+  // Both blank/synthetic — write blank so we stop inventing Branch Outlet.
+  return next || '';
+}
+
 export async function adoptOrCreateOutlet(
   tx: Prisma.TransactionClient,
   businessAccountId: string,
@@ -140,14 +158,19 @@ export async function adoptOrCreateOutlet(
           requiresAddressUpdate: true,
           addressLine: PLACEHOLDER_OUTLET_ADDRESS,
         },
-        select: { id: true },
+        select: { id: true, name: true },
       })
     : null;
 
   if (placeholderPrimary) {
+    const namePatch = resolveOutletName(fields.name, placeholderPrimary.name);
     const outlet = await tx.outlet.update({
       where: { id: placeholderPrimary.id },
-      data: { ...addressData, isActive: true },
+      data: {
+        ...addressData,
+        isActive: true,
+        ...(namePatch !== undefined ? { name: namePatch } : {}),
+      },
     });
     return { outlet, adopted: true };
   }
@@ -159,32 +182,37 @@ export async function adoptOrCreateOutlet(
 
   const activeMatch = candidates.find((o) => o.isActive && sameLocation(o, fields));
   if (activeMatch) {
+    const namePatch = resolveOutletName(fields.name, activeMatch.name);
     const outlet = await tx.outlet.update({
       where: { id: activeMatch.id },
-      data: addressData,
+      data: {
+        ...addressData,
+        ...(namePatch !== undefined ? { name: namePatch } : {}),
+      },
     });
     return { outlet, adopted: true };
   }
 
   const inactiveMatch = candidates.find((o) => !o.isActive && sameLocation(o, fields));
   if (inactiveMatch) {
+    const namePatch = resolveOutletName(fields.name, inactiveMatch.name);
     const outlet = await tx.outlet.update({
       where: { id: inactiveMatch.id },
       data: {
         ...addressData,
         isActive: true,
-        // Keep existing branch name unless caller provided a meaningful one
-        ...(fields.name.trim() ? { name: fields.name.trim() } : {}),
+        ...(namePatch !== undefined ? { name: namePatch } : {}),
         ...(fields.code !== undefined ? { code: fields.code ?? null } : {}),
       },
     });
     return { outlet, adopted: true };
   }
 
+  const createName = !isSyntheticOutletName(fields.name) ? fields.name.trim() : (fields.name.trim() || '');
   const outlet = await tx.outlet.create({
     data: {
       businessAccountId,
-      name: fields.name,
+      name: createName,
       code: fields.code ?? null,
       isActive: true,
       ...addressData,

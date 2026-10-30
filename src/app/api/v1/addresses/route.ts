@@ -85,7 +85,8 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
         // First real address adopts the empty placeholder primary outlet instead
         // of spawning a duplicate that leaves the primary stuck "Address needed".
         const { outlet } = await adoptOrCreateOutlet(tx, businessAccountId, {
-          name: input.businessName || input.label || 'Branch Outlet',
+          // Prefer typed outlet / business name. Never invent "Branch Outlet".
+          name: (input.businessName || '').trim(),
           addressLine: input.fullAddress,
           flatInfo: input.flatInfo,
           landmark: input.landmark,

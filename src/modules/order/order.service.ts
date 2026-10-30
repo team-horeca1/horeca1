@@ -21,6 +21,7 @@ import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.servic
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { isSyntheticOutletName } from '@/lib/constants/customerProfile';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -218,6 +219,11 @@ export class OrderService {
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
     if (outlet.requiresAddressUpdate) {
       throw Errors.badRequest('Active outlet needs its address completed before placing orders');
+    }
+    if (isSyntheticOutletName(outlet.name)) {
+      throw Errors.badRequest(
+        'Enter a branch / outlet name for this delivery location before placing orders',
+      );
     }
     const deliveryAddressSnapshot: Prisma.InputJsonValue = { ...outlet };
     // Location pricing follows the chosen "Deliver to" address (server-trusted

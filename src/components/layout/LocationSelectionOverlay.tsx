@@ -121,7 +121,9 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         setSearchQuery('');
         clearPredictions();
 
-        if (details.isAreaLevel || !details.pincodeReliable) {
+        // Area-level picks, unreliable pins, or no place name → confirm sheet so
+        // the user types a real outlet / branch name.
+        if (details.isAreaLevel || !details.pincodeReliable || !details.businessName?.trim()) {
             setInitialCoords({ lat: details.latitude, lng: details.longitude });
             setIsAddNewOpen(true);
             return;
@@ -129,7 +131,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
         const addressInput: Omit<Address, 'id'> = {
             label: 'Other',
-            businessName: details.businessName,
+            businessName: details.businessName.trim(),
             fullAddress: details.fullAddress,
             shortAddress: details.shortAddress,
             latitude: details.latitude,

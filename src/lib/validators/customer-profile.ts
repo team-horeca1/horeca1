@@ -159,6 +159,14 @@ export function validateCustomerProfile(
 
   if (context === 'completeProfile') {
     if (password && password.length < 6) errors.password = 'Password must be at least 6 characters';
+    // Address is optional on complete-profile, but when any address field is present
+    // the branch name, street, and pincode must all be real.
+    const hasAnyAddress = !!(addressLine || pincode || outletName);
+    if (hasAnyAddress) {
+      if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
+      if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';
+      if (!pincode || !PINCODE_RE.test(pincode)) errors.pincode = 'Pincode must be 6 digits';
+    }
   }
 
   if (context === 'selfRegister' || context === 'adminCreate') {
@@ -192,6 +200,16 @@ export function validateCustomerProfile(
       errors.password = 'Password must be at least 6 characters';
     } else if (relaxed && password && password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
+    }
+
+    // Admin create: when an address is supplied, require a real outlet name too.
+    if (context === 'adminCreate') {
+      const hasAnyAddress = !!(addressLine || pincode || outletName);
+      if (hasAnyAddress) {
+        if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
+        if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';
+        if (!pincode || !PINCODE_RE.test(pincode)) errors.pincode = 'Pincode must be 6 digits';
+      }
     }
   }
 

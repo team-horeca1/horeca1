@@ -66,6 +66,8 @@ function AddressPreview({ shortAddress, fullAddress, pincode, city, isGeocoding,
 }
 
 interface FormFieldsProps {
+    outletName: string;
+    setOutletName: (v: string) => void;
     flatInfo: string;
     setFlatInfo: (v: string) => void;
     landmark: string;
@@ -81,15 +83,35 @@ interface FormFieldsProps {
 }
 
 function FormFields({
+    outletName, setOutletName,
     flatInfo, setFlatInfo, landmark, setLandmark,
     shortAddress, fullAddress, pincode, setPincode, city, isGeocoding, isLocating,
     showFieldErrors,
 }: FormFieldsProps) {
+    const outletError = showFieldErrors && outletName.trim().length < 2;
     const flatError = showFieldErrors && !flatInfo.trim();
     const pinError = showFieldErrors && !/^\d{6}$/.test(pincode);
 
     return (
         <div className="space-y-4">
+            <div>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Outlet / Branch name <span className="text-primary">*</span>
+                </label>
+                <input
+                    type="text"
+                    value={outletName}
+                    onChange={(e) => setOutletName(e.target.value)}
+                    placeholder="e.g. Rockville Vashi Branch"
+                    className={cn(
+                        'w-full px-4 py-3 border rounded-xl text-[13px] outline-none focus:border-primary transition-colors',
+                        outletError ? 'border-red-400' : 'border-gray-200',
+                    )}
+                />
+                {outletError && (
+                    <p className="mt-1 text-[11px] font-medium text-red-600">Outlet name is required</p>
+                )}
+            </div>
             <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                     Shop no. / Floor / Building <span className="text-primary">*</span>
@@ -281,6 +303,7 @@ export function AddNewAddressOverlay({
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
+    const [outletName, setOutletName] = useState('');
     const [flatInfo, setFlatInfo] = useState('');
     const [landmark, setLandmark] = useState('');
     const [isFetchingDetails, setIsFetchingDetails] = useState(false);
@@ -317,6 +340,10 @@ export function AddNewAddressOverlay({
         setMapPlaceId(details.placeId);
         setMapLatLng({ lat: details.latitude, lng: details.longitude });
         allowGeocodeRef.current = true;
+        // Prefill only when the user has not typed a name yet — Google place name is a real pick.
+        if (details.businessName?.trim()) {
+            setOutletName((prev) => (prev.trim() ? prev : details.businessName!.trim()));
+        }
 
         if (mapRef.current) {
             mapRef.current.panTo({ lat: details.latitude, lng: details.longitude });
@@ -547,12 +574,14 @@ export function AddNewAddressOverlay({
 
     const handleSave = useCallback(async () => {
         if (!mapAddress || savingRef.current) return;
+        const trimmedOutlet = outletName.trim();
+        if (trimmedOutlet.length < 2) return;
         savingRef.current = true;
         setSaving(true);
         try {
             await onSave({
                 label: 'Business',
-                businessName: selectedPlace?.businessName,
+                businessName: trimmedOutlet,
                 fullAddress: mapAddress,
                 shortAddress: mapShortAddress || mapAddress.split(',').slice(0, 2).join(', '),
                 latitude: mapLatLng.lat,
@@ -569,11 +598,12 @@ export function AddNewAddressOverlay({
             savingRef.current = false;
             setSaving(false);
         }
-    }, [mapAddress, mapShortAddress, mapLatLng, mapPincode, mapCity, mapState, mapPlaceId, selectedPlace, flatInfo, landmark, onSave]);
+    }, [mapAddress, mapShortAddress, mapLatLng, mapPincode, mapCity, mapState, mapPlaceId, selectedPlace, flatInfo, landmark, outletName, onSave]);
 
     const pinOk = /^\d{6}$/.test(mapPincode);
     const isAreaLevel = !!selectedPlace?.isAreaLevel;
-    const canSave = !!mapAddress && !!flatInfo.trim() && pinOk && !isAreaLevel && !isGeocodingPin && !isLocatingGps && !saving;
+    const outletOk = outletName.trim().length >= 2;
+    const canSave = !!mapAddress && outletOk && !!flatInfo.trim() && pinOk && !isAreaLevel && !isGeocodingPin && !isLocatingGps && !saving;
 
     const trySave = () => {
         if (!canSave) {
@@ -584,10 +614,12 @@ export function AddNewAddressOverlay({
     };
 
     const saveHint = !canSave && !isGeocodingPin && !isLocatingGps && !saving
-        ? 'Add shop/unit number and a 6-digit pincode to continue'
+        ? 'Add outlet name, shop/unit number, and a 6-digit pincode to continue'
         : null;
 
     const formProps: FormFieldsProps = {
+        outletName,
+        setOutletName,
         flatInfo,
         setFlatInfo,
         landmark,
