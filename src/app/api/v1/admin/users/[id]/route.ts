@@ -479,7 +479,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
             const newOutlet = await tx.outlet.create({
               data: {
                 businessAccountId: bizAccountId,
-                name: targetOutletName || 'Main Outlet',
+                name: (targetOutletName || '').trim() || '',
                 addressLine: targetAddressLine || 'Address not set',
                 flatInfo: targetFlatInfo || null,
                 landmark: targetLandmark || null,

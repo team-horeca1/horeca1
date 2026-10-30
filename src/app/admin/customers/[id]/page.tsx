@@ -568,7 +568,7 @@ export default function CustomerDetailsPage() {
                                                     return (
                                                         <div className="space-y-4">
                                                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                                <InfoCardField label="Primary Outlet Name" value={primaryOutlet?.name || user.businessName || 'Main Outlet'} />
+                                                                <InfoCardField label="Primary Outlet Name" value={primaryOutlet?.name || user.businessName || '—'} />
                                                                 <div className="sm:col-span-2">
                                                                     <InfoCardField label="Delivery Address" value={deliveryAddress || 'Not set'} />
                                                                 </div>

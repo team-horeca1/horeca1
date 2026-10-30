@@ -19,7 +19,10 @@
 
 import type { Prisma, Outlet } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { isSyntheticOutletName, PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
+import {
+  normalizeOutletName,
+  PLACEHOLDER_OUTLET_ADDRESS,
+} from '@/lib/constants/customerProfile';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 
 export interface OutletAddressFields {
@@ -116,11 +119,17 @@ function resolveOutletName(
   incoming: string,
   existingName: string | null | undefined,
 ): string | undefined {
-  const next = incoming.trim();
-  if (!isSyntheticOutletName(next)) return next;
-  if (existingName != null && !isSyntheticOutletName(existingName)) return undefined;
-  // Both blank/synthetic — write blank so we stop inventing Branch Outlet.
-  return next || '';
+  const next = normalizeOutletName(incoming);
+  if (next) return next;
+  // Incoming blank/synthetic — keep a real existing name; otherwise heal legacy "— Main".
+  const existingNormalized = normalizeOutletName(existingName);
+  if (existingNormalized) {
+    // Persist the stripped form when the DB still has "— Main".
+    if ((existingName ?? '').trim() !== existingNormalized) return existingNormalized;
+    return undefined;
+  }
+  // Both blank/synthetic — write blank so we stop inventing Branch Outlet / Main.
+  return '';
 }
 
 export async function adoptOrCreateOutlet(
@@ -208,7 +217,7 @@ export async function adoptOrCreateOutlet(
     return { outlet, adopted: true };
   }
 
-  const createName = !isSyntheticOutletName(fields.name) ? fields.name.trim() : (fields.name.trim() || '');
+  const createName = normalizeOutletName(fields.name) || '';
   const outlet = await tx.outlet.create({
     data: {
       businessAccountId,

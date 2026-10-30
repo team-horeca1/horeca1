@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { GST_RE, PAN_RE, PINCODE_RE } from '@/lib/validators/vendor-kyc';
-import { isSyntheticOutletName } from '@/lib/constants/customerProfile';
+import { normalizeOutletName } from '@/lib/constants/customerProfile';
 import { mapToPrimaryOutlet } from '@/lib/customerProfileMapper';
 import type { CustomerProfileInput } from '@/lib/validators/customer-profile';
 
@@ -70,8 +70,9 @@ export async function completeCustomerProfile(
   const hasAddress = !!addressLine || !!pincode;
   const outletId = member?.businessAccount.primaryOutletId ?? null;
 
+  const normalizedOutletName = normalizeOutletName(outletName);
   if (hasAddress) {
-    if (isSyntheticOutletName(outletName)) {
+    if (!normalizedOutletName) {
       throw Errors.badRequest('Enter a branch / outlet name before saving the address');
     }
     if (!addressLine || addressLine.length < 5) {
@@ -111,15 +112,16 @@ export async function completeCustomerProfile(
     });
 
     if (hasAddress && outletId) {
-      const outlet = mapToPrimaryOutlet(input);
+      const outlet = mapToPrimaryOutlet({ ...input, outletName: normalizedOutletName });
       const existing = await tx.outlet.findUnique({
         where: { id: outletId },
         select: { name: true },
       });
-      // Never overwrite a real name with blank / synthetic; only write a typed name.
-      const nextName = !isSyntheticOutletName(outlet.name)
-        ? outlet.name
-        : (existing && !isSyntheticOutletName(existing.name) ? existing.name : outlet.name);
+      // Prefer typed name; heal legacy "— Main" on the existing row if needed.
+      const nextName =
+        normalizeOutletName(outlet.name)
+        || normalizeOutletName(existing?.name)
+        || '';
 
       await tx.outlet.update({
         where: { id: outletId },
