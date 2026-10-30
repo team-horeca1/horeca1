@@ -118,25 +118,64 @@ export function cuisinesForSubType(businessType: string, subType: string): reado
   return CUISINE_BY_SUBTYPE[`${businessType}|${subType}`] ?? [];
 }
 
+/**
+ * @deprecated Do not invent outlet names. Prefer a blank string until the user types one.
+ * Kept for tests / legacy callers — returns the display/legal base with no "Main" suffix.
+ */
 export function defaultOutletName(displayName: string, legalName: string): string {
-  const base = displayName.trim() || legalName.trim();
-  return base ? `${base} — Main` : 'Primary Outlet';
+  return displayName.trim() || legalName.trim() || '';
 }
 
 /** Names the system used to invent — treat as not captured. */
-const SYNTHETIC_OUTLET_EXACT = new Set(['Primary Outlet', 'Branch Outlet']);
+const SYNTHETIC_OUTLET_EXACT = new Set([
+  'Primary Outlet',
+  'Branch Outlet',
+  'Main Outlet',
+  'Main',
+]);
+
+const LEGACY_MAIN_SUFFIXES = [' — Main', ' - Main', ' – Main'] as const;
+
+/**
+ * Strip the legacy "{display} — Main" suffix (and similar). Outlets are just
+ * outlets — nothing is called "Main".
+ */
+export function stripLegacyMainOutletSuffix(name: string | null | undefined): string {
+  let n = (name ?? '').trim();
+  for (const suffix of LEGACY_MAIN_SUFFIXES) {
+    if (n.endsWith(suffix)) {
+      n = n.slice(0, -suffix.length).trim();
+      break;
+    }
+  }
+  if (SYNTHETIC_OUTLET_EXACT.has(n)) return '';
+  return n;
+}
 
 /**
  * True when the outlet name was never typed by the user (blank, or a legacy
- * auto-generated "{display} — Main" / Primary Outlet / Branch Outlet).
+ * auto-generated "{display} — Main" / Primary Outlet / Branch Outlet / Main).
  */
 export function isSyntheticOutletName(name: string | null | undefined): boolean {
-  const n = (name ?? '').trim();
-  if (n.length < 2) return true;
-  if (SYNTHETIC_OUTLET_EXACT.has(n)) return true;
-  // defaultOutletName always ends with the em-dash + " Main" suffix.
-  if (n.endsWith(' — Main')) return true;
+  const stripped = stripLegacyMainOutletSuffix(name);
+  // Still has a Main-style suffix that strip left empty, or was blank/exact synthetic.
+  const raw = (name ?? '').trim();
+  if (raw.length < 2) return true;
+  if (SYNTHETIC_OUTLET_EXACT.has(raw)) return true;
+  for (const suffix of LEGACY_MAIN_SUFFIXES) {
+    if (raw.endsWith(suffix)) return true;
+  }
+  if (stripped.length < 2) return true;
   return false;
+}
+
+/**
+ * Prefer a typed name; if the only name we have is "{x} — Main", return "x"
+ * so the outlet is no longer labeled Main. Blank / exact placeholders stay blank.
+ */
+export function normalizeOutletName(name: string | null | undefined): string {
+  const stripped = stripLegacyMainOutletSuffix(name);
+  return stripped.length >= 2 ? stripped : '';
 }
 
 /**

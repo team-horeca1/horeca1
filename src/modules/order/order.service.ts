@@ -21,7 +21,7 @@ import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.servic
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
-import { isSyntheticOutletName } from '@/lib/constants/customerProfile';
+import { isSyntheticOutletName, normalizeOutletName } from '@/lib/constants/customerProfile';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -208,7 +208,7 @@ export class OrderService {
 
     // Snapshot the outlet address once outside the transaction — same value
     // is written onto every PO in this checkout batch.
-    const outlet = await prisma.outlet.findFirst({
+    let outlet = await prisma.outlet.findFirst({
       where: { id: outletId, businessAccountId },
       select: {
         name: true, addressLine: true, flatInfo: true, landmark: true,
@@ -219,6 +219,15 @@ export class OrderService {
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
     if (outlet.requiresAddressUpdate) {
       throw Errors.badRequest('Active outlet needs its address completed before placing orders');
+    }
+    // Heal legacy "{display} — Main" → "{display}". Nothing is called Main anymore.
+    const healedName = normalizeOutletName(outlet.name);
+    if (healedName && healedName !== outlet.name.trim()) {
+      await prisma.outlet.update({
+        where: { id: outletId },
+        data: { name: healedName },
+      });
+      outlet = { ...outlet, name: healedName };
     }
     if (isSyntheticOutletName(outlet.name)) {
       throw Errors.badRequest(
