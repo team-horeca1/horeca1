@@ -64,19 +64,11 @@ export async function listPublishedVoiceStories(limit = 20): Promise<VoiceStoryP
   return [];
 }
 
-/** Homepage teaser: one live story per category, newest first, max 8. */
+/** Homepage teaser row: latest published first; fill the 4-up desktop grid (no one-per-category). */
+const HOMEPAGE_VOICES_VISIBLE = 4;
+
 export async function listHomepageVoiceStories(): Promise<VoiceStoryPublic[]> {
-  const all = await listPublishedVoiceStories(40);
-  const seen = new Set<string>();
-  const picked: VoiceStoryPublic[] = [];
-  for (const story of all) {
-    const key = String(story.category);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    picked.push(story);
-    if (picked.length >= 8) break;
-  }
-  return picked;
+  return listPublishedVoiceStories(HOMEPAGE_VOICES_VISIBLE);
 }
 
 export async function getPublishedVoiceStoryBySlug(slug: string): Promise<VoiceStoryPublic | null> {
