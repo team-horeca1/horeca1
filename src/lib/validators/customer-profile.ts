@@ -150,10 +150,11 @@ export function validateCustomerProfile(
   if (context === 'selfRegisterLite') {
     if (!trim(data.firstName)) errors.firstName = 'First name is required';
     if (!trim(data.lastName)) errors.lastName = 'Last name is required';
-    if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
-    if (!trim(data.displayName)) errors.displayName = 'Display name is required';
+    if (!legalName || legalName.length < 2) errors.legalName = 'Restaurant / business name is required';
+    // Display name is optional at signup — fall back to legal name when empty.
     const mobile = trim(data.mobilePhone || data.phone).replace(/\D/g, '').slice(-10);
     if (mobile.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+    if (!pincode || !PINCODE_RE.test(pincode)) errors.pincode = 'Enter a valid 6-digit pincode';
     if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
   }
 

@@ -13,6 +13,7 @@ import {
   resolvedAddressLine,
 } from '@/lib/validators/customer-profile';
 import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
+import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 
 function str(v: string | undefined | null): string | null {
   const t = (v ?? '').trim();
@@ -142,10 +143,13 @@ export function mapToPrimaryOutlet(p: CustomerProfileInput): {
   requiresAddressUpdate: boolean;
 } {
   const addressLine = resolvedAddressLine(p);
-  const hasCoords = p.latitude != null && p.longitude != null;
+  const pincode = str(p.pincode || p.billingPincode);
+  const latitude = p.latitude ?? null;
+  const longitude = p.longitude ?? null;
 
   // Do not invent "{display} — Main". Blank stays blank until the user types one.
   // Prisma requires a non-null string; empty string means "not captured yet".
+  // First-order-ready when pincode (or real coords) is present — street can come later.
   return {
     name: str(p.outletName) || '',
     addressLine: addressLine || PLACEHOLDER_OUTLET_ADDRESS,
@@ -153,11 +157,11 @@ export function mapToPrimaryOutlet(p: CustomerProfileInput): {
     landmark: str(p.landmark),
     city: str(p.city || p.billingCity),
     state: str(p.state || p.billingState),
-    pincode: str(p.pincode || p.billingPincode),
-    latitude: p.latitude ?? null,
-    longitude: p.longitude ?? null,
+    pincode,
+    latitude,
+    longitude,
     placeId: str(p.placeId),
-    requiresAddressUpdate: !addressLine || !hasCoords,
+    requiresAddressUpdate: !hasUsableDeliveryLocation({ pincode, latitude, longitude }),
   };
 }
 

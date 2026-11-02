@@ -155,16 +155,14 @@ export async function adoptOrCreateOutlet(
     select: { primaryOutletId: true },
   });
 
-  // Only the still-empty placeholder primary is eligible for adoption. Keying on
-  // the placeholder addressLine (not just requiresAddressUpdate) guarantees we
-  // never overwrite an outlet that already has a real address but lacks a
-  // serviceable pincode.
+  // Adopt the primary when it still has the placeholder street line (pincode-only
+  // signup clears requiresAddressUpdate but keeps this addressLine until a real
+  // street is saved). Never overwrite an outlet that already has a real street.
   const placeholderPrimary = account?.primaryOutletId
     ? await tx.outlet.findFirst({
         where: {
           id: account.primaryOutletId,
           businessAccountId,
-          requiresAddressUpdate: true,
           addressLine: PLACEHOLDER_OUTLET_ADDRESS,
         },
         select: { id: true, name: true },

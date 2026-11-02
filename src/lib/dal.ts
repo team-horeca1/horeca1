@@ -393,6 +393,57 @@ function toCategory(c: Record<string, unknown>): Category {
   };
 }
 
+type CategoryTreeNode = Record<string, unknown> & {
+  children?: Array<Record<string, unknown>>;
+};
+
+/** Dedup concurrent tree fetches from showcase / rails / navbar. */
+let categoryTreeInflight: Promise<CategoryTreeNode[]> | null = null;
+
+function getSharedCategoryTree(): Promise<CategoryTreeNode[]> {
+  if (!categoryTreeInflight) {
+    categoryTreeInflight = apiFetch<CategoryTreeNode[]>('/api/v1/categories').finally(() => {
+      categoryTreeInflight = null;
+    });
+  }
+  return categoryTreeInflight;
+}
+
+function mapRailItem(item: {
+  master: {
+    id: string;
+    name: string;
+    sku?: string;
+    imageUrl: string | null;
+    images?: string[];
+    packSize: string | null;
+    unit: string | null;
+  } | null;
+  vendorCount: number;
+  defaultOffer: Record<string, unknown>;
+  offers: Record<string, unknown>[];
+}) {
+  const defaultOffer = toVendorProduct(item.defaultOffer);
+  if (item.master) {
+    if (item.master.name) defaultOffer.displayName = item.master.name;
+    if (item.master.imageUrl || (item.master.images && item.master.images[0])) {
+      const imgs = [
+        ...(item.master.imageUrl ? [item.master.imageUrl] : []),
+        ...(item.master.images ?? []),
+      ].filter(Boolean);
+      if (imgs.length > 0) defaultOffer.images = imgs;
+    }
+    if (item.master.packSize) defaultOffer.packSize = item.master.packSize;
+    if (item.master.unit) defaultOffer.unit = item.master.unit;
+  }
+  return {
+    master: item.master,
+    vendorCount: item.vendorCount,
+    defaultOffer,
+    offers: (item.offers ?? []).map((o) => toVendorProduct(o)),
+  };
+}
+
 // ---- API FUNCTIONS ----
 
 export const dal = {
@@ -444,19 +495,13 @@ export const dal = {
   categories: {
     /** List all categories */
     async list() {
-      const data = await apiFetch<Record<string, unknown>[]>('/api/v1/categories');
+      const data = await getSharedCategoryTree();
       return data.map(toCategory);
     },
 
     /** Roots with nested children (raw API shape — for homepage rails). */
     async listTree() {
-      return apiFetch<
-        Array<
-          Record<string, unknown> & {
-            children?: Array<Record<string, unknown>>;
-          }
-        >
-      >('/api/v1/categories');
+      return getSharedCategoryTree();
     },
 
     /** Fair category aisle rails — one item per MasterProduct with competing offers. */
@@ -485,28 +530,56 @@ export const dal = {
 
       return {
         noVendorsForPincode: Boolean(data.noVendorsForPincode),
-        items: (data.items ?? []).map((item) => {
-          const defaultOffer = toVendorProduct(item.defaultOffer);
-          // Prefer master identity on the card when available
-          if (item.master) {
-            if (item.master.name) defaultOffer.displayName = item.master.name;
-            if (item.master.imageUrl || (item.master.images && item.master.images[0])) {
-              const imgs = [
-                ...(item.master.imageUrl ? [item.master.imageUrl] : []),
-                ...(item.master.images ?? []),
-              ].filter(Boolean);
-              if (imgs.length > 0) defaultOffer.images = imgs;
-            }
-            if (item.master.packSize) defaultOffer.packSize = item.master.packSize;
-            if (item.master.unit) defaultOffer.unit = item.master.unit;
-          }
-          return {
-            master: item.master,
-            vendorCount: item.vendorCount,
-            defaultOffer,
-            offers: (item.offers ?? []).map((o) => toVendorProduct(o)),
-          };
-        }),
+        items: (data.items ?? []).map(mapRailItem),
+      };
+    },
+
+    /**
+     * Homepage Shop-by-Category rails — one batched, Redis-backed response
+     * instead of N per-category product calls.
+     */
+    async getHomepageRails(options?: { pincode?: string; parentId?: string }) {
+      const params = new URLSearchParams();
+      if (options?.pincode) params.set('pincode', options.pincode);
+      if (options?.parentId) params.set('parentId', options.parentId);
+      const qs = params.toString() ? `?${params}` : '';
+      const data = await apiFetch<{
+        rails: Array<{
+          category: { id: string; name: string; slug: string };
+          subtitle: string;
+          items: Array<{
+            master: {
+              id: string;
+              name: string;
+              sku?: string;
+              imageUrl: string | null;
+              images?: string[];
+              packSize: string | null;
+              unit: string | null;
+            } | null;
+            vendorCount: number;
+            defaultOffer: Record<string, unknown>;
+            offers: Record<string, unknown>[];
+          }>;
+        }>;
+        tabs: Array<{
+          id: string;
+          name: string;
+          slug: string;
+          image?: string;
+          children: Array<{ id: string; name: string; slug: string }>;
+        }>;
+        noVendorsForPincode?: boolean;
+      }>(`/api/v1/homepage/category-rails${qs}`);
+
+      return {
+        noVendorsForPincode: Boolean(data.noVendorsForPincode),
+        tabs: data.tabs ?? [],
+        rails: (data.rails ?? []).map((rail) => ({
+          category: rail.category,
+          subtitle: rail.subtitle,
+          items: (rail.items ?? []).map(mapRailItem),
+        })),
       };
     },
 

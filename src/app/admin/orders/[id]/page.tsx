@@ -28,6 +28,11 @@ import { toast } from 'sonner';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { InitiateReturnModal } from '@/components/features/orders/InitiateReturnModal';
 import {
+    ORDER_STATUS_OPTIONS,
+    ORDER_STATUS_STYLE,
+    orderStatusLabel,
+} from '@/components/features/orders/orderStatus';
+import {
     StatusTimeline,
     ORDER_STATUS_STEPS,
     orderTimelineCurrentKey,
@@ -111,30 +116,8 @@ interface OrderData {
     deliveryOtpVerifiedAt?: string | null;
 }
 
-const ORDER_STATUSES = [
-    'pending',
-    'confirmed',
-    'processing',
-    'shipped',
-    'delivered',
-    'cancelled',
-] as const;
-
 function getStatusBadgeClasses(status: string): string {
-    switch (status) {
-        case 'delivered':
-        case 'confirmed':
-            return 'bg-[#F8E8EC] text-[#6B1D2E] border-[#F8E8EC]';
-        case 'processing':
-        case 'pending':
-            return 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]';
-        case 'shipped':
-            return 'bg-[#E8F0FE] text-[#1A56DB] border-[#DBEAFE]';
-        case 'cancelled':
-            return 'bg-[#FDF2F2] text-[#EF4444] border-[#FEE2E2]';
-        default:
-            return 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]';
-    }
+    return ORDER_STATUS_STYLE[status] || 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]';
 }
 
 function getPaymentStatusBadgeClasses(status: string): string {
@@ -922,9 +905,16 @@ export default function OrderDetailsPage() {
                                     disabled={updatingStatus}
                                     className="w-full h-[38px] px-3 bg-white border border-[#D1D5DB] rounded-[8px] text-[13px] font-bold text-[#374151] outline-none focus:border-[#6B1D2E] cursor-pointer"
                                 >
-                                    {ORDER_STATUSES.map((s) => (
+                                    {!ORDER_STATUS_OPTIONS.includes(
+                                        selectedStatus as (typeof ORDER_STATUS_OPTIONS)[number],
+                                    ) && (
+                                        <option value={selectedStatus} disabled>
+                                            {orderStatusLabel(selectedStatus)}
+                                        </option>
+                                    )}
+                                    {ORDER_STATUS_OPTIONS.map((s) => (
                                         <option key={s} value={s}>
-                                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                                            {orderStatusLabel(s)}
                                         </option>
                                     ))}
                                 </select>
@@ -950,7 +940,10 @@ export default function OrderDetailsPage() {
                             {selectedStatus !== order.status && (
                                 <div className="text-[11px] text-[#B45309] bg-[#FFF8EB] border border-[#FEF3C7] p-2.5 rounded-lg flex items-center gap-1 font-bold">
                                     <CornerDownRight size={13} className="shrink-0" />
-                                    <span>Transitions: {order.status} &rarr; {selectedStatus}</span>
+                                    <span>
+                                        Transitions: {orderStatusLabel(order.status)} &rarr;{' '}
+                                        {orderStatusLabel(selectedStatus)}
+                                    </span>
                                 </div>
                             )}
                         </div>
@@ -967,7 +960,7 @@ export default function OrderDetailsPage() {
                                 'inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase border',
                                 getStatusBadgeClasses(order.status)
                             )}>
-                                {order.status.replace(/_/g, ' ')}
+                                {orderStatusLabel(order.status)}
                             </span>
                         </div>
 

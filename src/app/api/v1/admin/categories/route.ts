@@ -12,6 +12,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { syncCategoryParentLinks, getCategoryParentIds } from '@/modules/catalog/catalog.service';
+import { invalidateCatalogCaches } from '@/lib/catalogCache';
 
 // Auto-generate slug from name: lowercase, replace spaces with hyphens, strip non-alphanumeric
 function slugify(name: string): string {
@@ -138,6 +139,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     if (data.parentId) {
       await syncCategoryParentLinks(category.id, [data.parentId]);
     }
+
+    await invalidateCatalogCaches();
 
     return NextResponse.json({ success: true, data: category }, { status: 201 });
   } catch (error) {

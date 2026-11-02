@@ -6,9 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { CatalogService, resolveCategoriesForPicker } from '@/modules/catalog/catalog.service';
+import { getCachedCategoryTree } from '@/lib/catalogCache';
 import { errorResponse } from '@/middleware/errorHandler';
 
 const catalogService = new CatalogService();
+
+const TREE_CACHE_CONTROL = 'public, max-age=60, stale-while-revalidate=600';
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,8 +29,21 @@ export async function GET(req: NextRequest) {
     }
 
     const parentId = params.get('parentId') || undefined;
+
+    // Full approved tree is shared across all visitors — serve from Redis.
+    if (!parentId) {
+      const categories = await getCachedCategoryTree();
+      return NextResponse.json(
+        { success: true, data: categories },
+        { headers: { 'Cache-Control': TREE_CACHE_CONTROL } },
+      );
+    }
+
     const categories = await catalogService.getCategories(parentId);
-    return NextResponse.json({ success: true, data: categories });
+    return NextResponse.json(
+      { success: true, data: categories },
+      { headers: { 'Cache-Control': TREE_CACHE_CONTROL } },
+    );
   } catch (error) {
     return errorResponse(error);
   }

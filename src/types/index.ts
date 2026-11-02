@@ -278,11 +278,15 @@ export type PaymentStatus =
     | 'refunded';
 
 export type OrderStatus =
+    | 'draft'
     | 'pending'
     | 'confirmed'
     | 'processing'
+    | 'ready_for_dispatch'
     | 'shipped'
+    | 'partially_delivered'
     | 'delivered'
+    | 'returned'
     | 'cancelled';
 
 // ---- USER MODULE ----

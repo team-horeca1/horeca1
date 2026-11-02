@@ -59,20 +59,26 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
         }
     };
 
-    const canSave = fullAddress.trim().length > 0
-        && !fullAddress.includes('Address pending');
+    const pinOk = /^\d{6}$/.test(pincode.trim());
+    const hasRealStreet =
+        fullAddress.trim().length > 0 && !fullAddress.includes('Address pending');
+    const canSave = pinOk || hasRealStreet;
 
     const handleSave = async () => {
         if (!canSave) {
-            toast.error('Search and pick a real delivery address');
+            toast.error('Enter a 6-digit pincode or pick a delivery address');
             return;
         }
         setIsSaving(true);
         try {
+            const resolvedFull =
+                hasRealStreet
+                    ? fullAddress.trim()
+                    : `Pincode ${pincode.trim()} — street later`;
             await updateAddress(address.id, {
                 businessName: businessName.trim() || undefined,
-                fullAddress: fullAddress.trim(),
-                shortAddress: shortAddress.trim() || fullAddress.trim().split(',').slice(0, 2).join(', '),
+                fullAddress: resolvedFull,
+                shortAddress: shortAddress.trim() || resolvedFull.split(',').slice(0, 2).join(', '),
                 flatInfo: flatInfo.trim() || undefined,
                 landmark: landmark.trim() || undefined,
                 pincode: pincode.trim() || undefined,
@@ -163,7 +169,25 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                         </div>
 
                         <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Floor / Unit / Building</label>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                                Pincode <span className="text-primary">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                value={pincode}
+                                onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                placeholder="6-digit delivery pincode"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors tabular-nums"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                                Floor / Unit / Building{' '}
+                                <span className="text-gray-400 normal-case font-normal">(optional)</span>
+                            </label>
                             <input
                                 type="text"
                                 value={flatInfo}

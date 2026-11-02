@@ -199,9 +199,29 @@ export function CustomerProfileForm({
   if (mode === 'register') {
     return (
       <div className={cn(GRID, 'space-y-0', className)}>
+        <div data-field="legalName">
+          <TextField
+            label="Restaurant / Business Name"
+            required
+            value={value.legalName ?? value.companyName ?? ''}
+            error={errors.legalName}
+            onChange={v =>
+              set({
+                legalName: v,
+                companyName: v,
+                // Keep display name in sync unless the user already customized it.
+                displayName:
+                  !value.displayName || value.displayName === (value.legalName ?? value.companyName)
+                    ? v
+                    : value.displayName,
+              })
+            }
+            placeholder="Restaurant / hotel / company"
+          />
+        </div>
         <div data-field="firstName">
           <TextField
-            label="First Name"
+            label="Person's first name"
             required
             value={value.firstName ?? ''}
             error={errors.firstName}
@@ -211,7 +231,7 @@ export function CustomerProfileForm({
         </div>
         <div data-field="lastName">
           <TextField
-            label="Last Name"
+            label="Person's last name"
             required
             value={value.lastName ?? ''}
             error={errors.lastName}
@@ -219,35 +239,29 @@ export function CustomerProfileForm({
             placeholder="Last name"
           />
         </div>
-        <div data-field="legalName">
-          <TextField
-            label="Legal Business Name"
-            required
-            value={value.legalName ?? value.companyName ?? ''}
-            error={errors.legalName}
-            onChange={v => set({ legalName: v, companyName: v })}
-            placeholder="Restaurant / hotel / company"
-          />
-        </div>
-        <div data-field="displayName">
-          <TextField
-            label="Display Name"
-            required
-            hint="Shown on invoices & lists"
-            value={value.displayName ?? ''}
-            error={errors.displayName}
-            onChange={v => set({ displayName: v })}
-            placeholder="e.g. Rockville Bar & Diner"
-          />
-        </div>
         <div data-field="phone">
-          <FormField label="Mobile" required error={errors.phone}>
+          <FormField label="Mobile Number" required error={errors.phone}>
             <PhoneInput
               value={value.phone ?? value.mobilePhone ?? ''}
               onChange={v => set({ phone: v, mobilePhone: v })}
               hasError={!!errors.phone}
             />
           </FormField>
+        </div>
+        <div data-field="pincode">
+          <TextField
+            label="Pincode"
+            required
+            value={value.pincode ?? value.billingPincode ?? ''}
+            error={errors.pincode}
+            onChange={v => {
+              const digits = v.replace(/\D/g, '').slice(0, 6);
+              set({ pincode: digits, billingPincode: digits });
+            }}
+            placeholder="6-digit delivery pincode"
+            maxLength={6}
+            inputMode="numeric"
+          />
         </div>
         <div data-field="email">
           <TextField

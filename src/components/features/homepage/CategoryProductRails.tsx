@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { LayoutGrid, Package, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
-import { CATEGORY_FETCH_CONCURRENCY, mapWithConcurrency } from '@/lib/mapWithConcurrency';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useCart } from '@/context/CartContext';
@@ -17,39 +16,11 @@ import { productShareContent } from '@/lib/share-cards/types';
 import { cn, formatPrice } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 
-/** Preferred leaf slugs for homepage aisle rails (order = priority). */
-const PRIORITY_SLUGS = [
-  'pulses-dal',
-  'grains-pulses',
-  'grains-rice',
-  'oils-ghee',
-  'spices-masala',
-  'herbs-seasonings',
-  'cleaning-hygiene',
-  'cleaning-supplies',
-  'dairy-cheese-eggs',
-  'milk-butter',
-  'frozen-foods',
-  'soft-drinks-water',
-] as const;
-
-const SUBTITLE_BY_SLUG: Record<string, string> = {
-  'pulses-dal': 'restocked daily',
-  'grains-pulses': 'restocked daily',
-  'grains-rice': 'bulk-rate friendly',
-  'oils-ghee': 'bulk-rate friendly',
-  'spices-masala': 'flavour essentials',
-  'herbs-seasonings': 'flavour essentials',
-  'cleaning-hygiene': 'back-of-house needs',
-  'cleaning-supplies': 'back-of-house needs',
-  'dairy-cheese-eggs': 'cold-chain ready',
-  'milk-butter': 'cold-chain ready',
-  'frozen-foods': 'freezer staples',
-  'soft-drinks-water': 'high-turn SKUs',
-};
-
-const ITEMS_PER_RAIL = 8;
 const ALL_TAB_ID = 'all';
+const LS_TREE_KEY = 'h1:categories';
+const LS_RAILS_PREFIX = 'h1:rails:';
+const TREE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+const RAILS_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
 
 interface RailCategory {
   id: string;
@@ -89,52 +60,17 @@ type CategoryTreeNode = Record<string, unknown> & {
   children?: Array<Record<string, unknown>>;
 };
 
+interface PersistedBlob<T> {
+  savedAt: number;
+  data: T;
+}
+
 function toRailCategory(c: Record<string, unknown>): RailCategory | null {
   const id = c.id as string | undefined;
   const name = (c.name as string) || '';
   const slug = (c.slug as string) || '';
   if (!id || !slug) return null;
   return { id, name, slug };
-}
-
-function pickLeafTargets(roots: CategoryTreeNode[]): RailCategory[] {
-  const leaves: RailCategory[] = [];
-  const seen = new Set<string>();
-
-  const push = (c: Record<string, unknown>) => {
-    const cat = toRailCategory(c);
-    if (!cat || seen.has(cat.id)) return;
-    seen.add(cat.id);
-    leaves.push(cat);
-  };
-
-  const bySlug = new Map<string, Record<string, unknown>>();
-  for (const root of roots) {
-    const children = Array.isArray(root.children) ? root.children : [];
-    if (children.length === 0) {
-      bySlug.set((root.slug as string) || '', root);
-      continue;
-    }
-    for (const child of children) {
-      bySlug.set((child.slug as string) || '', child);
-    }
-  }
-
-  for (const slug of PRIORITY_SLUGS) {
-    const hit = bySlug.get(slug);
-    if (hit) push(hit);
-  }
-
-  for (const root of roots) {
-    const children = Array.isArray(root.children) ? root.children : [];
-    if (children.length === 0) {
-      push(root);
-    } else {
-      for (const child of children) push(child);
-    }
-  }
-
-  return leaves;
 }
 
 function parseTabs(roots: CategoryTreeNode[]): CategoryTab[] {
@@ -152,14 +88,6 @@ function parseTabs(roots: CategoryTreeNode[]): CategoryTab[] {
     });
   }
   return tabs;
-}
-
-function targetsForTab(tabId: string, tabs: CategoryTab[], allTargets: RailCategory[]): RailCategory[] {
-  if (tabId === ALL_TAB_ID) return allTargets;
-  const parent = tabs.find((t) => t.id === tabId);
-  if (!parent) return [];
-  if (parent.children.length === 0) return [parent];
-  return parent.children;
 }
 
 function cacheKey(tabId: string, pincode?: string): string {
@@ -188,34 +116,31 @@ function itemPack(item: RailItem): string | null {
   return pack || unit || null;
 }
 
-async function fetchRails(
-  targets: RailCategory[],
-  pincode?: string,
-): Promise<RailData[]> {
-  const results = await mapWithConcurrency(
-    targets,
-    CATEGORY_FETCH_CONCURRENCY,
-    async (category) => {
-      try {
-        const { items } = await dal.categories.getProducts(category.id, {
-          pincode,
-          limit: ITEMS_PER_RAIL,
-        });
-        return {
-          category,
-          subtitle: SUBTITLE_BY_SLUG[category.slug] || 'wholesale essentials',
-          items,
-        } satisfies RailData;
-      } catch {
-        return {
-          category,
-          subtitle: SUBTITLE_BY_SLUG[category.slug] || 'wholesale essentials',
-          items: [],
-        } satisfies RailData;
-      }
-    },
-  );
-  return results.filter((r) => r.items.length > 0);
+function readLocalStorage<T>(key: string, maxAgeMs: number): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedBlob<T>;
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > maxAgeMs) return null;
+    return parsed.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStorage<T>(key: string, data: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const blob: PersistedBlob<T> = { savedAt: Date.now(), data };
+    window.localStorage.setItem(key, JSON.stringify(blob));
+  } catch {
+    // quota / private mode — ignore
+  }
+}
+
+function railsStorageKey(tabId: string, pincode?: string): string {
+  return `${LS_RAILS_PREFIX}${tabId}|${pincode ?? 'all'}`;
 }
 
 function RailSkeleton() {
@@ -238,25 +163,61 @@ function RailSkeleton() {
   );
 }
 
-export function CategoryProductRails() {
-  const [tabs, setTabs] = useState<CategoryTab[]>([]);
-  const [allTargets, setAllTargets] = useState<RailCategory[]>([]);
+export interface CategoryProductRailsProps {
+  /** Approved category tree from the server (Redis-backed). */
+  initialTree?: CategoryTreeNode[];
+}
+
+export function CategoryProductRails({ initialTree }: CategoryProductRailsProps) {
+  const seededTabs = initialTree?.length ? parseTabs(initialTree) : [];
+  const [tabs, setTabs] = useState<CategoryTab[]>(seededTabs);
   const [activeTab, setActiveTab] = useState(ALL_TAB_ID);
   const [rails, setRails] = useState<RailData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [treeReady, setTreeReady] = useState(false);
+  const [treeReady, setTreeReady] = useState(seededTabs.length > 0);
   const [picker, setPicker] = useState<RailItem | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [allEmpty, setAllEmpty] = useState(false);
 
   const cacheRef = useRef<Map<string, RailData[]>>(new Map());
   const lastPincodeRef = useRef<string | undefined>(undefined);
+  const hydratedFromLsRef = useRef(false);
 
   const { addToCart } = useCart();
   const { selectedAddress } = useAddress();
   const { currentOutlet } = useBusinessAccountSwitcher();
   const pincode = currentOutlet?.pincode ?? selectedAddress?.pincode;
   const validPincode = pincode && /^\d{6}$/.test(pincode) ? pincode : undefined;
+
+  // Paint last rails from localStorage once on mount (survives reload).
+  useEffect(() => {
+    if (hydratedFromLsRef.current) return;
+    hydratedFromLsRef.current = true;
+
+    if (!initialTree?.length) {
+      const lsTree = readLocalStorage<CategoryTreeNode[]>(LS_TREE_KEY, TREE_MAX_AGE_MS);
+      if (lsTree?.length) {
+        setTabs(parseTabs(lsTree));
+        setTreeReady(true);
+      }
+    } else {
+      writeLocalStorage(LS_TREE_KEY, initialTree);
+    }
+
+    const cachedRails = readLocalStorage<RailData[]>(
+      railsStorageKey(ALL_TAB_ID, validPincode),
+      RAILS_MAX_AGE_MS,
+    );
+    if (cachedRails && cachedRails.length > 0) {
+      const key = cacheKey(ALL_TAB_ID, validPincode);
+      cacheRef.current.set(key, cachedRails);
+      setRails(cachedRails);
+      setLoading(false);
+      setAllEmpty(false);
+    }
+    // Only seed once from storage; pincode changes re-fetch below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount seed
+  }, []);
 
   useEffect(() => {
     if (lastPincodeRef.current !== validPincode) {
@@ -265,19 +226,24 @@ export function CategoryProductRails() {
     }
   }, [validPincode]);
 
+  // Ensure tabs exist (server tree or client fetch).
   useEffect(() => {
+    if (tabs.length > 0) {
+      setTreeReady(true);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
         const tree = await dal.categories.listTree();
         if (cancelled) return;
+        writeLocalStorage(LS_TREE_KEY, tree);
         setTabs(parseTabs(tree));
-        setAllTargets(pickLeafTargets(tree));
         setTreeReady(true);
       } catch {
         if (!cancelled) {
           setTabs([]);
-          setAllTargets([]);
           setTreeReady(true);
           setAllEmpty(true);
           setLoading(false);
@@ -287,49 +253,84 @@ export function CategoryProductRails() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tabs.length]);
 
+  // One batched rails request per tab / pincode. Paint LS/memory first, then revalidate.
   useEffect(() => {
     if (!treeReady) return;
 
     const key = cacheKey(activeTab, validPincode);
-    const cached = cacheRef.current.get(key);
-    if (cached) {
-      queueMicrotask(() => {
-        setRails(cached);
-        setLoading(false);
-        if (activeTab === ALL_TAB_ID) setAllEmpty(cached.length === 0);
-      });
-      return;
+    let memory = cacheRef.current.get(key);
+    if (!memory) {
+      const fromLs = readLocalStorage<RailData[]>(
+        railsStorageKey(activeTab, validPincode),
+        RAILS_MAX_AGE_MS,
+      );
+      if (fromLs) {
+        cacheRef.current.set(key, fromLs);
+        memory = fromLs;
+      }
     }
 
-    const targets = targetsForTab(activeTab, tabs, allTargets);
+    if (memory) {
+      queueMicrotask(() => {
+        setRails(memory!);
+        setLoading(false);
+        if (activeTab === ALL_TAB_ID) setAllEmpty(memory!.length === 0);
+      });
+      // Still revalidate All tab in the background so stock/prices refresh.
+      // Parent tabs that already have memory skip network until pincode changes.
+      if (activeTab !== ALL_TAB_ID) return;
+    } else {
+      queueMicrotask(() => setLoading(true));
+    }
+
     let cancelled = false;
-    queueMicrotask(() => setLoading(true));
+    const paintedFromCache = Boolean(memory);
 
     (async () => {
-      if (targets.length === 0) {
-        if (!cancelled) {
+      try {
+        const result = await dal.categories.getHomepageRails({
+          pincode: validPincode,
+          parentId: activeTab === ALL_TAB_ID ? undefined : activeTab,
+        });
+        if (cancelled) return;
+
+        if (result.tabs.length > 0 && tabs.length === 0) {
+          setTabs(
+            result.tabs.map((t) => ({
+              id: t.id,
+              name: t.name,
+              slug: t.slug,
+              image: t.image,
+              children: t.children,
+            })),
+          );
+        }
+
+        const next = result.rails as RailData[];
+        cacheRef.current.set(key, next);
+        writeLocalStorage(railsStorageKey(activeTab, validPincode), next);
+        setRails(next);
+        setLoading(false);
+        if (activeTab === ALL_TAB_ID) setAllEmpty(next.length === 0);
+      } catch {
+        if (cancelled) return;
+        if (!paintedFromCache) {
           cacheRef.current.set(key, []);
           setRails([]);
           setLoading(false);
           if (activeTab === ALL_TAB_ID) setAllEmpty(true);
+        } else {
+          setLoading(false);
         }
-        return;
       }
-
-      const next = await fetchRails(targets, validPincode);
-      if (cancelled) return;
-      cacheRef.current.set(key, next);
-      setRails(next);
-      setLoading(false);
-      if (activeTab === ALL_TAB_ID) setAllEmpty(next.length === 0);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [treeReady, activeTab, tabs, allTargets, validPincode]);
+  }, [treeReady, activeTab, validPincode, tabs.length]);
 
   const handleAddOffer = (offer: VendorProduct) => {
     setAddingId(offer.id);
@@ -356,8 +357,6 @@ export function CategoryProductRails() {
   const activeParent = tabs.find((t) => t.id === activeTab);
   const showEmptyAisle = !loading && rails.length === 0 && activeTab !== ALL_TAB_ID;
 
-  // If there are no category tabs to render, don't show the rails loader/skeleton.
-  // (This can happen when the category tree returns children but no valid root tabs.)
   if (treeReady && tabs.length === 0) return null;
   if (treeReady && allEmpty && activeTab === ALL_TAB_ID && !loading) return null;
 

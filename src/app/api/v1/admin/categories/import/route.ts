@@ -8,6 +8,7 @@ import {
   parseCategoryImport,
 } from '@/modules/import-export/excel.service';
 import { syncCategoryParentLinks } from '@/modules/catalog/catalog.service';
+import { invalidateCatalogCaches } from '@/lib/catalogCache';
 import { requirePermission } from '@/lib/permissions/engine';
 
 /** GET ?template=true&format=xlsx|csv — blank import sheet with sample rows. */
@@ -141,6 +142,10 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           message: err instanceof Error ? err.message : 'Failed to create category',
         });
       }
+    }
+
+    if (created > 0) {
+      await invalidateCatalogCaches();
     }
 
     return NextResponse.json({

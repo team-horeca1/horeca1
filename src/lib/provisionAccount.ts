@@ -166,12 +166,16 @@ export async function provisionDefaultAccount(
     data: { primaryOutletId: outlet.id },
   });
 
-  // V2.2: Ensure customer has a default SavedAddress matching this primary outlet
-  // so storefront checkout, cart delivery address, and order placement immediately resolve.
-  if (flags.isCustomer && outletData.addressLine && outletData.addressLine !== PLACEHOLDER_OUTLET_ADDRESS) {
+  // Ensure customer has a default SavedAddress so checkout / deliver-to resolve.
+  // Pincode-only signup is enough for a first order; street can be filled later.
+  if (flags.isCustomer && outletData.pincode) {
     const existingSaved = await db.savedAddress.findFirst({
       where: { userId: input.userId },
     });
+    const fullAddress =
+      outletData.addressLine && outletData.addressLine !== PLACEHOLDER_OUTLET_ADDRESS
+        ? outletData.addressLine
+        : `Pincode ${outletData.pincode} — street later`;
     if (!existingSaved) {
       await db.savedAddress.create({
         data: {
@@ -179,8 +183,8 @@ export async function provisionDefaultAccount(
           outletId: outlet.id,
           label: outletData.name || 'Primary Delivery Address',
           businessName: (baData as { legalName?: string }).legalName || input.businessName || input.fullName,
-          fullAddress: outletData.addressLine,
-          shortAddress: outletData.addressLine.split(',').slice(0, 2).join(', '),
+          fullAddress,
+          shortAddress: fullAddress.split(',').slice(0, 2).join(', '),
           flatInfo: outletData.flatInfo,
           landmark: outletData.landmark,
           city: outletData.city,
@@ -194,15 +198,15 @@ export async function provisionDefaultAccount(
       });
     }
 
-    if (outletData.pincode) {
-      await db.user.update({
-        where: { id: input.userId },
-        data: {
-          pincode: outletData.pincode,
-          ...((baData as { legalName?: string }).legalName ? { businessName: (baData as { legalName?: string }).legalName } : {}),
-        },
-      }).catch(() => {});
-    }
+    await db.user.update({
+      where: { id: input.userId },
+      data: {
+        pincode: outletData.pincode,
+        ...((baData as { legalName?: string }).legalName
+          ? { businessName: (baData as { legalName?: string }).legalName }
+          : {}),
+      },
+    }).catch(() => {});
   }
 
   await db.businessAccountMember.create({

@@ -10,6 +10,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { emitEvent } from '@/events/emitter';
 import { requirePermission } from '@/lib/permissions/engine';
+import { invalidateCatalogCaches } from '@/lib/catalogCache';
 
 // Helper: extract the [id] segment from /api/v1/admin/categories/{id}/approval
 function extractId(req: NextRequest): string {
@@ -57,6 +58,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         suggestedBy: existing.suggestedBy ?? undefined,
       });
 
+      await invalidateCatalogCaches();
+
       return NextResponse.json({ success: true, data: category });
     }
 
@@ -78,6 +81,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       suggestedBy: existing.suggestedBy ?? undefined,
       reason: note,
     });
+
+    await invalidateCatalogCaches();
 
     return NextResponse.json({ success: true, data: category });
   } catch (error) {

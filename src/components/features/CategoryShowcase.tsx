@@ -66,11 +66,95 @@ const OVERRIDE_CATEGORY_IMAGES: Record<string, string> = {
   'mineral-water': '/images/category/drink-juice.png',
 };
 
+type CategoryTreeNode = Record<string, unknown> & {
+  children?: Array<Record<string, unknown>>;
+};
+
 interface CategoryShowcaseProps {
   filterByProducts?: { category: string }[];
   title?: string;
   onCategoryClick?: (categoryName: string) => void;
   activeCategory?: string;
+  /** Server-fetched approved tree (Redis-backed) for first paint. */
+  initialTree?: CategoryTreeNode[];
+}
+
+function treeNodeToCategory(c: Record<string, unknown>): Category {
+  return {
+    id: c.id as string,
+    name: (c.name as string) || '',
+    slug: (c.slug as string) || '',
+    image: (c.imageUrl as string) || (c.image as string) || '',
+    parentId: (c.parentId as string) || undefined,
+    isActive: (c.isActive as boolean) ?? true,
+  };
+}
+
+function applyShowcaseLists(
+  treeOrList: CategoryTreeNode[] | Category[],
+  filterByProducts?: { category: string }[],
+): { desktop: (Category & { bgColor: string })[]; fullList: Category[] } {
+  const isTree =
+    treeOrList.length > 0 &&
+    Array.isArray((treeOrList[0] as CategoryTreeNode).children);
+
+  let flat: Category[] = [];
+  if (isTree) {
+    const roots = treeOrList as CategoryTreeNode[];
+    for (const root of roots) {
+      flat.push(treeNodeToCategory(root));
+      const children = Array.isArray(root.children) ? root.children : [];
+      for (const child of children) {
+        flat.push({
+          ...treeNodeToCategory(child),
+          parentId: (child.parentId as string) || (root.id as string),
+        });
+      }
+    }
+  } else {
+    flat = treeOrList as Category[];
+  }
+
+  let filtered = flat;
+  if (filterByProducts) {
+    const uniqueVendorCats = new Set(filterByProducts.map((p) => p.category));
+    filtered = flat.filter((c) => uniqueVendorCats.has(c.name));
+  }
+
+  // Desktop grid matches historical behavior: root categories only.
+  const parents = filtered.filter((c) => !c.parentId);
+  const desktop = parents.map((c) => ({
+    ...c,
+    bgColor: CATEGORY_BG[c.slug] || '#f7f8fa',
+  }));
+
+  const parentIds = new Set(parents.map((c) => c.id));
+  const fullList: Category[] = [...parents];
+
+  if (isTree) {
+    for (const root of treeOrList as CategoryTreeNode[]) {
+      const children = Array.isArray(root.children) ? root.children : [];
+      for (const child of children) {
+        const mapped = {
+          ...treeNodeToCategory(child),
+          parentId: (child.parentId as string) || (root.id as string),
+        };
+        if (!parentIds.has(mapped.id) && !fullList.some((c) => c.id === mapped.id)) {
+          if (!filterByProducts || filterByProducts.some((p) => p.category === mapped.name)) {
+            fullList.push(mapped);
+          }
+        }
+      }
+    }
+  }
+
+  filtered.forEach((c) => {
+    if (!fullList.some((existing) => existing.id === c.id)) {
+      fullList.push(c);
+    }
+  });
+
+  return { desktop, fullList };
 }
 
 export function CategoryShowcase({
@@ -78,50 +162,52 @@ export function CategoryShowcase({
   title = "Shop By Category",
   onCategoryClick,
   activeCategory,
+  initialTree,
 }: CategoryShowcaseProps) {
-  const [categories, setCategories] = useState<(Category & { bgColor: string })[]>([]);
-  const [allCategoriesList, setAllCategoriesList] = useState<Category[]>([]);
+  const seeded =
+    initialTree && initialTree.length > 0
+      ? applyShowcaseLists(initialTree, filterByProducts)
+      : null;
+
+  const [categories, setCategories] = useState<(Category & { bgColor: string })[]>(
+    seeded?.desktop ?? [],
+  );
+  const [allCategoriesList, setAllCategoriesList] = useState<Category[]>(
+    seeded?.fullList ?? [],
+  );
   const [isExpanded, setIsExpanded] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    dal.categories.list().then((cats) => {
-      let filtered = cats;
-      if (filterByProducts) {
-        const uniqueVendorCats = new Set(filterByProducts.map((p) => p.category));
-        filtered = cats.filter((c) => uniqueVendorCats.has(c.name));
+    if (seeded) {
+      try {
+        window.localStorage.setItem(
+          'h1:categories',
+          JSON.stringify({ savedAt: Date.now(), data: initialTree }),
+        );
+      } catch {
+        // ignore
       }
+    }
 
-      // Desktop original categories with background colors
-      setCategories(filtered.map((c) => ({
-        ...c,
-        bgColor: CATEGORY_BG[c.slug] || '#f7f8fa',
-      })));
-
-      // Collect all categories (parents first, then subcategories)
-      const parents = filtered.filter((c) => !c.parentId);
-      const parentIds = new Set(parents.map((c) => c.id));
-      const fullList: Category[] = [...parents];
-
-      filtered.forEach((parent) => {
-        const children = (parent as unknown as { children?: Category[] }).children;
-        if (Array.isArray(children)) {
-          children.forEach((child) => {
-            if (!parentIds.has(child.id) && !fullList.some((c) => c.id === child.id)) {
-              fullList.push(child);
-            }
-          });
+    // Revalidate in background (or fetch when server tree missing).
+    dal.categories
+      .listTree()
+      .then((tree) => {
+        const next = applyShowcaseLists(tree, filterByProducts);
+        setCategories(next.desktop);
+        setAllCategoriesList(next.fullList);
+        try {
+          window.localStorage.setItem(
+            'h1:categories',
+            JSON.stringify({ savedAt: Date.now(), data: tree }),
+          );
+        } catch {
+          // ignore
         }
-      });
-
-      filtered.forEach((c) => {
-        if (!fullList.some((existing) => existing.id === c.id)) {
-          fullList.push(c);
-        }
-      });
-
-      setAllCategoriesList(fullList);
-    }).catch(console.error);
+      })
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once; filterByProducts is the only re-fetch driver
   }, [filterByProducts]);
 
   if (categories.length === 0) return null;

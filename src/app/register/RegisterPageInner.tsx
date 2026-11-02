@@ -199,6 +199,8 @@ export default function RegisterPageInner() {
     const businessName = derivedLegalName(profile);
 
     try {
+      const pincode = (profile.pincode ?? profile.billingPincode ?? '').replace(/\D/g, '').slice(0, 6);
+      const displayName = (profile.displayName ?? businessName).trim();
       const result = await signIn('otp', {
         phone,
         loginEmail: '',
@@ -212,8 +214,9 @@ export default function RegisterPageInner() {
         redirect: false,
         firstName: profile.firstName ?? '',
         lastName: profile.lastName ?? '',
-        displayName: profile.displayName ?? '',
-        tradeName: profile.displayName ?? '',
+        displayName,
+        tradeName: displayName,
+        pincode,
       });
       if (result?.error) {
         setApiError('Invalid or expired OTP. Please try again.');
@@ -471,7 +474,9 @@ export default function RegisterPageInner() {
               <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.5rem)] font-[800] text-[#181725] leading-tight">
                 Create your account
               </h1>
-              <p className="text-[13px] text-gray-500 mt-1">Sign up to start ordering for your business.</p>
+              <p className="text-[13px] text-gray-500 mt-1">
+                Just business name, your name, mobile, and pincode — the rest can wait.
+              </p>
             </div>
             <p className="text-[13px] text-gray-500 lg:text-right shrink-0">
               Already have an account?{' '}
@@ -492,8 +497,7 @@ export default function RegisterPageInner() {
             errors={fieldErrors}
             onFieldBlur={handleFieldBlur}
             layout="wide"
-            mode="full"
-            visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
+            mode="register"
           />
 
           <div className="mt-6">

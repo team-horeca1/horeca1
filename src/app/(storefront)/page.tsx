@@ -5,6 +5,7 @@ import { CompleteProfileBanner } from '@/components/features/homepage/CompletePr
 import { listHomepageVoiceStories } from '@/modules/voices/voice.service';
 import { getHomepageHeroSlides } from '@/modules/homepage/homepage-hero.service';
 import { HERO_FALLBACK } from '@/modules/homepage/homepage-hero.constants';
+import { getCachedCategoryTree } from '@/lib/catalogCache';
 
 const ContinueOrdering = dynamic(
   () => import('@/components/features/homepage/ContinueOrdering').then((m) => m.ContinueOrdering),
@@ -46,9 +47,10 @@ const DistributorCTA = dynamic(
 );
 
 export default async function Home() {
-  const [voiceStoriesRaw, heroSlides] = await Promise.all([
+  const [voiceStoriesRaw, heroSlides, categoryTree] = await Promise.all([
     listHomepageVoiceStories().catch(() => []),
     getHomepageHeroSlides().catch(() => []),
+    getCachedCategoryTree().catch(() => []),
   ]);
 
   const voiceStories = voiceStoriesRaw.map((s) => ({
@@ -117,14 +119,14 @@ export default async function Home() {
       <ContinueOrdering />
       <CreditStatusStrip />
       <QuickActions />
-      <CategoryShowcase />
+      <CategoryShowcase initialTree={categoryTree} />
       <FrequentlyOrderedVendors />
       <NearbyVendors />
       <ShopByStorePromo />
       <FeatureBar />
       <Collections />
       <VoicesSection stories={voiceStories} />
-      <CategoryProductRails />
+      <CategoryProductRails initialTree={categoryTree} />
       <FeaturedDeals />
       <DistributorCTA />
     </div>
