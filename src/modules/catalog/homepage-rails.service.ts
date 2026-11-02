@@ -48,11 +48,11 @@ const SUBTITLE_BY_SLUG: Record<string, string> = {
 };
 
 const ITEMS_PER_RAIL = 8;
-const MAX_ALL_AISLES = 8;
-const MIN_PRIORITY_AISLES = 4;
 const OFFERS_CAP = 12;
 /** Cap candidates across all selected aisles in one query. */
-const CANDIDATE_TAKE_CAP = 320;
+const CANDIDATE_TAKE_CAP = 600;
+/** Bump when rail selection shape changes so Redis does not serve the old short list. */
+const RAILS_SHAPE_VERSION = 2;
 
 export interface RailCategory {
   id: string;
@@ -154,8 +154,8 @@ function collectBySlug(roots: CategoryTreeNode[]): Map<string, CategoryTreeNode>
 }
 
 /**
- * All-tab targets: priority slugs that exist, filled up to MAX_ALL_AISLES
- * from remaining leaves if fewer than MIN_PRIORITY_AISLES matched.
+ * All-tab targets: every leaf aisle, with PRIORITY_SLUGS ordered first.
+ * (Earlier speed work capped this to ~4 priority aisles — that hid most categories.)
  */
 export function pickAllTabTargets(roots: CategoryTreeNode[]): RailCategory[] {
   const bySlug = collectBySlug(roots);
@@ -170,27 +170,20 @@ export function pickAllTabTargets(roots: CategoryTreeNode[]): RailCategory[] {
   };
 
   for (const slug of PRIORITY_SLUGS) {
-    if (out.length >= MAX_ALL_AISLES) break;
     const hit = bySlug.get(slug);
     if (hit) push(hit);
   }
 
-  if (out.length < MIN_PRIORITY_AISLES) {
-    for (const root of roots) {
-      if (out.length >= MAX_ALL_AISLES) break;
-      const children = Array.isArray(root.children) ? root.children : [];
-      if (children.length === 0) {
-        push(root);
-      } else {
-        for (const child of children) {
-          if (out.length >= MAX_ALL_AISLES) break;
-          push(child);
-        }
-      }
+  for (const root of roots) {
+    const children = Array.isArray(root.children) ? root.children : [];
+    if (children.length === 0) {
+      push(root);
+    } else {
+      for (const child of children) push(child);
     }
   }
 
-  return out.slice(0, MAX_ALL_AISLES);
+  return out;
 }
 
 /** Parent-tab targets: children of parent, or the parent itself if it is a leaf. */
@@ -207,8 +200,7 @@ export function pickParentTabTargets(
     }
     return children
       .map((c) => toRailCategory(c))
-      .filter((c): c is RailCategory => c != null)
-      .slice(0, MAX_ALL_AISLES);
+      .filter((c): c is RailCategory => c != null);
   }
   return [];
 }
@@ -447,7 +439,7 @@ export async function getHomepageCategoryRails(options: {
     : pickAllTabTargets(tree);
 
   const ver = await getCatalogVersion();
-  const cacheKey = railsCacheKey(ver, options.pincode, options.parentId);
+  const cacheKey = railsCacheKey(ver, options.pincode, options.parentId, RAILS_SHAPE_VERSION);
 
   const cached = await getCachedJson<{
     rails: HomepageRail[];

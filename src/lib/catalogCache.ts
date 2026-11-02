@@ -94,8 +94,9 @@ export function railsCacheKey(
   ver: string,
   pincode: string | undefined,
   parentId?: string,
+  shapeVersion = 2,
 ): string {
   const pin = pincode && /^\d{6}$/.test(pincode) ? pincode : 'all';
   const scope = parentId ? `parent:${parentId}` : 'all';
-  return `horeca1:catalog:rails:${ver}:${pin}:${scope}`;
+  return `horeca1:catalog:rails:v${shapeVersion}:${ver}:${pin}:${scope}`;
 }
