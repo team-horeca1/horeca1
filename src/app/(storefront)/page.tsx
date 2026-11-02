@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 import { Hero } from '@/components/features/Hero';
 import { QuickActions } from '@/components/features/homepage/QuickActions';
 import { CompleteProfileBanner } from '@/components/features/homepage/CompleteProfileBanner';
@@ -7,42 +7,46 @@ import { getHomepageHeroSlides } from '@/modules/homepage/homepage-hero.service'
 import { HERO_FALLBACK } from '@/modules/homepage/homepage-hero.constants';
 import { getCachedCategoryTree } from '@/lib/catalogCache';
 
-const ContinueOrdering = dynamic(
+// Storefront shell uses auth/cookies; never SSG the homepage during Docker builds
+// without Redis/Postgres (category tree Redis probe used to hang the build).
+export const dynamic = 'force-dynamic';
+
+const ContinueOrdering = nextDynamic(
   () => import('@/components/features/homepage/ContinueOrdering').then((m) => m.ContinueOrdering),
 );
-const CreditStatusStrip = dynamic(
+const CreditStatusStrip = nextDynamic(
   () => import('@/components/features/homepage/CreditStatusStrip').then((m) => m.CreditStatusStrip),
 );
-const FrequentlyOrderedVendors = dynamic(() =>
+const FrequentlyOrderedVendors = nextDynamic(() =>
   import('@/components/features/homepage/VendorRollups').then((m) => m.FrequentlyOrderedVendors),
 );
-const NearbyVendors = dynamic(
+const NearbyVendors = nextDynamic(
   () => import('@/components/features/homepage/NearbyVendors').then((m) => m.NearbyVendors),
 );
-const ShopByStorePromo = dynamic(
+const ShopByStorePromo = nextDynamic(
   () => import('@/components/features/ShopByStorePromo').then((m) => m.ShopByStorePromo),
 );
-const FeaturedDeals = dynamic(
+const FeaturedDeals = nextDynamic(
   () => import('@/components/features/homepage/FeaturedDeals').then((m) => m.FeaturedDeals),
 );
-const Collections = dynamic(
+const Collections = nextDynamic(
   () => import('@/components/features/homepage/Collections').then((m) => m.Collections),
 );
-const VoicesSection = dynamic(
+const VoicesSection = nextDynamic(
   () => import('@/components/features/homepage/VoicesSection').then((m) => m.VoicesSection),
 );
-const CategoryShowcase = dynamic(
+const CategoryShowcase = nextDynamic(
   () => import('@/components/features/CategoryShowcase').then((m) => m.CategoryShowcase),
 );
-const CategoryProductRails = dynamic(() =>
+const CategoryProductRails = nextDynamic(() =>
   import('@/components/features/homepage/CategoryProductRails').then(
     (m) => m.CategoryProductRails,
   ),
 );
-const FeatureBar = dynamic(
+const FeatureBar = nextDynamic(
   () => import('@/components/features/FeatureBar').then((m) => m.FeatureBar),
 );
-const DistributorCTA = dynamic(
+const DistributorCTA = nextDynamic(
   () => import('@/components/features/homepage/DistributorCTA').then((m) => m.DistributorCTA),
 );
 
