@@ -611,7 +611,7 @@ export default function CustomersPage() {
                     ))}
                 </div>
             ) : (
-                <AdminRegistryTableShell minWidth="1100px">
+                <AdminRegistryTableShell minWidth="1100px" className="table-fixed">
                     <AdminRegistryTableHead>
                         <th className="px-6 py-3.5 font-bold text-center w-[52px] border-r border-[#D1D5DB]">
                             <input
@@ -622,10 +622,10 @@ export default function CustomersPage() {
                                 className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer"
                             />
                         </th>
-                        <th className="px-6 py-3.5 font-bold min-w-[240px] border-r border-[#D1D5DB]">Customer</th>
-                        <th className="px-6 py-3.5 font-bold min-w-[180px] border-r border-[#D1D5DB]">Email</th>
+                        <th className="px-6 py-3.5 font-bold w-[18%] min-w-[180px] border-r border-[#D1D5DB]">Customer</th>
+                        <th className="px-6 py-3.5 font-bold w-[24%] min-w-[220px] border-r border-[#D1D5DB]">Business</th>
                         <th className="px-6 py-3.5 font-bold min-w-[120px] border-r border-[#D1D5DB]">Phone</th>
-                        <th className="px-6 py-3.5 font-bold min-w-[100px] border-r border-[#D1D5DB]">Business</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[140px] border-r border-[#D1D5DB]">Email</th>
                         <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Status</th>
                         <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Joined</th>
                         <th className="px-6 py-3.5 font-bold text-left min-w-[240px]">Actions</th>
@@ -669,9 +669,13 @@ export default function CustomersPage() {
                                         </div>
                                     </div>
                                 </td>
-                                <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] truncate max-w-[200px] align-middle border-r border-[#D1D5DB]">{user.email}</td>
-                                <td className="px-6 py-3 text-[11px] text-[#9CA3AF] font-semibold font-mono align-middle border-r border-[#D1D5DB]">{user.phone || '—'}</td>
-                                <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] truncate max-w-[160px] align-middle border-r border-[#D1D5DB]">{user.businessName || '—'}</td>
+                                <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] align-middle border-r border-[#D1D5DB]">
+                                    <p className="truncate">{user.businessName || '—'}</p>
+                                </td>
+                                <td className="px-6 py-3 text-[11px] text-[#9CA3AF] font-semibold font-mono align-middle border-r border-[#D1D5DB] whitespace-nowrap">{user.phone || '—'}</td>
+                                <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] align-middle border-r border-[#D1D5DB]">
+                                    <p className="truncate max-w-[220px]">{user.email || '—'}</p>
+                                </td>
                                 <td className="px-6 py-3 text-center align-middle border-r border-[#D1D5DB]">
                                     <AdminStatusBadge variant={user.isActive ? 'active' : 'inactive'} />
                                 </td>

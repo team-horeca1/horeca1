@@ -5,12 +5,13 @@ import React from 'react';
 interface AdminRegistryTableShellProps {
   children: React.ReactNode;
   minWidth?: string;
+  className?: string;
 }
 
-export function AdminRegistryTableShell({ children, minWidth = '1000px' }: AdminRegistryTableShellProps) {
+export function AdminRegistryTableShell({ children, minWidth = '1000px', className }: AdminRegistryTableShellProps) {
   return (
     <div className="w-full max-w-full overflow-x-auto rounded-[16px] border border-divider bg-white shadow-sm">
-      <table className="w-full border-collapse text-left text-[13px]" style={{ minWidth }}>
+      <table className={`w-full border-collapse text-left text-[13px] ${className ?? ''}`} style={{ minWidth }}>
         {children}
       </table>
     </div>
