@@ -126,7 +126,11 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
         }
     };
 
-    const displayName = (addr: Address) => addr.businessName || addr.label || 'Address';
+    const displayName = (addr: Address) => {
+        const label = (addr.label || '').trim();
+        if (label && !/^\d{6}$/.test(label)) return label;
+        return addr.businessName || 'Outlet';
+    };
     const displayLine = (addr: Address) => {
         const parts = [
             addr.flatInfo,
@@ -282,10 +286,12 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                 isOpen={isAddNewOpen}
                 onClose={() => setIsAddNewOpen(false)}
                 onSave={handleSaveNewAddress}
+                businessName={currentAccount?.displayName || currentAccount?.legalName || ''}
             />
 
             <EditAddressOverlay
                 address={editingAddress}
+                businessName={currentAccount?.displayName || currentAccount?.legalName || ''}
                 onClose={() => {
                     setEditingAddress(null);
                     void refreshAddresses();

@@ -14,14 +14,16 @@ import { cn } from '@/lib/utils';
 
 interface EditAddressOverlayProps {
   address: Address | null;
+  /** Account business name, shown in Billing name when this outlet has no override. */
+  businessName?: string;
   onClose: () => void;
 }
 
-function fromAddress(address: Address): OutletAddressValue {
+function fromAddress(address: Address, businessName: string): OutletAddressValue {
   const line = isRealStreetAddress(address.fullAddress) ? address.fullAddress : '';
   return {
     outletName: address.label || '',
-    billingName: address.businessName || '',
+    billingName: address.businessName || businessName,
     billingAddressLine: line,
     billingCity: address.city || '',
     billingState: address.state || '',
@@ -34,7 +36,7 @@ function fromAddress(address: Address): OutletAddressValue {
   };
 }
 
-export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps) {
+export function EditAddressOverlay({ address, businessName = '', onClose }: EditAddressOverlayProps) {
   const { updateAddress } = useAddress();
   const [value, setValue] = useState<OutletAddressValue | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -44,8 +46,8 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
       setValue(null);
       return;
     }
-    setValue(fromAddress(address));
-  }, [address]);
+    setValue(fromAddress(address, businessName));
+  }, [address, businessName]);
 
   if (!address || !value) return null;
 
@@ -99,7 +101,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
             </button>
           </div>
           <div className="px-5 py-4 overflow-y-auto">
-            <OutletAddressForm value={value} onChange={setValue} businessName={address.businessName} />
+            <OutletAddressForm value={value} onChange={setValue} businessName={businessName} />
           </div>
           <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
             <button onClick={onClose} className="h-[44px] px-5 bg-white border border-gray-200 text-gray-700 rounded-xl text-[13px] font-bold">

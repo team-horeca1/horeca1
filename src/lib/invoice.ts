@@ -79,13 +79,23 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
   ).join(', ');
   const snapAddressText = composeParts(snapStreet, snapCityLine).join(', ');
 
-  const buyerOutletName =
-    snap?.name?.trim() ||
-    order.outlet?.name ||
-    order.businessAccount?.displayName ||
-    order.businessAccount?.legalName ||
-    order.user.businessName ||
+  const buyerBusinessName =
+    order.businessAccount?.displayName?.trim() ||
+    order.businessAccount?.legalName?.trim() ||
+    order.user.businessName?.trim() ||
     order.user.fullName;
+  const liveOutletName = order.outlet?.name?.trim() || '';
+  const snapOutletName = snap?.name?.trim() || '';
+  const sameAsBusiness = (name: string) =>
+    !!buyerBusinessName && name.toLowerCase() === buyerBusinessName.toLowerCase();
+  // The outlet line is the branch name. A snapshot that only copied the
+  // business name (bikaner) must not hide a real outlet name (VASHI KITCHEN).
+  const buyerOutletName =
+    (liveOutletName && !sameAsBusiness(liveOutletName) ? liveOutletName : '') ||
+    (snapOutletName && !sameAsBusiness(snapOutletName) ? snapOutletName : '') ||
+    liveOutletName ||
+    snapOutletName ||
+    buyerBusinessName;
 
   const buyerAddressText =
     snapAddressText ||
@@ -350,6 +360,7 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     const buyerH =
       8 +
       12 +
+      buyerLineH(buyerBusinessName) + 3 +
       buyerLineH(buyerOutletName) + 3 +
       buyerLineH(buyerAddressText) + 3 +
       buyerLineH(buyerPincode) + 3 +
@@ -375,6 +386,7 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
       doc.text(`${label} :`, lx, by, { lineBreak: false });
       by += 12;
+      line('Business :', buyerBusinessName);
       line('Outlet :', buyerOutletName);
       line('Address :', buyerAddressText);
       line('Pincode :', buyerPincode);

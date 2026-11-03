@@ -181,13 +181,11 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                             <div className="space-y-3 mb-6">
                                 {savedAddresses.map((addr) => {
                                     const isSelected = selectedAddress?.id === addr.id;
-                                    const title = addr.businessName
-                                        || addr.shortAddress
-                                        || addr.fullAddress.split(',').slice(0, 2).join(',')
-                                        || 'Delivery address';
-                                    const subtitle = addr.businessName
-                                        ? (addr.shortAddress || addr.fullAddress)
-                                        : addr.fullAddress;
+                                    const label = (addr.label || '').trim();
+                                    const title = label && !/^\d{6}$/.test(label)
+                                        ? label
+                                        : (addr.businessName || 'Outlet');
+                                    const subtitle = addr.fullAddress || addr.shortAddress || '';
 
                                     return (
                                         <div
@@ -293,11 +291,13 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                 onSave={handleSaveNewAddress}
                 initialLat={initialCoords.lat}
                 initialLng={initialCoords.lng}
+                businessName={currentAccount?.displayName || currentAccount?.legalName || ''}
             />
 
             {/* Edit Address Overlay */}
             <EditAddressOverlay
                 address={editingAddress}
+                businessName={currentAccount?.displayName || currentAccount?.legalName || ''}
                 onClose={() => {
                     setEditingAddress(null);
                     void refreshAddresses();
