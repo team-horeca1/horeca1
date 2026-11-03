@@ -219,7 +219,8 @@ export class OrderService {
     });
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
     // First order only needs a usable delivery location (6-digit pincode or real coords).
-    // Full street / Google pin / outlet name can be completed later.
+    // Full street / Google pin / outlet name can be completed later — do not block
+    // daily buyers whose outlet is still labeled "{business} — Main".
     if (!hasUsableDeliveryLocation(outlet)) {
       throw Errors.badRequest('Add a 6-digit delivery pincode before placing orders');
     }

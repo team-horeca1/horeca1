@@ -377,6 +377,8 @@ function CheckoutPageContent() {
         (selectedAddress?.fullAddress && selectedAddress.fullAddress.trim().length > 5),
     );
     const needsDeliveryAddress = !hasDeliverableAddress;
+    // Only block when there is no usable 6-digit pincode. Legacy "{name} — Main"
+    // outlets and incomplete street lines must not stop daily ordering.
     const outletNeedsFullAddress = Boolean(
         currentOutlet?.requiresAddressUpdate
         && !(currentOutlet.pincode && /^\d{6}$/.test(currentOutlet.pincode)),

@@ -153,20 +153,13 @@ export function stripLegacyMainOutletSuffix(name: string | null | undefined): st
 }
 
 /**
- * True when the outlet name was never typed by the user (blank, or a legacy
- * auto-generated "{display} — Main" / Primary Outlet / Branch Outlet / Main).
+ * True when there is no usable branch label — blank, or exact placeholders
+ * like "Primary Outlet" / "Main". Legacy "{display} — Main" is NOT synthetic:
+ * stripping leaves a real outlet name (e.g. "Eat Repeat — Main" → "Eat Repeat").
  */
 export function isSyntheticOutletName(name: string | null | undefined): boolean {
-  const stripped = stripLegacyMainOutletSuffix(name);
-  // Still has a Main-style suffix that strip left empty, or was blank/exact synthetic.
-  const raw = (name ?? '').trim();
-  if (raw.length < 2) return true;
-  if (SYNTHETIC_OUTLET_EXACT.has(raw)) return true;
-  for (const suffix of LEGACY_MAIN_SUFFIXES) {
-    if (raw.endsWith(suffix)) return true;
-  }
-  if (stripped.length < 2) return true;
-  return false;
+  // Healable legacy suffixes count as real names — never block checkout on them.
+  return normalizeOutletName(name).length < 2;
 }
 
 /**
