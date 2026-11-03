@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, Pencil, X, Loader2, Check } from 'lucide-react';
-import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
 import { FormErrorBanner } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
 
@@ -257,21 +256,6 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
         }
     };
 
-    const handlePick = (place: AddressPickPayload) => {
-        const resolved = place.fullAddress || place.shortAddress;
-        setAddress(resolved);
-        setShortAddress(place.shortAddress || resolved);
-        setPincode(place.pincode);
-        setCity(place.city);
-        setState(place.state);
-        setLatitude(place.latitude);
-        setLongitude(place.longitude);
-        setPlaceId(place.placeId);
-        if (place.businessName) {
-            setBusinessName(place.businessName);
-        }
-    };
-
     const handleSave = async () => {
         if (saving || otpLoading) return;
         setError('');
@@ -494,12 +478,13 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                         )}
 
                         <div>
-                            <AddressAutocomplete
-                                label="Search delivery address"
-                                placeholder="Search area, street, or business name…"
-                                hint="Pick a place from search — this sets pincode, city and map pin."
-                                initialValue={address}
-                                onPick={handlePick}
+                            <label className="text-[12px] md:text-[13px] font-semibold text-[#181725] ml-0.5 mb-1.5 block">Address</label>
+                            <input
+                                type="text"
+                                value={address}
+                                onChange={(e) => setAddress(e.target.value)}
+                                placeholder="Building, street, area"
+                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                             />
                         </div>
                         <div>

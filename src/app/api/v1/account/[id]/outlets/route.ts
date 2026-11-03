@@ -46,6 +46,7 @@ const CreateBody = z.object({
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
   placeId: z.string().max(500).nullable().optional(),
+  billingName: z.string().max(255).nullable().optional(),
 });
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
@@ -70,6 +71,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         latitude: body.latitude,
         longitude: body.longitude,
         placeId: body.placeId,
+        billingName: body.billingName,
       });
 
       // Keep the linked SavedAddress in sync. Use the outlet's own name (preserved

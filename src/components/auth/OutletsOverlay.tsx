@@ -2,8 +2,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Loader2, MapPin, Plus, AlertCircle, X, Trash2, Pencil } from 'lucide-react';
-import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { useAddress } from '@/context/AddressContext';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
+import {
+  deliveryFromOutletAddress,
+  OutletAddressForm,
+  type OutletAddressValue,
+} from '@/components/features/customer/OutletAddressForm';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { notifyAccountsRefresh } from '@/lib/addressUsability';
 import { FormErrorBanner } from '@/components/ui/form';
@@ -23,6 +28,7 @@ interface Outlet {
   latitude: number | null;
   longitude: number | null;
   placeId: string | null;
+  billingName?: string | null;
   isActive: boolean;
   requiresAddressUpdate: boolean;
 }
@@ -84,7 +90,10 @@ export function OutletsOverlay({
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<OutletDraft | null>(null); // null = closed, has .id = editing, no .id = creating
-  const { refresh: refreshAccounts } = useBusinessAccountSwitcher();
+  const { refresh: refreshAccounts, accounts } = useBusinessAccountSwitcher();
+  const businessName = accounts.find((a) => a.id === accountId)?.legalName
+    || accounts.find((a) => a.id === accountId)?.displayName
+    || '';
   const { refreshAddresses } = useAddress();
   const openedInitialRef = useRef<string | null>(null);
 
@@ -240,6 +249,7 @@ export function OutletsOverlay({
         <OutletEditorModal
           accountId={accountId}
           draft={editing}
+          businessName={businessName}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); afterMutation(); }}
         />
@@ -248,57 +258,34 @@ export function OutletsOverlay({
   );
 }
 
-function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
-  accountId: string; draft: OutletDraft; onClose: () => void; onSaved: () => void;
+function OutletEditorModal({ accountId, draft, businessName, onClose, onSaved }: {
+  accountId: string; draft: OutletDraft; businessName: string; onClose: () => void; onSaved: () => void;
 }) {
   const isEdit = !!draft.id;
   const { setSelectedAddress } = useAddress();
-  const [name, setName] = useState(draft.name);
-  const [addressLine, setAddressLine] = useState(draft.addressLine);
-  const [flatInfo, setFlatInfo] = useState(draft.flatInfo);
-  const [landmark, setLandmark] = useState(draft.landmark);
-  const [city, setCity] = useState(draft.city);
-  const [state, setState] = useState(draft.state);
-  const [pincode, setPincode] = useState(draft.pincode);
-  const [latitude, setLatitude] = useState<number | null>(draft.latitude);
-  const [longitude, setLongitude] = useState<number | null>(draft.longitude);
-  const [placeId, setPlaceId] = useState<string | null>(draft.placeId);
+  const line = isRealStreetAddress(draft.addressLine) ? draft.addressLine : '';
+  const [value, setValue] = useState<OutletAddressValue>({
+    outletName: draft.name,
+    billingName: businessName,
+    billingAddressLine: line,
+    billingCity: draft.city,
+    billingState: draft.state,
+    billingPincode: draft.pincode,
+    sameAsBilling: true,
+    addressLine: line,
+    city: draft.city,
+    state: draft.state,
+    pincode: draft.pincode,
+  });
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-fill city & state when a valid 6-digit pincode is typed manually
-  useEffect(() => {
-    if (!/^\d{6}$/.test(pincode)) return;
-    if (city.trim() && state.trim()) return; // already filled (e.g. via map picker)
-    fetch(`https://api.postalpincode.in/pincode/${pincode}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const po = data?.[0]?.PostOffice?.[0];
-        if (!po) return;
-        if (!city.trim()) setCity(po.District || po.Division || '');
-        if (!state.trim()) setState(po.State || '');
-      })
-      .catch(() => {});
-  }, [pincode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const pincodeValid = /^\d{6}$/.test(pincode);
-  const hasCoords = latitude !== null && longitude !== null;
-
-  const handlePick = (place: import('@/components/ui/AddressAutocomplete').AddressPickPayload) => {
-    const resolved = place.fullAddress || place.shortAddress;
-    setAddressLine(resolved);
-    setCity(place.city);
-    setState(place.state);
-    setPincode(place.pincode);
-    setLatitude(place.latitude);
-    setLongitude(place.longitude);
-    setPlaceId(place.placeId);
-    if (!name.trim() && place.businessName) setName(place.businessName);
-  };
+  const delivery = deliveryFromOutletAddress(value);
+  const canSave = value.outletName.trim().length >= 2 && isRealStreetAddress(delivery.addressLine);
 
   const submit = async () => {
-    if (submittingRef.current) return;
+    if (submittingRef.current || !canSave) return;
     submittingRef.current = true;
     setSubmitting(true);
     setError(null);
@@ -307,16 +294,20 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
         ? `/api/v1/account/${accountId}/outlets/${draft.id}`
         : `/api/v1/account/${accountId}/outlets`;
       const method = isEdit ? 'PATCH' : 'POST';
+      const billingOverride = value.billingName.trim() && value.billingName.trim() !== businessName.trim()
+        ? value.billingName.trim()
+        : null;
       const body = {
-        name: name.trim(),
-        addressLine: addressLine.trim(),
-        flatInfo: flatInfo.trim() || null,
-        landmark: landmark.trim() || null,
-        city: city.trim() || null,
-        state: state.trim() || null,
-        pincode: pincode.trim() || null,
-        ...(latitude !== null && longitude !== null && { latitude, longitude }),
-        ...(placeId !== null && { placeId }),
+        name: value.outletName.trim(),
+        addressLine: delivery.addressLine.trim(),
+        flatInfo: draft.flatInfo.trim() || null,
+        landmark: draft.landmark.trim() || null,
+        city: delivery.city.trim() || null,
+        state: delivery.state.trim() || null,
+        pincode: delivery.pincode.trim() || null,
+        billingName: billingOverride,
+        ...(draft.latitude !== null && draft.longitude !== null && { latitude: draft.latitude, longitude: draft.longitude }),
+        ...(draft.placeId !== null && { placeId: draft.placeId }),
       };
       const res = await fetch(url, {
         method,
@@ -331,21 +322,21 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
         return;
       }
 
-      if (hasCoords && pincodeValid) {
+      if (/^\d{6}$/.test(delivery.pincode)) {
         setSelectedAddress({
           id: `outlet_${json.data.id}`,
-          label: name.trim() || 'Outlet',
-          businessName: name.trim(),
-          fullAddress: addressLine.trim(),
-          shortAddress: [city, state].filter(Boolean).join(', ') || addressLine.trim().split(',').slice(0, 2).join(','),
-          latitude: latitude!,
-          longitude: longitude!,
-          flatInfo: flatInfo.trim() || undefined,
-          landmark: landmark.trim() || undefined,
-          pincode: pincode.trim(),
-          city: city.trim() || undefined,
-          state: state.trim() || undefined,
-          placeId: placeId ?? undefined,
+          label: value.outletName.trim() || 'Outlet',
+          businessName: value.billingName.trim() || businessName,
+          fullAddress: delivery.addressLine.trim(),
+          shortAddress: [delivery.city, delivery.state].filter(Boolean).join(', ') || delivery.addressLine.trim().split(',').slice(0, 2).join(','),
+          latitude: draft.latitude ?? 0,
+          longitude: draft.longitude ?? 0,
+          flatInfo: draft.flatInfo.trim() || undefined,
+          landmark: draft.landmark.trim() || undefined,
+          pincode: delivery.pincode.trim(),
+          city: delivery.city.trim() || undefined,
+          state: delivery.state.trim() || undefined,
+          placeId: draft.placeId ?? undefined,
           isDefault: false,
         });
       }
@@ -368,72 +359,8 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
 
         <FormErrorBanner message={error} className="mx-5" />
 
-        <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          <AddressAutocomplete
-            label="Pick from map"
-            placeholder="Search address, locality, or business name…"
-            hint="Picking a place fills the address, city, state and pincode for you."
-            onPick={handlePick}
-          />
-
-          <Field
-            label="Outlet name"
-            value={name}
-            onChange={setName}
-            placeholder="e.g. Eve Powai"
-            required
-          />
-          <Field
-            label="Address line 1"
-            value={addressLine}
-            onChange={setAddressLine}
-            placeholder="House / building / street"
-            required
-          />
-          <Field
-            label="Apartment, floor (optional)"
-            value={flatInfo}
-            onChange={setFlatInfo}
-            placeholder="Flat 4B, 2nd floor"
-          />
-          <Field
-            label="Landmark (optional)"
-            value={landmark}
-            onChange={setLandmark}
-            placeholder="Near metro station"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="City" value={city} onChange={setCity} placeholder="e.g. Mumbai" />
-            <Field label="State" value={state} onChange={setState} placeholder="e.g. Maharashtra" />
-          </div>
-          <div>
-            <Field
-              label="Pincode (6 digits)"
-              value={pincode}
-              onChange={(v) => setPincode(v.replace(/\D/g, '').slice(0, 6))}
-              placeholder="e.g. 400076"
-              inputMode="numeric"
-              required
-            />
-            {!pincodeValid && pincode.length > 0 && (
-              <p className="mt-1 text-[11px] text-amber-700">Enter a 6-digit pincode.</p>
-            )}
-            {pincodeValid && (
-              <p className="mt-1 text-[11px] text-primary">
-                ✓ Pincode set — &quot;Address needed&quot; flag will clear after save.
-              </p>
-            )}
-          </div>
-
-          {hasCoords && (
-            <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-2.5 flex items-center gap-2">
-              <MapPin size={14} className="text-primary shrink-0" />
-              <p className="text-[11.5px] text-primary">
-                Map location captured · {latitude!.toFixed(5)}, {longitude!.toFixed(5)}
-              </p>
-            </div>
-          )}
-
+        <div className="p-5 overflow-y-auto flex-1">
+          <OutletAddressForm value={value} onChange={setValue} businessName={businessName} />
         </div>
 
         <div className="p-4 border-t border-[#F0F0F0] flex items-center justify-end gap-2 shrink-0 bg-[#F9F9F9]">
@@ -446,7 +373,7 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
           </button>
           <button
             onClick={submit}
-            disabled={submitting || !name.trim() || !addressLine.trim()}
+            disabled={submitting || !canSave}
             className="px-4 py-2 bg-primary text-white text-[13px] font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
@@ -458,27 +385,3 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
   );
 }
 
-function Field({ label, value, onChange, placeholder, required, inputMode }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  required?: boolean;
-  inputMode?: 'text' | 'numeric' | 'tel' | 'email';
-}) {
-  return (
-    <label className="block">
-      <span className="text-[11px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </span>
-      <input
-        type="text"
-        inputMode={inputMode}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-gray-700 placeholder:text-gray-400 bg-[#FAFAFA] focus:bg-white transition-all"
-      />
-    </label>
-  );
-}

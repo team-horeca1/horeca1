@@ -89,6 +89,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
               select: {
                 id: true,
                 name: true,
+                addressLine: true,
                 pincode: true,
                 latitude: true,
                 longitude: true,
@@ -133,6 +134,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
           outlets: ba.outlets.map((o) => ({
             id: o.id,
             name: o.name,
+            addressLine: o.addressLine,
             pincode: o.pincode,
             requiresAddressUpdate: !hasUsableDeliveryLocation(o),
           })),

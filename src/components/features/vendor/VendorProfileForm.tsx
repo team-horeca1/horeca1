@@ -8,7 +8,6 @@
 import React, { useState } from 'react';
 import { Building2, MapPin, Receipt, User, ShieldCheck, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
 import {
   FormField, FormInput, FormSelect, FormTextarea, TextField, SectionLabel, inputClass, PasswordField,
 } from '@/components/ui/form';
@@ -129,22 +128,6 @@ export function VendorProfileForm({
       set({ categoriesHandled: [...selectedCategories, label] });
     }
     setCategoryDraft('');
-  };
-
-  const handleBillingPick = (place: AddressPickPayload) => {
-    const resolvedAddress = place.fullAddress || place.shortAddress || '';
-    set({
-      billingAddressLine: resolvedAddress,
-      billingCity: place.city,
-      billingState: place.state,
-      billingPincode: place.pincode,
-      billingAddress: {
-        addressLine: resolvedAddress,
-        city: place.city,
-        state: place.state,
-        pincode: place.pincode,
-      },
-    });
   };
 
   const billingLine = value.billingAddressLine ?? value.billingAddress?.addressLine ?? '';
@@ -332,13 +315,6 @@ export function VendorProfileForm({
         {visibleSections.billing && (
           <>
             <SectionHeader icon={MapPin} spanClass={SPAN_FULL}>Billing Address</SectionHeader>
-            <div className={SPAN_FULL}>
-              <AddressAutocomplete
-                label="Search billing address"
-                placeholder="Registered office, warehouse, or street address..."
-                onPick={handleBillingPick}
-              />
-            </div>
             <TextField label="Address Line" required value={billingLine}
               error={errors.billingAddressLine}
               onChange={v => set({

@@ -79,6 +79,7 @@ export const CustomerProfileSchema = z.object({
   billingPincode: z.string().optional(),
   pincode: z.string().optional(),
   outletName: z.string().optional(),
+  billingName: z.string().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
   placeId: z.string().nullable().optional(),
@@ -148,8 +149,7 @@ export function validateCustomerProfile(
   const password = trim(data.password);
 
   if (context === 'selfRegisterLite') {
-    if (!trim(data.firstName)) errors.firstName = 'First name is required';
-    if (!trim(data.lastName)) errors.lastName = 'Last name is required';
+    if (!trim(data.firstName) && !trim(data.fullName)) errors.firstName = 'Contact person is required';
     if (!legalName || legalName.length < 2) errors.legalName = 'Restaurant / business name is required';
     // Display name is optional at signup — fall back to legal name when empty.
     const mobile = trim(data.mobilePhone || data.phone).replace(/\D/g, '').slice(-10);
@@ -162,7 +162,7 @@ export function validateCustomerProfile(
     if (password && password.length < 6) errors.password = 'Password must be at least 6 characters';
     // Address is optional on complete-profile, but when any address field is present
     // the branch name, street, and pincode must all be real.
-    const hasAnyAddress = !!(addressLine || pincode || outletName);
+    const hasAnyAddress = !!(addressLine || trim(data.billingAddressLine) || outletName);
     if (hasAnyAddress) {
       if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
       if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';
@@ -205,7 +205,7 @@ export function validateCustomerProfile(
 
     // Admin create: when an address is supplied, require a real outlet name too.
     if (context === 'adminCreate') {
-      const hasAnyAddress = !!(addressLine || pincode || outletName);
+      const hasAnyAddress = !!(addressLine || trim(data.billingAddressLine) || outletName);
       if (hasAnyAddress) {
         if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
         if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';

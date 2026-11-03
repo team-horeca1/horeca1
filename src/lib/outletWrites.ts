@@ -20,10 +20,10 @@
 import type { Prisma, Outlet } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
+  isRealStreetAddress,
   normalizeOutletName,
   PLACEHOLDER_OUTLET_ADDRESS,
 } from '@/lib/constants/customerProfile';
-import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 
 export interface OutletAddressFields {
   name: string;
@@ -37,6 +37,7 @@ export interface OutletAddressFields {
   latitude?: number | null;
   longitude?: number | null;
   placeId?: string | null;
+  billingName?: string | null;
 }
 
 const COORD_EPS = 0.0001;
@@ -147,7 +148,8 @@ export async function adoptOrCreateOutlet(
     latitude: fields.latitude ?? null,
     longitude: fields.longitude ?? null,
     placeId: fields.placeId ?? null,
-    requiresAddressUpdate: !hasUsableDeliveryLocation(fields),
+    ...(fields.billingName !== undefined ? { billingName: fields.billingName } : {}),
+    requiresAddressUpdate: !isRealStreetAddress(fields.addressLine),
   };
 
   const account = await tx.businessAccount.findUnique({

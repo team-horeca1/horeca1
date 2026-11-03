@@ -12,7 +12,6 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { focusFirstFormError } from '@/lib/formErrorFocus';
-import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { FORM, FormField as Field, FormInput, inputClass, selectClass, FormErrorBanner } from '@/components/ui/form';
 import {
   VendorProfileForm,
@@ -1535,30 +1534,6 @@ export default function VendorRegisterClient() {
               <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
                 <h3 className="font-bold text-[15px] text-gray-800 mb-3">Billing Address</h3>
                 <div className="space-y-3">
-                  <AddressAutocomplete
-                    label="Search from maps"
-                    placeholder="Type location, e.g. Vashi Rockville Diner..."
-                    hint="Selecting a place from maps auto-fills address details below."
-                    onPick={(place) => {
-                      if (place.pincode) {
-                        lastFetchedBillingPin.current = place.pincode;
-                      }
-                      setBillingAddress({
-                        addressLine: place.fullAddress,
-                        city: place.city || billingAddress.city,
-                        state: place.state || billingAddress.state,
-                        pincode: place.pincode || billingAddress.pincode,
-                      });
-                      setFieldErrors(prev => ({
-                        ...prev,
-                        billingAddressLine: '',
-                        billingCity: '',
-                        billingState: '',
-                        billingPincode: ''
-                      }));
-                    }}
-                    className="mb-2"
-                  />
                   <Field label="Address Line" required error={fieldErrors.billingAddressLine} dataField="billingAddressLine">
                     <Input value={billingAddress.addressLine}
                       onChange={v => { setBillingAddress({ ...billingAddress, addressLine: v }); if (fieldErrors.billingAddressLine) setFE('billingAddressLine', v.trim().length < 5 ? 'Enter the full address' : ''); }}
@@ -1600,32 +1575,6 @@ export default function VendorRegisterClient() {
                   </label>
                 </div>
                 <div className="space-y-3">
-                  {!pickupSameAsBilling && (
-                    <AddressAutocomplete
-                      label="Search from maps"
-                      placeholder="Type location, e.g. Vashi Rockville Diner..."
-                      hint="Selecting a place from maps auto-fills address details below."
-                      onPick={(place) => {
-                        if (place.pincode) {
-                          lastFetchedPickupPin.current = place.pincode;
-                        }
-                        setPickupAddress({
-                          addressLine: place.fullAddress,
-                          city: place.city || pickupAddress.city,
-                          state: place.state || pickupAddress.state,
-                          pincode: place.pincode || pickupAddress.pincode,
-                        });
-                        setFieldErrors(prev => ({
-                          ...prev,
-                          pickupAddressLine: '',
-                          pickupCity: '',
-                          pickupState: '',
-                          pickupPincode: ''
-                        }));
-                      }}
-                      className="mb-2"
-                    />
-                  )}
                   <Field label="Address Line" required error={!pickupSameAsBilling ? fieldErrors.pickupAddressLine : undefined} dataField="pickupAddressLine">
                     <Input value={pickupAddress.addressLine} disabled={pickupSameAsBilling}
                       onChange={v => { setPickupAddress({ ...pickupAddress, addressLine: v }); if (fieldErrors.pickupAddressLine) setFE('pickupAddressLine', v.trim().length < 5 ? 'Enter the full address' : ''); }}

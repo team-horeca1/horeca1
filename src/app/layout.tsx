@@ -70,12 +70,8 @@ export const metadata: Metadata = {
   },
 };
 
-import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
-
 /**
- * Root layout: auth + google maps + confirm + toaster.
- * GoogleMapsProvider is provided globally so address search and location
- * services work reliably across all pages, registration flows, and portals.
+ * Root layout: auth + confirm + toaster.
  */
 export default async function RootLayout({
   children,
@@ -87,7 +83,6 @@ export default async function RootLayout({
     <html lang="en" className={`${inter.variable}`}>
       <body className="font-sans antialiased bg-background">
         <AuthProvider session={session}>
-          <GoogleMapsProvider>
             <ConfirmProvider>
               <Suspense fallback={null}>
                 <ScrollRestoration />
@@ -100,7 +95,6 @@ export default async function RootLayout({
               {children}
               <PostLoginAccountSelector />
             </ConfirmProvider>
-          </GoogleMapsProvider>
         </AuthProvider>
       </body>
     </html>

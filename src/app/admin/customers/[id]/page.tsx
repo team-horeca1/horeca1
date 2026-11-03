@@ -26,13 +26,14 @@ import {
     Users,
     SlidersHorizontal,
     MapPin,
-    Truck,
-    Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { AdminAccountTeamPanel } from '@/components/features/admin/AdminAccountTeamPanel';
+import { CustomerDeliveryAddresses } from '@/components/features/admin/CustomerDeliveryAddresses';
+import { CustomerProfileForm, EMPTY_CUSTOMER_PROFILE, type CustomerProfileValues } from '@/components/features/customer/CustomerProfileForm';
+import { buildCompanyProfile, mapToUserFields } from '@/lib/customerProfileMapper';
 import {
     AdminEntityDetailHeader,
     AdminEntityStatsRow,
@@ -76,6 +77,8 @@ interface UserData {
             id: string;
             legalName: string | null;
             displayName: string | null;
+            firstName: string | null;
+            lastName: string | null;
             gstin: string | null;
             pan: string | null;
             fssaiNumber: string | null;
@@ -97,6 +100,7 @@ interface UserData {
             outlets?: Array<{
                 id: string;
                 name: string;
+                billingName?: string | null;
                 code: string | null;
                 addressLine: string;
                 city: string | null;
@@ -174,14 +178,9 @@ export default function CustomerDetailsPage() {
     const [toggling, setToggling] = useState(false);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'overview' | 'business' | 'credit' | 'team'>('overview');
-    const [draft, setDraft] = useState<{
-        fullName: string; email: string; phone: string;
-        businessName: string; gstNumber: string; pincode: string;
-        // P0-4 master-datasheet attributes (BusinessAccount companyProfile).
-        cp: Record<string, string>;
-    }>({ fullName: '', email: '', phone: '', businessName: '', gstNumber: '', pincode: '', cp: {} });
-
+    const [activeTab, setActiveTab] = useState<'overview' | 'business' | 'addresses' | 'credit' | 'team'>('overview');
+    const [profile, setProfile] = useState<CustomerProfileValues>(EMPTY_CUSTOMER_PROFILE);
+    const [refreshKey, setRefreshKey] = useState(0);
     useEffect(() => {
         async function fetchUser() {
             try {
@@ -207,28 +206,41 @@ export default function CustomerDetailsPage() {
         if (userId) {
             fetchUser();
         }
-    }, [userId]);
+    }, [userId, refreshKey]);
 
     function startEdit() {
         if (!user) return;
         const ba = user.accountMemberships?.find((m) => m.isPrimary)?.businessAccount;
-        setDraft({
-            fullName: user.fullName || '',
+        const contact = [ba?.firstName, ba?.lastName].filter(Boolean).join(' ') || user.fullName || '';
+        setProfile({
+            ...EMPTY_CUSTOMER_PROFILE,
+            firstName: contact,
+            lastName: '',
+            legalName: ba?.legalName || user.businessName || '',
+            companyName: ba?.legalName || user.businessName || '',
+            displayName: ba?.displayName || user.businessName || '',
             email: user.email || '',
             phone: user.phone || '',
-            businessName: user.businessName || '',
-            gstNumber: user.gstNumber || '',
-            pincode: user.pincode || '',
-            cp: {
-                pan: ba?.pan || '', fssaiNumber: ba?.fssaiNumber || '',
-                billingAddressLine: ba?.billingAddressLine || '', billingCity: ba?.billingCity || '',
-                billingState: ba?.billingState || '', billingPincode: ba?.billingPincode || '',
-                businessType: ba?.businessType || '', subType: ba?.subType || '',
-                cuisine: ba?.cuisine || '', businessSize: ba?.businessSize || '',
-                businessStructure: ba?.businessStructure || '', serviceModel: ba?.serviceModel || '',
-                monthlyPurchaseBand: ba?.monthlyPurchaseBand || '', procurementFrequency: ba?.procurementFrequency || '',
-                designation: ba?.designation || '', leadStatus: ba?.leadStatus || '', creditType: ba?.creditType || '',
-            },
+            mobilePhone: user.phone || '',
+            gstin: user.gstNumber || ba?.gstin || '',
+            pan: ba?.pan || '',
+            fssaiNumber: ba?.fssaiNumber || '',
+            designation: ba?.designation || '',
+            businessType: ba?.businessType || '',
+            subType: ba?.subType || '',
+            cuisine: ba?.cuisine || '',
+            businessSize: ba?.businessSize || '',
+            businessStructure: ba?.businessStructure || '',
+            serviceModel: ba?.serviceModel || '',
+            monthlyPurchaseBand: ba?.monthlyPurchaseBand || '',
+            procurementFrequency: ba?.procurementFrequency || '',
+            leadStatus: ba?.leadStatus || '',
+            creditType: ba?.creditType || '',
+            billingAddressLine: ba?.billingAddressLine || '',
+            billingCity: ba?.billingCity || '',
+            billingState: ba?.billingState || '',
+            billingPincode: ba?.billingPincode || '',
+            pincode: user.pincode || ba?.billingPincode || '',
         });
         setEditing(true);
     }
@@ -237,16 +249,16 @@ export default function CustomerDetailsPage() {
         if (!user || saving) return;
         setSaving(true);
         try {
-            const payload: Record<string, string> = {
-                fullName: draft.fullName.trim(),
-                email: draft.email.trim(),
-                phone: (() => { const d = draft.phone.replace(/\D/g, ''); return d.length === 12 ? d.replace(/^91/, '') : d; })(),
-                businessName: draft.businessName.trim(),
-                gstNumber: draft.gstNumber.trim(),
-                pincode: draft.pincode.trim(),
+            const mapped = mapToUserFields(profile);
+            const payload = {
+                fullName: mapped.fullName,
+                email: mapped.email ?? '',
+                phone: mapped.phone,
+                businessName: mapped.businessName ?? '',
+                gstNumber: mapped.gstNumber ?? '',
+                pincode: mapped.pincode ?? '',
             };
-            const companyProfile: Record<string, string> = {};
-            for (const [k, v] of Object.entries(draft.cp)) companyProfile[k] = v.trim();
+            const companyProfile = buildCompanyProfile(profile);
             const res = await fetch(`/api/v1/admin/users/${userId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -324,6 +336,7 @@ export default function CustomerDetailsPage() {
     const tabs = [
         { id: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
         { id: 'business' as const, label: 'Business Profile', icon: Building2 },
+        { id: 'addresses' as const, label: 'Delivery addresses', icon: MapPin },
         { id: 'credit' as const, label: 'Credit & Orders', icon: Wallet },
         { id: 'team' as const, label: 'Team', icon: Users },
     ];
@@ -474,47 +487,14 @@ export default function CustomerDetailsPage() {
                                 <div className="space-y-6">
                                     {editing ? (
                                         <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
-                                            <h3 className="font-extrabold text-[15px] text-[#181725] mb-4">Edit Profile Details</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <EditField label="Full Name">
-                                                    <input value={draft.fullName} onChange={e => setDraft(d => ({ ...d, fullName: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                </EditField>
-                                                <EditField label="Email">
-                                                    <input type="email" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                </EditField>
-                                                <EditField label="Phone">
-                                                    <input type="tel" inputMode="numeric" maxLength={10}
-                                                        value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                </EditField>
-                                                <EditField label="Pincode">
-                                                    <input value={draft.pincode} onChange={e => setDraft(d => ({ ...d, pincode: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                </EditField>
-                                                <EditField label="Business name">
-                                                    <input value={draft.businessName} onChange={e => setDraft(d => ({ ...d, businessName: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                </EditField>
-                                                <EditField label="GST number">
-                                                    <input value={draft.gstNumber} onChange={e => setDraft(d => ({ ...d, gstNumber: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                </EditField>
-                                                {([
-                                                    ['pan', 'PAN'], ['fssaiNumber', 'FSSAI'],
-                                                    ['billingAddressLine', 'Billing address'], ['billingCity', 'Billing city'],
-                                                    ['billingState', 'Billing state'], ['billingPincode', 'Billing pincode'],
-                                                    ['businessType', 'Business type'], ['subType', 'Sub-type'],
-                                                    ['cuisine', 'Cuisine / category'], ['businessSize', 'Business size'],
-                                                    ['designation', 'Designation'],
-                                                ] as [string, string][]).map(([key, label]) => (
-                                                    <EditField key={key} label={label}>
-                                                        <input value={draft.cp[key] ?? ''} onChange={e => setDraft(d => ({ ...d, cp: { ...d.cp, [key]: e.target.value } }))}
-                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
-                                                    </EditField>
-                                                ))}
-                                            </div>
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mb-4">Business profile</h3>
+                                            <CustomerProfileForm
+                                                value={profile}
+                                                onChange={(patch) => setProfile((prev) => ({ ...prev, ...patch }))}
+                                                singleContact
+                                                layout="modal"
+                                                visibleSections={{ contact: true, business: true, tax: true, admin: true }}
+                                            />
                                         </div>
                                     ) : (
                                         <div className="space-y-6 animate-in fade-in duration-300">
@@ -548,73 +528,6 @@ export default function CustomerDetailsPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Primary Delivery Address & Outlets */}
-                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
-                                                <div className="flex items-center justify-between border-b pb-2.5 mb-4">
-                                                    <h3 className="font-extrabold text-[15px] text-[#181725] flex items-center gap-2">
-                                                        <Truck size={16} className="text-[#6B1D2E]" />
-                                                        Primary Delivery Address &amp; Outlets
-                                                    </h3>
-                                                    {primaryBa?.outlets && primaryBa.outlets.length > 0 && (
-                                                        <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                                                            {primaryBa.outlets.length} outlet{primaryBa.outlets.length !== 1 ? 's' : ''}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {(() => {
-                                                    const primaryOutlet = primaryBa?.outlets?.[0];
-                                                    const deliveryAddress = primaryOutlet?.addressLine && primaryOutlet.addressLine !== 'Address not set' ? primaryOutlet.addressLine : null;
-                                                    return (
-                                                        <div className="space-y-4">
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                                <InfoCardField label="Primary Outlet Name" value={primaryOutlet?.name || user.businessName || '—'} />
-                                                                <div className="sm:col-span-2">
-                                                                    <InfoCardField label="Delivery Address" value={deliveryAddress || 'Not set'} />
-                                                                </div>
-                                                                <InfoCardField label="Delivery City" value={primaryOutlet?.city || primaryBa?.billingCity} />
-                                                                <InfoCardField label="Delivery State" value={primaryOutlet?.state || primaryBa?.billingState} />
-                                                                <InfoCardField label="Delivery Pincode" value={primaryOutlet?.pincode || user.pincode} />
-                                                            </div>
-
-                                                            {primaryBa?.outlets && primaryBa.outlets.length > 1 && (
-                                                                <div className="pt-3 border-t border-gray-100">
-                                                                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">All Branch Outlets</p>
-                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                                                        {primaryBa.outlets.map((o) => (
-                                                                            <div key={o.id} className="p-3 rounded-xl border border-gray-100 bg-[#FAFAFA] flex items-start gap-2.5 text-[12px]">
-                                                                                <Store size={14} className="text-gray-400 shrink-0 mt-0.5" />
-                                                                                <div className="min-w-0">
-                                                                                    <p className="font-bold text-[#181725] truncate">{o.name}</p>
-                                                                                    <p className="text-gray-500 truncate">{o.addressLine || 'Address pending'}</p>
-                                                                                    <p className="text-gray-400 text-[11px]">{[o.city, o.pincode].filter(Boolean).join(' - ')}</p>
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-
-                                            {/* Billing & Address */}
-                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
-                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <MapPin size={16} className="text-[#6B1D2E]" />
-                                                    Billing Address & Location
-                                                </h3>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                    <div className="sm:col-span-2">
-                                                        <InfoCardField label="Billing Address" value={primaryBa?.billingAddressLine} />
-                                                    </div>
-                                                    <InfoCardField label="Billing City" value={primaryBa?.billingCity} />
-                                                    <InfoCardField label="Billing State" value={primaryBa?.billingState} />
-                                                    <InfoCardField label="Billing Pincode" value={primaryBa?.billingPincode} />
-                                                </div>
-                                            </div>
-
                                             {/* Business Profile Details */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
@@ -630,6 +543,23 @@ export default function CustomerDetailsPage() {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {activeTab === 'addresses' && (
+                                <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                    <CustomerDeliveryAddresses
+                                        userId={user.id}
+                                        businessName={primaryBa?.legalName || user.businessName || ''}
+                                        billing={{
+                                            line: primaryBa?.billingAddressLine || '',
+                                            city: primaryBa?.billingCity || '',
+                                            state: primaryBa?.billingState || '',
+                                            pincode: primaryBa?.billingPincode || '',
+                                        }}
+                                        outlets={primaryBa?.outlets ?? []}
+                                        onSaved={() => setRefreshKey((n) => n + 1)}
+                                    />
                                 </div>
                             )}
 
@@ -721,15 +651,6 @@ export default function CustomerDetailsPage() {
                     </div>
                 </div>
             </div>
-        </div>
-    );
-}
-
-function EditField({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex flex-col gap-1.5 w-full">
-            <span className="text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">{label}</span>
-            <div className="w-full">{children}</div>
         </div>
     );
 }

@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import type { AssignmentType, CustomerTarget, PriceListCol } from '../types';
 import { CustomerPricePanel } from './CustomerPricePanel';
 import { ConflictDialog, type PreviewConflict } from './ConflictDialog';
-import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 
 type PriceListAssignment = {
   type: AssignmentType;
@@ -374,8 +373,6 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain, onR
     priceListId: string;
   } | null>(null);
   /** Area targets should come from Google Maps picks; manual entry is only a fallback. */
-  const [manualArea, setManualArea] = useState(false);
-
   const openEditGroup = async (row: TargetRow) => {
     setGroupModal({ groupId: row.value, name: row.name, memberIds: [], memberSearch: '', saving: true });
     try {
@@ -518,7 +515,7 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain, onR
             </button>
             <button
               type="button"
-              onClick={() => { setManualArea(false); setTargetModal({ type: 'pincode', value: '', priceListId: '' }); }}
+              onClick={() => { setTargetModal({ type: 'pincode', value: '', priceListId: '' }); }}
               className="h-10 px-3 rounded-[12px] border border-[#E9E3DD] bg-white text-[12px] font-bold flex items-center gap-1.5 shrink-0"
             >
               <Plus size={14} /> Add pincode / area / segment
@@ -741,50 +738,19 @@ export function AssignmentMatrix({ priceLists, onReloadLists, onOpenExplain, onR
                 className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] bg-white font-normal"
               >
                 <option value="pincode">Pincode (e.g. 400706)</option>
-                <option value="area">Area / City — pick from map (e.g. Thane, Navi Mumbai)</option>
+                <option value="area">Area / City (e.g. Thane, Navi Mumbai)</option>
                 <option value="segment">Segment tag (e.g. Hotel, Cafe, Caterer)</option>
               </select>
             </label>
             {targetModal.type === 'area' ? (
               <div className="block">
                 <span className="text-[12px] font-semibold text-[#181725]">Area / City</span>
-                {manualArea ? (
-                  <>
-                    <input
-                      value={targetModal.value}
-                      onChange={(e) => setTargetModal((m) => (m ? { ...m, value: e.target.value } : m))}
-                      placeholder="Type the city / area name exactly, e.g. Thane"
-                      className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-normal"
-                    />
-                    <button type="button" onClick={() => setManualArea(false)} className="mt-1.5 text-[11px] text-primary font-semibold">
-                      Use map search instead (recommended)
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="mt-1">
-                      <AddressAutocomplete
-                        placeholder="Search area or city on the map (e.g. Thane)"
-                        initialValue={targetModal.value}
-                        onPick={(place) => {
-                          // Store Google's own city/state name so it matches the
-                          // city/state stored on customer outlets exactly.
-                          const name = (place.city || place.state || place.shortAddress.split(',')[0] || '').trim();
-                          if (name) setTargetModal((m) => (m ? { ...m, value: name } : m));
-                        }}
-                        hint="Pick from the map suggestions — the name then matches your customers' addresses exactly, no spelling mistakes."
-                      />
-                    </div>
-                    {targetModal.value ? (
-                      <p className="mt-1.5 text-[12px] text-[#181725]">Selected area: <span className="font-bold">{targetModal.value}</span></p>
-                    ) : (
-                      <p className="mt-1.5 text-[11px] text-amber-700">Pick a suggestion from the map search to add this area.</p>
-                    )}
-                    <button type="button" onClick={() => setManualArea(true)} className="mt-1 text-[11px] text-[#7C7C7C] font-medium underline">
-                      Can&apos;t find it? Type the area name manually
-                    </button>
-                  </>
-                )}
+                <input
+                  value={targetModal.value}
+                  onChange={(e) => setTargetModal((m) => (m ? { ...m, value: e.target.value } : m))}
+                  placeholder="Type the city / area name, e.g. Thane"
+                  className="mt-1 w-full h-11 px-3 border border-[#E9E3DD] rounded-[12px] font-normal"
+                />
               </div>
             ) : (
               <label className="block text-[12px] font-semibold text-[#181725]">Value

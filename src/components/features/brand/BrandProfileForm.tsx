@@ -6,10 +6,9 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Building2, User, MapPin, Globe, Target, ChevronDown, ChevronUp, Check, ShieldCheck,
+  Building2, User, MapPin, Globe, Target, ChevronDown, ChevronUp, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
 import {
   FormField, FormInput, FormSelect, FormTextarea, TextField, PhoneInput, PasswordInput,
 } from '@/components/ui/form';
@@ -32,8 +31,6 @@ import {
 import {
   validateFieldBlur,
   type BrandProfileInput,
-  derivedLegalName,
-  derivedDisplayName,
 } from '@/lib/validators/brand-profile';
 
 export type BrandProfileValues = BrandProfileInput;
@@ -222,29 +219,6 @@ export function BrandProfileForm({
     set({ subType: selected, productCategories: [] });
   };
 
-  const handleAddressPick = (place: AddressPickPayload) => {
-    const legal = derivedLegalName(value);
-    const display = derivedDisplayName(value);
-    const resolvedAddress = place.fullAddress || place.shortAddress || '';
-    const patch: Partial<BrandProfileValues> = {
-      addressLine: resolvedAddress,
-      billingAddressLine: resolvedAddress,
-      city: place.city,
-      billingCity: place.city,
-      state: place.state,
-      billingState: place.state,
-      pincode: place.pincode,
-      billingPincode: place.pincode,
-      latitude: place.latitude,
-      longitude: place.longitude,
-      placeId: place.placeId,
-    };
-    if (!value.outletName?.trim() && (display || legal)) {
-      patch.outletName = `${display || legal} HQ`;
-    }
-    set(patch);
-  };
-
   const subTypes = subTypesForBrandType(value.brandType ?? '');
   const productCats = productCategoriesForSubType(value.brandType ?? '', value.subType ?? '');
 
@@ -264,13 +238,7 @@ export function BrandProfileForm({
 
   const addressContent = (
     <div className="space-y-4">
-      <AddressAutocomplete
-        label="Search address or place name"
-        placeholder="e.g. Bandra office, Andheri West..."
-        hint="Selecting a place auto-fills city, state, and pincode."
-        onPick={handleAddressPick}
-      />
-      <TextField label="Primary Outlet / HQ name" required={requireLocationFields} value={value.outletName ?? ''}
+      <TextField label="Outlet name" required={requireLocationFields} value={value.outletName ?? ''}
         dataField="outletName"
         error={errors.outletName}
         onChange={v => set({ outletName: v })}
@@ -296,16 +264,6 @@ export function BrandProfileForm({
         <TextField label="State" value={value.state ?? value.billingState ?? ''}
           onChange={v => set({ state: v, billingState: v })} placeholder="State" />
       </div>
-      {value.latitude != null && value.longitude != null && (
-        <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-3 flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-primary-light flex items-center justify-center shrink-0">
-            <Check size={12} className="text-primary" strokeWidth={3} />
-          </div>
-          <p className="text-[11.5px] text-primary">
-            GPS coordinates captured ({value.latitude.toFixed(5)}, {value.longitude.toFixed(5)})
-          </p>
-        </div>
-      )}
     </div>
   );
 

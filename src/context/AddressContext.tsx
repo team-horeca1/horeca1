@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { toast } from 'sonner';
 import { notifyAccountsRefresh } from '@/lib/addressUsability';
 import {
@@ -82,13 +81,12 @@ function pickAddressForOutlet(
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AddressProvider({ children }: { children: React.ReactNode }) {
-    const { isLoaded, google } = useGoogleMaps();
     const { session, isAuthenticated, isResolved } = useStableSession();
     const userId = session?.user?.id ?? null;
     const activeOutletId = session?.user?.activeOutletId ?? null;
     const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
     const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-    const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+    const [isDetectingLocation] = useState(false);
     const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
     const [buyerImpersonating, setBuyerImpersonating] = useState(false);
     const impersonatingRef = useRef(false);
@@ -435,160 +433,42 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     // ─── Reverse Geocode ─────────────────────────────────────────────────
 
     const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<Partial<Address> | null> => {
-        if (!isLoaded || !google) return null;
-
-        try {
-            const geocoder = new google.maps.Geocoder();
-            const response = await geocoder.geocode({ location: { lat, lng } });
-
-            if (response.results && response.results.length > 0) {
-                const result = response.results[0];
-                const components = result.address_components;
-
-                const locality = components?.find(c => c.types.includes('locality'));
-                const sublocality = components?.find(c =>
-                    c.types.includes('sublocality_level_1') || c.types.includes('sublocality')
-                );
-                const postalCode = components?.find(c => c.types.includes('postal_code'));
-                const stateComp = components?.find(c => c.types.includes('administrative_area_level_1'));
-
-                const pincode = postalCode?.long_name || '';
-                const city = locality?.long_name || '';
-                const state = stateComp?.long_name || '';
-                let shortAddr = '';
-                if (sublocality && locality) {
-                    shortAddr = `${sublocality.long_name}, ${locality.long_name}`;
-                } else if (locality) {
-                    shortAddr = locality.long_name;
-                } else {
-                    shortAddr = result.formatted_address.split(',').slice(0, 2).join(',');
-                }
-
-                return {
-                    fullAddress: result.formatted_address,
-                    shortAddress: shortAddr,
-                    latitude: lat,
-                    longitude: lng,
-                    pincode,
-                    city,
-                    state,
-                    placeId: result.place_id,
-                };
-            }
-            return null;
-        } catch (error) {
-            console.error('Reverse geocode failed:', error);
-            return null;
-        }
-    }, [isLoaded, google]);
+        void lat;
+        void lng;
+        return null;
+    }, []);
 
     // ─── Forward Geocode a Pincode ───────────────────────────────────────
     // Resolves a bare 6-digit pincode to a real location (city/state/lat/lng)
     // so the "Deliver to" chip never shows a fabricated default area.
     const geocodePincode = useCallback(async (pincode: string): Promise<Partial<Address> | null> => {
-        if (!isLoaded || !google) return null;
-
         try {
-            const geocoder = new google.maps.Geocoder();
-            const response = await geocoder.geocode({
-                componentRestrictions: { country: 'IN', postalCode: pincode },
-            });
-
-            if (response.results && response.results.length > 0) {
-                const result = response.results[0];
-                const loc = result.geometry.location;
-                const components = result.address_components;
-
-                const locality = components?.find(c => c.types.includes('locality'));
-                const sublocality = components?.find(c =>
-                    c.types.includes('sublocality_level_1') || c.types.includes('sublocality')
-                );
-                const stateComp = components?.find(c => c.types.includes('administrative_area_level_1'));
-
-                const city = locality?.long_name || '';
-                const state = stateComp?.long_name || '';
-                let shortAddr = '';
-                if (sublocality && locality) {
-                    shortAddr = `${sublocality.long_name}, ${locality.long_name}`;
-                } else if (locality) {
-                    shortAddr = locality.long_name;
-                } else {
-                    shortAddr = result.formatted_address.split(',').slice(0, 2).join(',');
-                }
-
-                return {
-                    fullAddress: result.formatted_address,
-                    shortAddress: shortAddr,
-                    latitude: loc.lat(),
-                    longitude: loc.lng(),
-                    pincode,
-                    city,
-                    state,
-                    placeId: result.place_id,
-                };
-            }
-            return null;
-        } catch (error) {
-            console.error('Pincode geocode failed:', error);
+            const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+            const data = await res.json() as Array<{ PostOffice?: Array<{ District?: string; Division?: string; State?: string; Name?: string }> }>;
+            const po = data?.[0]?.PostOffice?.[0];
+            const city = po?.District || po?.Division || '';
+            const state = po?.State || '';
+            const shortAddr = [po?.Name, city, state].filter(Boolean).join(', ') || `Pincode ${pincode}`;
+            return {
+                fullAddress: shortAddr,
+                shortAddress: shortAddr,
+                latitude: 0,
+                longitude: 0,
+                pincode,
+                city,
+                state,
+            };
+        } catch {
             return null;
         }
-    }, [isLoaded, google]);
+    }, []);
 
     // ─── Detect Current Location ─────────────────────────────────────────
 
     const detectCurrentLocation = useCallback(async (): Promise<Address | null> => {
-        if (!navigator.geolocation) {
-            toast.error('Geolocation is not supported by your browser');
-            return null;
-        }
-
-        setIsDetectingLocation(true);
-
-        try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 60000,
-                });
-            });
-
-            const { latitude, longitude } = position.coords;
-            const geocoded = await reverseGeocode(latitude, longitude);
-
-            if (geocoded) {
-                const address: Address = {
-                    id: `current_${Date.now()}`,
-                    label: 'Other',
-                    fullAddress: geocoded.fullAddress || '',
-                    shortAddress: geocoded.shortAddress || '',
-                    latitude,
-                    longitude,
-                    pincode: geocoded.pincode,
-                    city: geocoded.city,
-                    state: geocoded.state,
-                    placeId: geocoded.placeId,
-                };
-                setSelectedAddress(address);
-                setIsDetectingLocation(false);
-                return address;
-            }
-
-            setIsDetectingLocation(false);
-            return null;
-        } catch (error: unknown) {
-            setIsDetectingLocation(false);
-            const geoError = error as { code?: number };
-            if (geoError.code === 1) {
-                toast.error('Location access denied. Enable location permissions in your browser settings.');
-            } else if (geoError.code === 2) {
-                toast.error('Unable to determine your location. Please try again.');
-            } else if (geoError.code === 3) {
-                toast.error('Location request timed out. Please try again.');
-            }
-            return null;
-        }
-    }, [reverseGeocode, setSelectedAddress]);
+        toast.error('Type the address instead of using GPS.');
+        return null;
+    }, []);
 
     const value = useMemo(() => ({
         selectedAddress,

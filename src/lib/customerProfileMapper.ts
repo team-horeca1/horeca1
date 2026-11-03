@@ -12,8 +12,7 @@ import {
   primaryPhoneDigits,
   resolvedAddressLine,
 } from '@/lib/validators/customer-profile';
-import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
-import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import { isRealStreetAddress, PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
 
 function str(v: string | undefined | null): string | null {
   const t = (v ?? '').trim();
@@ -140,19 +139,23 @@ export function mapToPrimaryOutlet(p: CustomerProfileInput): {
   latitude: number | null;
   longitude: number | null;
   placeId: string | null;
+  billingName: string | null;
   requiresAddressUpdate: boolean;
 } {
   const addressLine = resolvedAddressLine(p);
+  const realStreet = isRealStreetAddress(addressLine);
   const pincode = str(p.pincode || p.billingPincode);
   const latitude = p.latitude ?? null;
   const longitude = p.longitude ?? null;
+  const businessName = derivedLegalName(p);
+  const billingName = str(p.billingName);
+  // A billing name that matches the business is not an override.
+  const billingOverride = billingName && billingName !== businessName ? billingName : null;
 
-  // Do not invent "{display} — Main". Blank stays blank until the user types one.
-  // Prisma requires a non-null string; empty string means "not captured yet".
-  // First-order-ready when pincode (or real coords) is present — street can come later.
+  // Do not invent "{display} — Main". A pincode alone is not a finished street.
   return {
     name: str(p.outletName) || '',
-    addressLine: addressLine || PLACEHOLDER_OUTLET_ADDRESS,
+    addressLine: realStreet ? addressLine : PLACEHOLDER_OUTLET_ADDRESS,
     flatInfo: str(p.flatInfo),
     landmark: str(p.landmark),
     city: str(p.city || p.billingCity),
@@ -161,7 +164,8 @@ export function mapToPrimaryOutlet(p: CustomerProfileInput): {
     latitude,
     longitude,
     placeId: str(p.placeId),
-    requiresAddressUpdate: !hasUsableDeliveryLocation({ pincode, latitude, longitude }),
+    billingName: billingOverride,
+    requiresAddressUpdate: !realStreet,
   };
 }
 

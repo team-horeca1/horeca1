@@ -1,234 +1,123 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, MapPin, Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useAddress, Address } from '@/context/AddressContext';
-import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
+import {
+  deliveryFromOutletAddress,
+  OutletAddressForm,
+  type OutletAddressValue,
+} from '@/components/features/customer/OutletAddressForm';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface EditAddressOverlayProps {
-    address: Address | null;
-    onClose: () => void;
+  address: Address | null;
+  onClose: () => void;
+}
+
+function fromAddress(address: Address): OutletAddressValue {
+  const line = isRealStreetAddress(address.fullAddress) ? address.fullAddress : '';
+  return {
+    outletName: address.label || '',
+    billingName: address.businessName || '',
+    billingAddressLine: line,
+    billingCity: address.city || '',
+    billingState: address.state || '',
+    billingPincode: address.pincode || '',
+    sameAsBilling: true,
+    addressLine: line,
+    city: address.city || '',
+    state: address.state || '',
+    pincode: address.pincode || '',
+  };
 }
 
 export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps) {
-    const { updateAddress } = useAddress();
-    const [businessName, setBusinessName] = useState('');
-    const [fullAddress, setFullAddress] = useState('');
-    const [shortAddress, setShortAddress] = useState('');
-    const [flatInfo, setFlatInfo] = useState('');
-    const [landmark, setLandmark] = useState('');
-    const [pincode, setPincode] = useState('');
-    const [city, setCity] = useState('');
-    const [state, setState] = useState('');
-    const [latitude, setLatitude] = useState<number | null>(null);
-    const [longitude, setLongitude] = useState<number | null>(null);
-    const [placeId, setPlaceId] = useState<string | undefined>(undefined);
-    const [isSaving, setIsSaving] = useState(false);
+  const { updateAddress } = useAddress();
+  const [value, setValue] = useState<OutletAddressValue | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        if (!address) return;
-        setBusinessName(address.businessName || '');
-        setFullAddress(address.fullAddress || '');
-        setShortAddress(address.shortAddress || '');
-        setFlatInfo(address.flatInfo || '');
-        setLandmark(address.landmark || '');
-        setPincode(address.pincode || '');
-        setCity(address.city || '');
-        setState(address.state || '');
-        setLatitude(Number.isFinite(address.latitude) ? address.latitude : null);
-        setLongitude(Number.isFinite(address.longitude) ? address.longitude : null);
-        setPlaceId(address.placeId);
-    }, [address]);
+  useEffect(() => {
+    if (!address) {
+      setValue(null);
+      return;
+    }
+    setValue(fromAddress(address));
+  }, [address]);
 
-    if (!address) return null;
+  if (!address || !value) return null;
 
-    const handlePick = (place: AddressPickPayload) => {
-        const resolved = place.fullAddress || place.shortAddress;
-        setFullAddress(resolved);
-        setShortAddress(place.shortAddress || resolved);
-        setPincode(place.pincode);
-        setCity(place.city);
-        setState(place.state);
-        setLatitude(place.latitude);
-        setLongitude(place.longitude);
-        setPlaceId(place.placeId);
-        // Overwrite business name when Places returns one; keep existing if street-only pick.
-        if (place.businessName) {
-            setBusinessName(place.businessName);
-        }
-    };
+  const delivery = deliveryFromOutletAddress(value);
+  const canSave = isRealStreetAddress(delivery.addressLine) && /^\d{6}$/.test(delivery.pincode);
 
-    const pinOk = /^\d{6}$/.test(pincode.trim());
-    const hasRealStreet =
-        fullAddress.trim().length > 0 && !fullAddress.includes('Address pending');
-    const canSave = pinOk || hasRealStreet;
+  const handleSave = async () => {
+    if (!canSave) {
+      toast.error('Enter the address and a 6-digit pincode');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const line = delivery.addressLine.trim();
+      await updateAddress(address.id, {
+        label: value.outletName.trim() || address.label,
+        businessName: value.billingName.trim() || undefined,
+        fullAddress: line,
+        shortAddress: line.split(',').slice(0, 2).join(', '),
+        pincode: delivery.pincode,
+        city: delivery.city.trim() || undefined,
+        state: delivery.state.trim() || undefined,
+        flatInfo: address.flatInfo,
+        landmark: address.landmark,
+        // Keep an existing map pin. Typing a street does not wipe old coordinates.
+        latitude: address.latitude,
+        longitude: address.longitude,
+        ...(address.placeId ? { placeId: address.placeId } : {}),
+      });
+      toast.success('Address updated');
+      onClose();
+    } catch {
+      toast.error('Could not update address');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    const handleSave = async () => {
-        if (!canSave) {
-            toast.error('Enter a 6-digit pincode or pick a delivery address');
-            return;
-        }
-        setIsSaving(true);
-        try {
-            const resolvedFull =
-                hasRealStreet
-                    ? fullAddress.trim()
-                    : `Pincode ${pincode.trim()} — street later`;
-            await updateAddress(address.id, {
-                businessName: businessName.trim() || undefined,
-                fullAddress: resolvedFull,
-                shortAddress: shortAddress.trim() || resolvedFull.split(',').slice(0, 2).join(', '),
-                flatInfo: flatInfo.trim() || undefined,
-                landmark: landmark.trim() || undefined,
-                pincode: pincode.trim() || undefined,
-                city: city.trim() || undefined,
-                state: state.trim() || undefined,
-                ...(latitude !== null && longitude !== null
-                    ? { latitude, longitude }
-                    : {}),
-                ...(placeId ? { placeId } : {}),
-            });
-            toast.success('Address updated');
-            onClose();
-        } catch {
-            toast.error('Could not update address');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const isPlaceholder = fullAddress.includes('Address pending') || !fullAddress.trim();
-
-    return (
-        <>
-            <div
-                className="fixed inset-0 z-[15000] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-                onClick={onClose}
-            />
-            <div className="fixed inset-0 z-[15001] flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
-                <div
-                    className="w-full md:max-w-[460px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom md:zoom-in-95 duration-300 pointer-events-auto"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0F0F0]">
-                        <h3 className="font-extrabold text-[16px] text-gray-900">
-                            Edit Delivery Address
-                        </h3>
-                        <button
-                            onClick={onClose}
-                            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-                        >
-                            <X size={18} className="text-gray-600" />
-                        </button>
-                    </div>
-
-                    <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                        <AddressAutocomplete
-                            label="Search address"
-                            placeholder="Search area, street, or business name…"
-                            hint="Pick a place from search — this sets the map pin, pincode, city and state."
-                            initialValue={isPlaceholder ? '' : fullAddress}
-                            onPick={handlePick}
-                        />
-
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                                Business Name <span className="text-gray-400 normal-case font-normal">(optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={businessName}
-                                onChange={(e) => setBusinessName(e.target.value)}
-                                placeholder="e.g. Malvan Tadka"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[14px] outline-none focus:border-primary transition-colors"
-                            />
-                        </div>
-
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex items-start gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
-                                <MapPin size={16} className="text-primary" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-[13px] font-bold text-gray-800 leading-tight">
-                                    {isPlaceholder
-                                        ? 'No location set yet'
-                                        : (shortAddress || fullAddress.split(',').slice(0, 2).join(','))}
-                                </p>
-                                <p className="text-[12px] text-gray-500 mt-0.5 line-clamp-2">
-                                    {isPlaceholder
-                                        ? 'Use search above to pick a delivery location'
-                                        : fullAddress}
-                                </p>
-                                {pincode && !isPlaceholder && (
-                                    <span className="inline-block mt-1.5 text-[11px] font-semibold text-primary bg-primary-light px-2 py-0.5 rounded-full">
-                                        {pincode}{city ? ` · ${city}` : ''}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                                Pincode <span className="text-primary">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={6}
-                                value={pincode}
-                                onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                placeholder="6-digit delivery pincode"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors tabular-nums"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                                Floor / Unit / Building{' '}
-                                <span className="text-gray-400 normal-case font-normal">(optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={flatInfo}
-                                onChange={(e) => setFlatInfo(e.target.value)}
-                                placeholder="e.g. Ground Floor, Shop 4"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                                Landmark <span className="text-gray-400 normal-case font-normal">(optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={landmark}
-                                onChange={(e) => setLandmark(e.target.value)}
-                                placeholder="Near main gate / opposite bus stop"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
-                        <button
-                            onClick={onClose}
-                            className="h-[44px] px-5 bg-white border border-gray-200 text-gray-700 rounded-xl text-[13px] font-bold hover:bg-gray-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || !canSave}
-                            className="flex-1 h-[44px] bg-primary hover:bg-primary-dark disabled:opacity-70 text-white rounded-xl text-[13px] font-bold transition-colors flex items-center justify-center gap-2"
-                        >
-                            {isSaving && <Loader2 size={15} className="animate-spin" />}
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
+  return (
+    <>
+      <div className="fixed inset-0 z-[15000] bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[15001] flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
+        <div
+          className="w-full md:max-w-[520px] max-h-[90vh] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0F0F0] shrink-0">
+            <h3 className="font-extrabold text-[16px] text-gray-900">Edit delivery address</h3>
+            <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">
+              <X size={18} className="text-gray-600" />
+            </button>
+          </div>
+          <div className="px-5 py-4 overflow-y-auto">
+            <OutletAddressForm value={value} onChange={setValue} businessName={address.businessName} />
+          </div>
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+            <button onClick={onClose} className="h-[44px] px-5 bg-white border border-gray-200 text-gray-700 rounded-xl text-[13px] font-bold">
+              Cancel
+            </button>
+            <button
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className={cn(
+                'flex-1 h-[44px] rounded-xl text-[13px] font-bold text-white',
+                canSave ? 'bg-primary' : 'bg-gray-200 text-gray-400',
+              )}
+            >
+              {isSaving ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }

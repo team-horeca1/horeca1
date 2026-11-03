@@ -7,10 +7,10 @@
 
 import React, { useState } from 'react';
 import {
-  Building2, MapPin, ShieldCheck, User, Receipt, ChevronDown, ChevronUp, Check, Plus, Trash2,
+  Building2, MapPin, ShieldCheck, User, Receipt, ChevronDown, ChevronUp, Plus, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
+import { OutletAddressForm, type OutletAddressValue } from '@/components/features/customer/OutletAddressForm';
 import {
   FormField, FormInput, FormSelect, FormTextarea, TextField, PhoneInput, SectionLabel, inputClass,
   PasswordInput, PasswordToggleButton,
@@ -74,6 +74,8 @@ export interface CustomerProfileFormProps {
   businessTypeInput?: 'select' | 'text';
   /** Hide first/last/legal/display/mobile/email — they were collected at signup. */
   omitCoreFields?: boolean;
+  /** One contact-person field. Register and admin create use this. */
+  singleContact?: boolean;
 }
 
 function SectionHeader({ icon: Icon, children, spanClass }: { icon: React.ComponentType<{ size?: number; className?: string }>; children: React.ReactNode; spanClass: string }) {
@@ -138,6 +140,7 @@ export function CustomerProfileForm({
   mode = 'full',
   businessTypeInput = 'select',
   omitCoreFields = false,
+  singleContact = false,
 }: CustomerProfileFormProps) {
   const set = (patch: Partial<CustomerProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
@@ -145,9 +148,11 @@ export function CustomerProfileForm({
   const isModal = layout === 'modal';
   const isTextTypes = businessTypeInput === 'text';
   const relaxedContact = isRegisterEmailOtpEnabled() && mode !== 'register' && !omitCoreFields;
-  const [sameAsDelivery, setSameAsDelivery] = useState(
-    !value.billingAddressLine || value.billingAddressLine === value.addressLine,
-  );
+  const [sameAsBilling, setSameAsBilling] = useState(() => {
+    const bill = (value.billingAddressLine ?? '').trim();
+    const delivery = (value.addressLine ?? '').trim();
+    return !delivery || !bill || delivery === bill;
+  });
   const GRID = isModal
     ? 'flex flex-col gap-4 min-w-0'
     : isWide
@@ -170,27 +175,6 @@ export function CustomerProfileForm({
       return;
     }
     set({ subType, cuisine: '' });
-  };
-
-  const handleAddressPick = (place: AddressPickPayload) => {
-    const resolvedAddress = place.fullAddress || place.shortAddress || '';
-    const patch: Partial<CustomerProfileValues> = {
-      addressLine: resolvedAddress,
-      city: place.city,
-      state: place.state,
-      pincode: place.pincode,
-      latitude: place.latitude,
-      longitude: place.longitude,
-      placeId: place.placeId,
-    };
-    if (sameAsDelivery) {
-      patch.billingAddressLine = resolvedAddress;
-      patch.billingCity = place.city;
-      patch.billingState = place.state;
-      patch.billingPincode = place.pincode;
-    }
-    // Do not invent an outlet name from the place or display name — the user must type it.
-    set(patch);
   };
 
   const subTypes = subTypesForBusinessType(value.businessType ?? '');
@@ -221,22 +205,12 @@ export function CustomerProfileForm({
         </div>
         <div data-field="firstName">
           <TextField
-            label="Person's first name"
+            label="Contact person"
             required
-            value={value.firstName ?? ''}
+            value={[value.firstName, value.lastName].filter(Boolean).join(' ')}
             error={errors.firstName}
-            onChange={v => set({ firstName: v })}
-            placeholder="First name"
-          />
-        </div>
-        <div data-field="lastName">
-          <TextField
-            label="Person's last name"
-            required
-            value={value.lastName ?? ''}
-            error={errors.lastName}
-            onChange={v => set({ lastName: v })}
-            placeholder="Last name"
+            onChange={v => set({ firstName: v, lastName: '' })}
+            placeholder="Name of the person we should call"
           />
         </div>
         <div data-field="phone">
@@ -303,132 +277,41 @@ export function CustomerProfileForm({
     </div>
   );
 
+  const businessLabel = value.displayName || value.legalName || value.companyName || '';
+  const addressValue: OutletAddressValue = {
+    outletName: value.outletName ?? '',
+    billingName: value.billingName ?? businessLabel,
+    billingAddressLine: value.billingAddressLine ?? '',
+    billingCity: value.billingCity ?? '',
+    billingState: value.billingState ?? '',
+    billingPincode: value.billingPincode ?? '',
+    sameAsBilling,
+    addressLine: value.addressLine ?? '',
+    city: value.city ?? '',
+    state: value.state ?? '',
+    pincode: value.pincode ?? '',
+  };
   const addressContent = (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-3 text-[12px] text-gray-600 flex items-center gap-2">
-        <MapPin size={15} className="text-primary shrink-0" />
-        <span>Configure the primary delivery outlet where client orders will be delivered.</span>
-      </div>
-
-      <AddressAutocomplete
-        label="Search delivery location or place name"
-        placeholder="e.g. Vashi Rockville Diner, Digha, Linking Road..."
-        hint="Selecting a place from maps auto-fills the coordinates, address, and city for you."
-        onPick={handleAddressPick}
-      />
-      <TextField label="Primary Branch / Outlet Name" required value={value.outletName ?? ''}
-        error={errors.outletName}
-        onChange={v => set({ outletName: v })}
-        placeholder="e.g. Rockville Vashi Branch / Central Kitchen" />
-      <TextField label="Delivery Address (Street, Building, Area)" required value={value.addressLine ?? ''}
-        error={errors.addressLine}
-        onChange={v => {
-          set({
-            addressLine: v,
-            ...(sameAsDelivery ? { billingAddressLine: v } : {}),
-          });
-        }}
-        placeholder="Building, street, area" />
-      <div className={GRID}>
-        <TextField label="Address Line 2 (optional)" value={value.flatInfo ?? ''}
-          onChange={v => set({ flatInfo: v })} placeholder="e.g. Flat 12A, near metro station" />
-        <TextField label="Delivery Pincode" value={value.pincode ?? ''} maxLength={6}
-          error={errors.pincode} placeholder="6-digit PIN" inputMode="numeric"
-          onChange={v => {
-            const n = v.replace(/\D/g, '').slice(0, 6);
-            set({
-              pincode: n,
-              ...(sameAsDelivery ? { billingPincode: n } : {}),
-            });
-          }}
-          onBlur={() => blur('pincode', value.pincode ?? '')} />
-        <TextField label="City" value={value.city ?? ''}
-          onChange={v => {
-            set({
-              city: v,
-              ...(sameAsDelivery ? { billingCity: v } : {}),
-            });
-          }} placeholder="City" />
-        <TextField label="State" value={value.state ?? ''}
-          onChange={v => {
-            set({
-              state: v,
-              ...(sameAsDelivery ? { billingState: v } : {}),
-            });
-          }} placeholder="State" />
-      </div>
-      {value.latitude != null && value.longitude != null && (
-        <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-3 flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-primary-light flex items-center justify-center shrink-0">
-            <Check size={12} className="text-primary" strokeWidth={3} />
-          </div>
-          <p className="text-[11.5px] text-primary">
-            GPS coordinates captured ({value.latitude.toFixed(5)}, {value.longitude.toFixed(5)})
-          </p>
-        </div>
-      )}
-
-      {/* Billing Address Toggle & Separate Form */}
-      <div className="pt-3 border-t border-[#EEEEEE]">
-        <label className="flex items-center gap-2.5 text-[13px] font-bold text-[#181725] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={sameAsDelivery}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              setSameAsDelivery(checked);
-              if (checked) {
-                set({
-                  billingAddressLine: value.addressLine,
-                  billingCity: value.city,
-                  billingState: value.state,
-                  billingPincode: value.pincode,
-                });
-              }
-            }}
-            className="accent-primary w-4 h-4 rounded"
-          />
-          Billing address is same as delivery address
-        </label>
-
-        {!sameAsDelivery && (
-          <div className="mt-3.5 space-y-3 p-4 rounded-xl border border-gray-200 bg-[#FAFAFA] animate-in fade-in duration-150">
-            <div className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#6B1D2E] uppercase tracking-wider">
-              <Receipt size={14} />
-              <span>Registered Billing Office / Invoice Address</span>
-            </div>
-            <TextField
-              label="Billing Address Line"
-              value={value.billingAddressLine ?? ''}
-              onChange={(v) => set({ billingAddressLine: v })}
-              placeholder="Corporate office, registered address"
-            />
-            <div className={GRID}>
-              <TextField
-                label="Billing Pincode"
-                value={value.billingPincode ?? ''}
-                maxLength={6}
-                placeholder="6-digit PIN"
-                inputMode="numeric"
-                onChange={(v) => set({ billingPincode: v.replace(/\D/g, '').slice(0, 6) })}
-              />
-              <TextField
-                label="Billing City"
-                value={value.billingCity ?? ''}
-                onChange={(v) => set({ billingCity: v })}
-                placeholder="City"
-              />
-              <TextField
-                label="Billing State"
-                value={value.billingState ?? ''}
-                onChange={(v) => set({ billingState: v })}
-                placeholder="State"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <OutletAddressForm
+      value={addressValue}
+      businessName={businessLabel}
+      errors={errors}
+      onChange={(next) => {
+        setSameAsBilling(next.sameAsBilling);
+        set({
+          outletName: next.outletName,
+          billingName: next.billingName,
+          billingAddressLine: next.billingAddressLine,
+          billingCity: next.billingCity,
+          billingState: next.billingState,
+          billingPincode: next.billingPincode,
+          addressLine: next.addressLine,
+          city: next.city,
+          state: next.state,
+          pincode: next.pincode,
+        });
+      }}
+    />
   );
 
   return (
@@ -438,24 +321,14 @@ export function CustomerProfileForm({
           {isModal && !omitCoreFields && visibleSections.contact && visibleSections.business ? (
             <>
               <TextField
-                label="First Name"
+                label="Contact person"
                 required
                 dataField="firstName"
-                value={value.firstName ?? ''}
+                value={[value.firstName, value.lastName].filter(Boolean).join(' ')}
                 error={errors.firstName}
-                onChange={v => set({ firstName: v })}
+                onChange={v => set({ firstName: v, lastName: '' })}
                 onBlur={() => blur('firstName', value.firstName ?? '')}
-                placeholder="First name"
-              />
-              <TextField
-                label="Last Name"
-                required
-                dataField="lastName"
-                value={value.lastName ?? ''}
-                error={errors.lastName}
-                onChange={v => set({ lastName: v })}
-                onBlur={() => blur('lastName', value.lastName ?? '')}
-                placeholder="Last name"
+                placeholder="Name of the person we should call"
               />
               <div data-field="legalName">
                 <TextField label="Legal Business Name" required value={value.legalName ?? value.companyName ?? ''}
@@ -509,7 +382,17 @@ export function CustomerProfileForm({
                 </>
               ) : (
                 <>
-                  <FormField label="Primary Contact" className={SPAN_FULL}>
+                  <FormField label="Contact person" className={SPAN_FULL}>
+                    {singleContact ? (
+                      <div data-field="firstName">
+                        <FormInput
+                          value={[value.firstName, value.lastName].filter(Boolean).join(' ')}
+                          onChange={v => set({ firstName: v, lastName: '' })}
+                          placeholder="Name of the person we should call"
+                          hasError={!!errors.firstName}
+                        />
+                      </div>
+                    ) : (
                     <div data-field="firstName" className={cn('grid gap-2 min-w-0', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                       <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                         {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
@@ -522,6 +405,7 @@ export function CustomerProfileForm({
                           placeholder="Designation (optional)" />
                       )}
                     </div>
+                    )}
                     {errors.firstName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.firstName}</p>}
                   </FormField>
                   {!isWide && (
@@ -663,7 +547,7 @@ export function CustomerProfileForm({
           <CollapsibleSection id="tax-section" title="Tax & Compliance (optional)" icon={Receipt} defaultOpen={false}>
             {taxContent}
           </CollapsibleSection>
-          <CollapsibleSection id="address-section" title="Primary Branch / Location (optional)" icon={MapPin} defaultOpen={false}>
+          <CollapsibleSection id="address-section" title="Delivery address (optional)" icon={MapPin} defaultOpen={false}>
             {addressContent}
           </CollapsibleSection>
         </div>
@@ -684,12 +568,12 @@ export function CustomerProfileForm({
 
       {visibleSections.address && (
         collapsedSections.includes('address') ? (
-          <CollapsibleSection id="address-section" title="Primary Branch / Location (optional)" icon={MapPin} defaultOpen={false} spanClass={SPAN_FULL}>
+          <CollapsibleSection id="address-section" title="Delivery address (optional)" icon={MapPin} defaultOpen={false} spanClass={SPAN_FULL}>
             {addressContent}
           </CollapsibleSection>
         ) : (
           <div className="space-y-4">
-            <SectionHeader icon={MapPin} spanClass={SPAN_FULL}>Primary Branch / Location</SectionHeader>
+            <SectionHeader icon={MapPin} spanClass={SPAN_FULL}>Delivery address</SectionHeader>
             {addressContent}
           </div>
         )

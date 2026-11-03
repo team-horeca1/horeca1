@@ -157,6 +157,7 @@ export async function provisionDefaultAccount(
       latitude: outletData.latitude,
       longitude: outletData.longitude,
       placeId: outletData.placeId,
+      billingName: outletData.billingName,
       requiresAddressUpdate: outletData.requiresAddressUpdate,
     },
   });
@@ -166,8 +167,8 @@ export async function provisionDefaultAccount(
     data: { primaryOutletId: outlet.id },
   });
 
-  // Ensure customer has a default SavedAddress so checkout / deliver-to resolve.
-  // Pincode-only signup is enough for a first order; street can be filled later.
+  // Pincode-only signup is a service pin, not a finished street. The saved row
+  // uses the synthetic line so checkout can tell it apart from a real address.
   if (flags.isCustomer && outletData.pincode) {
     const existingSaved = await db.savedAddress.findFirst({
       where: { userId: input.userId },
@@ -181,7 +182,7 @@ export async function provisionDefaultAccount(
         data: {
           userId: input.userId,
           outletId: outlet.id,
-          label: outletData.name || 'Primary Delivery Address',
+          label: outletData.name || 'Delivery',
           businessName: (baData as { legalName?: string }).legalName || input.businessName || input.fullName,
           fullAddress,
           shortAddress: fullAddress.split(',').slice(0, 2).join(', '),

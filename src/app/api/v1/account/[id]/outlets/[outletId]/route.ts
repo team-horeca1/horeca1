@@ -9,6 +9,7 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertCanMutateAccount } from '@/lib/accountAccess';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 
 const PatchBody = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -24,6 +25,7 @@ const PatchBody = z.object({
   placeId: z.string().max(500).nullable().optional(),
   isActive: z.boolean().optional(),
   requiresAddressUpdate: z.boolean().optional(),
+  billingName: z.string().max(255).nullable().optional(),
 });
 
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
@@ -32,21 +34,16 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     await assertCanMutateAccount(ctx, id, 'outlets.edit', ctx.activeOutletId);
     const existing = await prisma.outlet.findFirst({
       where: { id: outletId, businessAccountId: id },
-      select: { id: true, pincode: true, requiresAddressUpdate: true },
+      select: { id: true, pincode: true, addressLine: true, requiresAddressUpdate: true },
     });
     if (!existing) throw Errors.notFound('Outlet');
     const body = PatchBody.parse(await req.json());
 
-    // Auto-clear "address needed" once a valid 6-digit pincode lands.
-    // Pincode is what serviceability + checkout actually need; lat/lng is nice-to-have
-    // for future map features. Without this, users were stuck with the amber chip
-    // forever because the legacy seed never asked for coordinates.
+    // A typed street clears "address needed". A pincode alone does not.
     const data: Record<string, unknown> = { ...body };
     if (body.requiresAddressUpdate === undefined) {
-      const incomingPincode = body.pincode === undefined ? existing.pincode : body.pincode;
-      if (incomingPincode && /^\d{6}$/.test(incomingPincode)) {
-        data.requiresAddressUpdate = false;
-      }
+      const incomingLine = body.addressLine === undefined ? existing.addressLine : body.addressLine;
+      data.requiresAddressUpdate = !isRealStreetAddress(incomingLine);
     }
 
     const updated = await prisma.$transaction(async (tx) => {

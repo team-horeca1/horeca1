@@ -34,7 +34,6 @@ import {
   validateFieldBlur as validateVendorFieldBlur,
   resolveVendorTypeSlug,
 } from '@/lib/validators/vendor-profile';
-import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { cn } from '@/lib/utils';
 import { FORM, FormField as Field, FormInput, SectionLabel, selectClass, textareaClass, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
 import { parseJsonResponse } from '@/lib/apiError';
@@ -836,28 +835,8 @@ function AddressFields({
       .catch(() => {});
   }, [value.pincode, value, onChange]);
 
-  const handlePick = (place: import('@/components/ui/AddressAutocomplete').AddressPickPayload) => {
-    if (place.pincode) {
-      lastFetchedPin.current = place.pincode;
-    }
-    onChange({
-      addressLine: place.fullAddress,
-      city: place.city || value.city,
-      state: place.state || value.state,
-      pincode: place.pincode || value.pincode,
-    });
-  };
-
   return (
     <div className="space-y-3">
-      <AddressAutocomplete
-        label="Search from maps"
-        placeholder="Type location, e.g. Vashi Rockville Diner..."
-        initialValue={value.addressLine}
-        hint="Selecting a place from maps auto-fills address details below."
-        onPick={handlePick}
-        className="mb-2"
-      />
       <Field label="Address line" required error={errors?.addressLine}>
         <Input
           name={`${fieldPrefix}-line`} value={value.addressLine}

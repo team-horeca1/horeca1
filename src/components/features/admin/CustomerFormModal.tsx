@@ -242,6 +242,7 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           <CustomerProfileForm
             value={profile}
             onChange={handleProfileChange}
+            singleContact
             visibleSections={tabSections[tab]}
             errors={fieldErrors}
             showPassword={mode === 'create' && tab === 'overview'}
@@ -258,9 +259,9 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
             <div className="mt-4 p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-start gap-2.5 text-[12px] text-blue-900">
               <MapPin size={16} className="text-blue-600 shrink-0 mt-0.5" />
               <div>
-                <strong className="font-bold">Primary Delivery &amp; Billing Location:</strong>
+                <strong className="font-bold">Delivery outlet</strong>
                 <p className="text-blue-700/90 mt-0.5 leading-relaxed">
-                  This address is saved as the customer&apos;s primary outlet and default delivery address. Orders placed by or for this customer will dispatch here.
+                  This address is saved as a delivery outlet. Every outlet is the same level. Orders dispatch to the outlet the customer is ordering for.
                 </p>
               </div>
             </div>

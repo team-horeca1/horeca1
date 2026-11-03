@@ -5,7 +5,6 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { CartProvider } from '@/context/CartContext';
 import { AddressProvider } from '@/context/AddressContext';
-import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { VendorApplicationBanner } from '@/components/features/homepage/VendorApplicationBanner';
 import { AdminImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
 import { BrowseOnlyBanner } from '@/components/layout/BrowseOnlyBanner';
@@ -33,7 +32,6 @@ export function StorefrontShell({
   initialNav: InitialNav;
 }) {
   return (
-    <GoogleMapsProvider>
       <AddressProvider>
         <CartProvider>
           <ShareProvider>
@@ -50,6 +48,5 @@ export function StorefrontShell({
           </ShareProvider>
         </CartProvider>
       </AddressProvider>
-    </GoogleMapsProvider>
   );
 }

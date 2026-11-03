@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { hardDeleteUserById } from '@/lib/userHardDelete';
@@ -112,6 +113,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
                     city: true,
                     state: true,
                     pincode: true,
+                    billingName: true,
                     isActive: true,
                   },
                 },
@@ -412,6 +414,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
                   city: o.city !== undefined ? o.city : undefined,
                   state: o.state !== undefined ? o.state : undefined,
                   pincode: o.pincode !== undefined ? o.pincode : undefined,
+                  billingName: o.billingName !== undefined ? o.billingName : undefined,
+                  requiresAddressUpdate: o.addressLine !== undefined ? !isRealStreetAddress(o.addressLine) : undefined,
                   isActive: typeof o.isActive === 'boolean' ? o.isActive : undefined,
                 },
               });
@@ -425,6 +429,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
                   city: o.city || null,
                   state: o.state || null,
                   pincode: o.pincode || null,
+                  billingName: o.billingName || null,
+                  requiresAddressUpdate: !isRealStreetAddress(o.addressLine),
                   isActive: typeof o.isActive === 'boolean' ? o.isActive : true,
                 },
               });

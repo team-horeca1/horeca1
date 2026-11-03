@@ -2268,6 +2268,8 @@ model Outlet {
   id                    String   @id @default(uuid()) @db.Uuid
   businessAccountId     String   @map("business_account_id") @db.Uuid
   name                  String   @db.VarChar(255)
+  /// Invoice / billing name for this outlet. Null means use the business name.
+  billingName           String?  @map("billing_name") @db.VarChar(255)
   code                  String?  @db.VarChar(50)
   addressLine           String   @map("address_line") @db.Text
   flatInfo              String?  @map("flat_info") @db.VarChar(255)

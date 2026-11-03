@@ -3,13 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-    ArrowLeft, Search, MapPin, Loader2,
-    Navigation, X, Trash2, Store, Pencil,
+    ArrowLeft, MapPin, Loader2,
+    X, Trash2, Store, Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAddress, Address } from '@/context/AddressContext';
-import { useGooglePlacesAutocomplete, PlacePrediction } from '@/hooks/useGooglePlacesAutocomplete';
-import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { AddNewAddressOverlay } from './AddNewAddressOverlay';
 import { EditAddressOverlay } from './EditAddressOverlay';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -24,7 +22,6 @@ interface LocationSelectionOverlayProps {
 }
 
 export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionOverlayProps) {
-    const { isLoaded, loadError } = useGoogleMaps();
     const confirm = useConfirm();
     const {
         selectedAddress,
@@ -34,8 +31,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         updateAddress,
         addAddress,
         removeAddress,
-        detectCurrentLocation,
-        isDetectingLocation,
         refreshAddresses,
     } = useAddress();
 
@@ -48,7 +43,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         refresh: refreshAccounts,
     } = useBusinessAccountSwitcher();
 
-    const [searchQuery, setSearchQuery] = useState('');
     const [isAddNewOpen, setIsAddNewOpen] = useState(false);
     const [initialCoords, setInitialCoords] = useState<{ lat?: number; lng?: number }>({});
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -58,10 +52,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         if (!isOpen) return;
         void refreshAddresses();
     }, [isOpen, refreshAddresses]);
-
-    // ─── Google Places autocomplete (address search in main overlay) ─────
-    const { predictions, isSearching, getPlaceDetails, clearPredictions } =
-        useGooglePlacesAutocomplete(searchQuery);
 
     // ─── Sync selected address with active session outlet ────────────────
     const handleSelectAddressAndSyncOutlet = async (addr: Address) => {
@@ -111,50 +101,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
     // ─── Select a saved address ──────────────────────────────────────────
     const handleSelectSaved = async (addr: Address) => {
         await handleSelectAddressAndSyncOutlet(addr);
-    };
-
-    // ─── Select from autocomplete prediction — confirm before save for area-level picks ──
-    const handleSelectPrediction = async (pred: PlacePrediction) => {
-        const details = await getPlaceDetails(pred.placeId);
-        if (!details) return;
-
-        setSearchQuery('');
-        clearPredictions();
-
-        // Area-level picks, unreliable pins, or no place name → confirm sheet so
-        // the user types a real outlet / branch name.
-        if (details.isAreaLevel || !details.pincodeReliable || !details.businessName?.trim()) {
-            setInitialCoords({ lat: details.latitude, lng: details.longitude });
-            setIsAddNewOpen(true);
-            return;
-        }
-
-        const addressInput: Omit<Address, 'id'> = {
-            label: 'Other',
-            businessName: details.businessName.trim(),
-            fullAddress: details.fullAddress,
-            shortAddress: details.shortAddress,
-            latitude: details.latitude,
-            longitude: details.longitude,
-            pincode: details.pincode,
-            city: details.city,
-            state: details.state,
-            placeId: details.placeId,
-            isDefault: false,
-        };
-
-        const saved = await addAddress(addressInput);
-        if (saved) {
-            await handleSelectAddressAndSyncOutlet(saved);
-        }
-    };
-
-    // ─── Use current location ────────────────────────────────────────────
-    const handleUseCurrentLocation = async () => {
-        const detected = await detectCurrentLocation();
-        if (detected) {
-            await handleSelectAddressAndSyncOutlet(detected);
-        }
     };
 
     // ─── Save from AddNewAddressOverlay ──────────────────────────────────
@@ -217,71 +163,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                         </div>
                     )}
 
-                    {/* Search Bar */}
-                    <div className="mb-4 relative">
-                        <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg w-full shadow-sm focus-within:border-primary/50 transition-colors">
-                            <Search size={20} className="text-gray-400 shrink-0" />
-                            <input
-                                type="text"
-                                placeholder={isLoaded ? 'Search area or street name...' : 'Loading maps...'}
-                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                disabled={!isLoaded || !canManageOutlets}
-                            />
-                            {searchQuery && (
-                                <button onClick={() => { setSearchQuery(''); clearPredictions(); }}>
-                                    <X size={16} className="text-gray-400" />
-                                </button>
-                            )}
-                            {isSearching && <Loader2 size={16} className="animate-spin text-gray-400 shrink-0" />}
-                        </div>
-
-                        {loadError && (
-                            <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                                <p className="text-xs text-amber-700">{loadError}</p>
-                            </div>
-                        )}
-
-                        {predictions.length > 0 && (
-                            <div className="mt-2 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden">
-                                {predictions.map((pred) => (
-                                    <button
-                                        key={pred.placeId}
-                                        onClick={() => handleSelectPrediction(pred)}
-                                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0"
-                                    >
-                                        <MapPin size={18} className="text-gray-400 mt-0.5 shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-gray-800 truncate">{pred.mainText}</p>
-                                            <p className="text-xs text-gray-400 truncate mt-0.5">{pred.secondaryText}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Use Current Location */}
-                    <button
-                        onClick={handleUseCurrentLocation}
-                        disabled={isDetectingLocation || !canManageOutlets}
-                        className="w-full flex items-center gap-4 p-4 bg-primary-light border border-primary/20 rounded-lg mb-6 active:scale-[0.98] transition-transform text-left disabled:opacity-60"
-                    >
-                        <div className="w-10 h-10 shrink-0 bg-white rounded-full flex items-center justify-center shadow-sm">
-                            {isDetectingLocation
-                                ? <Loader2 size={20} className="animate-spin text-primary" />
-                                : <Navigation size={20} className="text-primary" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-[15px] font-bold text-primary">
-                                {isDetectingLocation ? 'Detecting location...' : 'Use current location'}
-                            </h3>
-                            <p className="text-[11px] text-primary/70 font-medium truncate mt-0.5">
-                                {selectedAddress?.shortAddress || 'Using GPS'}
-                            </p>
-                        </div>
-                    </button>
+                    <p className="text-[13px] text-gray-500 mb-4">Pick a saved outlet, or type a new address.</p>
 
                     {/* Saved Addresses */}
                     {isLoadingAddresses && (
@@ -379,7 +261,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                 <Store size={28} className="text-gray-300" />
                             </div>
                             <h3 className="text-sm font-semibold text-text-secondary mb-1">No delivery outlets yet</h3>
-                            <p className="text-xs text-text-muted text-pretty">Search for your restaurant, hotel, or cafe</p>
+                            <p className="text-xs text-text-muted text-pretty">Add an outlet by typing the address</p>
                         </div>
                     )}
                 </div>

@@ -33,6 +33,7 @@ import {
 import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAbandonAfterVerifyFailure, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
 
@@ -368,22 +369,14 @@ function CheckoutPageContent() {
             router.replace(purchaseAccess.href || '/businesses?add=buyer');
         }
     }, [sessionStatus, router, searchParams, purchaseAccess.allowed, purchaseAccess.href]);
-    const { currentOutlet, activeBusinessAccountId, activeOutletId } = useBusinessAccountSwitcher();
+    const { currentOutlet, activeBusinessAccountId } = useBusinessAccountSwitcher();
     const { selectedAddress } = useAddress();
-    // Outlet on JWT is optional — saved "Deliver to" address is enough (server resolves at order time).
-    const hasDeliverableAddress = Boolean(
-        activeOutletId ||
-        (selectedAddress?.pincode && /^\d{6}$/.test(selectedAddress.pincode)) ||
-        (selectedAddress?.fullAddress && selectedAddress.fullAddress.trim().length > 5),
-    );
-    const needsDeliveryAddress = !hasDeliverableAddress;
-    // Only block when there is no usable 6-digit pincode. Legacy "{name} — Main"
-    // outlets and incomplete street lines must not stop daily ordering.
-    const outletNeedsFullAddress = Boolean(
-        currentOutlet?.requiresAddressUpdate
-        && !(currentOutlet.pincode && /^\d{6}$/.test(currentOutlet.pincode)),
-    );
-    const checkoutBlocked = needsDeliveryAddress || outletNeedsFullAddress;
+    // Block only when there is no real street. A saved Google or typed street
+    // (including legacy "— Main" outlet names) stays orderable.
+    const hasRealStreet = isRealStreetAddress(currentOutlet?.addressLine)
+        || isRealStreetAddress(selectedAddress?.fullAddress);
+    const needsOutletAddress = !hasRealStreet;
+    const checkoutBlocked = needsOutletAddress;
     const [step, setStep] = useState<CheckoutStep>('review');
     const [selectedPayment, setSelectedPayment] = useState('');
     const [orderSnapshot, setOrderSnapshot] = useState<{ groups: VendorCartGroup[], total: number, count: number } | null>(null);
@@ -916,17 +909,16 @@ function CheckoutPageContent() {
             setOrderError('Select at least one vendor PO to place.');
             return;
         }
-        if (needsDeliveryAddress) {
-            setOrderError('Select a delivery address before placing orders. Use Deliver to in the navbar.');
+        if (needsOutletAddress) {
+            setOrderError('Add a delivery outlet and fill the address before placing the order.');
             return;
         }
         if (selectedPayment === 'po_number' && !poNumberInput.trim()) {
             setOrderError('Enter your purchase order number.');
             return;
         }
-        // Block only when there is no usable pincode / deliver-to location.
-        if (outletNeedsFullAddress) {
-            setOrderError('Add a 6-digit delivery pincode before placing the order.');
+        if (needsOutletAddress) {
+            setOrderError('Add a delivery outlet and fill the address before placing the order.');
             return;
         }
         const missingMode = selectedGroups.find((g) => !modeByVendor[g.vendorId]?.mode);
@@ -1082,8 +1074,8 @@ function CheckoutPageContent() {
     // charging / clearing the cart. Submitted later from My Orders.
     const handleSaveDraft = async () => {
         if (selectedGroups.length === 0) { setOrderError('Select at least one vendor PO to save.'); return; }
-        if (needsDeliveryAddress) {
-            setOrderError('Select a delivery address before saving a draft. Use Deliver to in the navbar.');
+        if (needsOutletAddress) {
+            setOrderError('Add a delivery outlet and fill the address before saving a draft.');
             return;
         }
         setIsPlacingOrder(true);
@@ -1408,43 +1400,16 @@ function CheckoutPageContent() {
                             </p>
                         </div>
 
-                        {needsDeliveryAddress && (
-                            <div className="text-[13px] text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
-                                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    Select a delivery address before placing orders. Use <strong>Deliver to</strong> in the navbar to pick where your order should go.
-                                </div>
-                            </div>
-                        )}
-
-                        {outletNeedsFullAddress && (
+                        {needsOutletAddress && (
                             <div className="text-[13px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
                                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    Add a 6-digit delivery pincode to continue. {activeBusinessAccountId && (
+                                    Add an outlet and fill the address before placing the order. {activeBusinessAccountId && (
                                         <Link
                                             href={`/account/${activeBusinessAccountId}/outlets`}
                                             className="underline font-bold hover:text-orange-800"
                                         >
-                                            Edit outlet
-                                        </Link>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {currentOutlet?.requiresAddressUpdate
-                            && currentOutlet.pincode
-                            && /^\d{6}$/.test(currentOutlet.pincode) && (
-                            <div className="text-[13px] text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
-                                <AlertCircle size={16} className="shrink-0 mt-0.5 text-gray-400" />
-                                <div className="flex-1">
-                                    Tip: add a full street address later for smoother delivery. {activeBusinessAccountId && (
-                                        <Link
-                                            href={`/account/${activeBusinessAccountId}/outlets`}
-                                            className="underline font-bold hover:text-primary"
-                                        >
-                                            Improve address
+                                            Add outlet
                                         </Link>
                                     )}
                                 </div>
@@ -1766,11 +1731,11 @@ function CheckoutPageContent() {
                             </div>
 
                             {/* Errors */}
-                            {needsDeliveryAddress && (
-                                <div className="text-[12px] text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 font-semibold text-left flex items-start gap-2">
+                            {needsOutletAddress && (
+                                <div className="text-[12px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-semibold text-left flex items-start gap-2">
                                     <AlertCircle size={14} className="shrink-0 mt-0.5" />
                                     <span>
-                                        No delivery address selected. Use <strong>Deliver to</strong> in the navbar.
+                                        Add an outlet and fill the address before placing the order.
                                     </span>
                                 </div>
                             )}

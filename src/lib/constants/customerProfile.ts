@@ -177,3 +177,19 @@ export function normalizeOutletName(name: string | null | undefined): string {
  * first saved address should *adopt* (fill in place) rather than duplicate.
  */
 export const PLACEHOLDER_OUTLET_ADDRESS = 'Address pending — complete in account settings';
+
+/** Signup writes this on the saved address when the customer skipped a street. */
+const SIGNUP_STREET_LATER = /^Pincode \d{6}\s*[—–-]\s*street later$/i;
+
+/**
+ * True when the line is a street the customer (or an old Google pick) actually
+ * saved. Placeholder, blank, and pincode-only signup lines are not a street.
+ */
+export function isRealStreetAddress(addressLine: string | null | undefined): boolean {
+  const line = (addressLine ?? '').trim();
+  if (line.length < 5) return false;
+  if (line === PLACEHOLDER_OUTLET_ADDRESS) return false;
+  if (line === 'Address not set' || line === 'Address pending') return false;
+  if (SIGNUP_STREET_LATER.test(line)) return false;
+  return true;
+}

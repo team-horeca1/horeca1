@@ -21,7 +21,7 @@ import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.servic
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
-import { normalizeOutletName } from '@/lib/constants/customerProfile';
+import { isRealStreetAddress, normalizeOutletName } from '@/lib/constants/customerProfile';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import {
   promotionService,
@@ -218,9 +218,20 @@ export class OrderService {
       },
     });
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
-    // First order only needs a usable delivery location (6-digit pincode or real coords).
-    // Full street / Google pin / outlet name can be completed later — do not block
-    // daily buyers whose outlet is still labeled "{business} — Main".
+    // A skipped signup has only a placeholder or "Pincode … — street later".
+    // A saved street (typed or an old Google pick) is enough — do not ask them to re-enter it.
+    let streetOk = isRealStreetAddress(outlet.addressLine);
+    if (!streetOk) {
+      const savedRows = await prisma.savedAddress.findMany({
+        where: { userId, OR: [{ outletId }, { isDefault: true }] },
+        select: { fullAddress: true },
+        take: 10,
+      });
+      streetOk = savedRows.some((row) => isRealStreetAddress(row.fullAddress));
+    }
+    if (!streetOk) {
+      throw Errors.badRequest('Add a delivery outlet and fill the address before placing orders');
+    }
     if (!hasUsableDeliveryLocation(outlet)) {
       throw Errors.badRequest('Add a 6-digit delivery pincode before placing orders');
     }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   defaultOutletName,
+  isRealStreetAddress,
   isSyntheticOutletName,
   normalizeOutletName,
   stripLegacyMainOutletSuffix,
@@ -33,6 +34,16 @@ describe('outlet name — no Main', () => {
     expect(isSyntheticOutletName('Main')).toBe(true);
     expect(isSyntheticOutletName('Rockville Vashi Branch')).toBe(false);
     expect(isSyntheticOutletName('Vashi')).toBe(false);
+  });
+
+  it('treats a saved street as real and ignores signup placeholders', () => {
+    expect(isRealStreetAddress(null)).toBe(false);
+    expect(isRealStreetAddress('')).toBe(false);
+    expect(isRealStreetAddress('Address pending — complete in account settings')).toBe(false);
+    expect(isRealStreetAddress('Address not set')).toBe(false);
+    expect(isRealStreetAddress('Pincode 400703 — street later')).toBe(false);
+    expect(isRealStreetAddress('3XGR+2WX, Jambul Marg')).toBe(true);
+    expect(isRealStreetAddress('Shop 4, Jambul Marg, Vashi')).toBe(true);
   });
 
   it('normalizeOutletName heals Main into a plain outlet label', () => {
