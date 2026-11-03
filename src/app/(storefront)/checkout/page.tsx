@@ -33,7 +33,6 @@ import {
 import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAbandonAfterVerifyFailure, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
-import { isSyntheticOutletName } from '@/lib/constants/customerProfile';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
 
@@ -278,12 +277,13 @@ function DeliveringToRow() {
                 </button>
             </div>
 
-            {currentOutlet.requiresAddressUpdate && (
+            {currentOutlet.requiresAddressUpdate
+                && !(currentOutlet.pincode && /^\d{6}$/.test(currentOutlet.pincode)) && (
                 <div className="mt-3 flex items-start gap-2 px-3 py-2.5 bg-orange-50 border border-orange-100 rounded-xl">
                     <AlertCircle size={14} className="text-orange-600 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-bold text-orange-700">This outlet has no delivery address yet</p>
-                        <p className="text-[11px] text-orange-600 mt-0.5">Add one before placing the order.</p>
+                        <p className="text-[12px] font-bold text-orange-700">This outlet needs a delivery pincode</p>
+                        <p className="text-[11px] text-orange-600 mt-0.5">Add a 6-digit pincode before placing the order.</p>
                     </div>
                     <Link
                         href={`/account/${activeBusinessAccountId}/outlets`}
@@ -377,13 +377,13 @@ function CheckoutPageContent() {
         (selectedAddress?.fullAddress && selectedAddress.fullAddress.trim().length > 5),
     );
     const needsDeliveryAddress = !hasDeliverableAddress;
-    const needsOutletName = Boolean(
-        currentOutlet && isSyntheticOutletName(currentOutlet.name),
+    // Only block when there is no usable 6-digit pincode. Legacy "{name} — Main"
+    // outlets and incomplete street lines must not stop daily ordering.
+    const outletNeedsFullAddress = Boolean(
+        currentOutlet?.requiresAddressUpdate
+        && !(currentOutlet.pincode && /^\d{6}$/.test(currentOutlet.pincode)),
     );
-    const checkoutBlocked =
-        needsDeliveryAddress
-        || (!!currentOutlet && currentOutlet.requiresAddressUpdate)
-        || needsOutletName;
+    const checkoutBlocked = needsDeliveryAddress || outletNeedsFullAddress;
     const [step, setStep] = useState<CheckoutStep>('review');
     const [selectedPayment, setSelectedPayment] = useState('');
     const [orderSnapshot, setOrderSnapshot] = useState<{ groups: VendorCartGroup[], total: number, count: number } | null>(null);
@@ -924,15 +924,9 @@ function CheckoutPageContent() {
             setOrderError('Enter your purchase order number.');
             return;
         }
-        // V2.2: an outlet without an address cannot receive deliveries. Block the
-        // order here as well, even though the button is disabled below — defence
-        // in depth in case state changes between render and click.
-        if (currentOutlet?.requiresAddressUpdate) {
-            setOrderError('Add a delivery address to this outlet before placing the order.');
-            return;
-        }
-        if (currentOutlet && isSyntheticOutletName(currentOutlet.name)) {
-            setOrderError('Enter a branch / outlet name for this delivery location before placing the order.');
+        // Block only when there is no usable pincode / deliver-to location.
+        if (outletNeedsFullAddress) {
+            setOrderError('Add a 6-digit delivery pincode before placing the order.');
             return;
         }
         const missingMode = selectedGroups.find((g) => !modeByVendor[g.vendorId]?.mode);
@@ -1423,34 +1417,36 @@ function CheckoutPageContent() {
                             </div>
                         )}
 
-                        {currentOutlet?.requiresAddressUpdate && (
+                        {outletNeedsFullAddress && (
                             <div className="text-[13px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
                                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    Your active outlet has no delivery address. {activeBusinessAccountId && (
+                                    Add a 6-digit delivery pincode to continue. {activeBusinessAccountId && (
                                         <Link
                                             href={`/account/${activeBusinessAccountId}/outlets`}
                                             className="underline font-bold hover:text-orange-800"
                                         >
-                                            Add one now
+                                            Edit outlet
                                         </Link>
-                                    )} to continue.
+                                    )}
                                 </div>
                             </div>
                         )}
 
-                        {needsOutletName && !currentOutlet?.requiresAddressUpdate && (
-                            <div className="text-[13px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
-                                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                        {currentOutlet?.requiresAddressUpdate
+                            && currentOutlet.pincode
+                            && /^\d{6}$/.test(currentOutlet.pincode) && (
+                            <div className="text-[13px] text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
+                                <AlertCircle size={16} className="shrink-0 mt-0.5 text-gray-400" />
                                 <div className="flex-1">
-                                    This delivery location needs a real branch / outlet name. {activeBusinessAccountId && (
+                                    Tip: add a full street address later for smoother delivery. {activeBusinessAccountId && (
                                         <Link
                                             href={`/account/${activeBusinessAccountId}/outlets`}
-                                            className="underline font-bold hover:text-orange-800"
+                                            className="underline font-bold hover:text-primary"
                                         >
-                                            Edit the outlet
+                                            Improve address
                                         </Link>
-                                    )} before placing orders.
+                                    )}
                                 </div>
                             </div>
                         )}

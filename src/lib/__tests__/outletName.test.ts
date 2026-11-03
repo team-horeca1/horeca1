@@ -21,13 +21,16 @@ describe('outlet name — no Main', () => {
     expect(stripLegacyMainOutletSuffix('Central Kitchen')).toBe('Central Kitchen');
   });
 
-  it('treats Main-style names as synthetic until stripped', () => {
+  it('treats blank/exact placeholders as synthetic; heals legacy Main as real', () => {
     expect(isSyntheticOutletName(null)).toBe(true);
     expect(isSyntheticOutletName('')).toBe(true);
-    expect(isSyntheticOutletName('Vashi — Main')).toBe(true);
+    // Legacy auto-suffix — real business label remains after strip.
+    expect(isSyntheticOutletName('Vashi — Main')).toBe(false);
+    expect(isSyntheticOutletName('Eat Repeat — Main')).toBe(false);
     expect(isSyntheticOutletName('Primary Outlet')).toBe(true);
     expect(isSyntheticOutletName('Branch Outlet')).toBe(true);
     expect(isSyntheticOutletName('Main Outlet')).toBe(true);
+    expect(isSyntheticOutletName('Main')).toBe(true);
     expect(isSyntheticOutletName('Rockville Vashi Branch')).toBe(false);
     expect(isSyntheticOutletName('Vashi')).toBe(false);
   });

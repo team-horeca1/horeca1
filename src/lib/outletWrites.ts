@@ -112,8 +112,8 @@ function locationDedupeKey(o: {
  * Resolve the name to persist on adopt/update.
  * - Typed real name always wins (including over synthetic "{display} — Main").
  * - Empty incoming name never wipes a real existing name.
- * - Synthetic existing + empty incoming → leave existing (still synthetic) so
- *   checkout can refuse until the user types a real branch name.
+ * - Synthetic existing + empty incoming → leave existing (still synthetic);
+ *   order placement heals legacy "— Main" and only requires a usable pincode.
  */
 function resolveOutletName(
   incoming: string,

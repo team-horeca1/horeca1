@@ -21,7 +21,8 @@ import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.servic
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
-import { isSyntheticOutletName, normalizeOutletName } from '@/lib/constants/customerProfile';
+import { normalizeOutletName } from '@/lib/constants/customerProfile';
+import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -217,8 +218,11 @@ export class OrderService {
       },
     });
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
-    if (outlet.requiresAddressUpdate) {
-      throw Errors.badRequest('Active outlet needs its address completed before placing orders');
+    // First order only needs a usable delivery location (6-digit pincode or real coords).
+    // Full street / Google pin / outlet name can be completed later — do not block
+    // daily buyers whose outlet is still labeled "{business} — Main".
+    if (!hasUsableDeliveryLocation(outlet)) {
+      throw Errors.badRequest('Add a 6-digit delivery pincode before placing orders');
     }
     // Heal legacy "{display} — Main" → "{display}". Nothing is called Main anymore.
     const healedName = normalizeOutletName(outlet.name);
@@ -228,11 +232,6 @@ export class OrderService {
         data: { name: healedName },
       });
       outlet = { ...outlet, name: healedName };
-    }
-    if (isSyntheticOutletName(outlet.name)) {
-      throw Errors.badRequest(
-        'Enter a branch / outlet name for this delivery location before placing orders',
-      );
     }
     const deliveryAddressSnapshot: Prisma.InputJsonValue = { ...outlet };
     // Location pricing follows the chosen "Deliver to" address (server-trusted
