@@ -94,6 +94,7 @@ export async function completeCustomerProfile(
         businessType: opt(input.businessType),
         subType: opt(input.subType),
         cuisine: opt(input.cuisine),
+        businessSize: opt(input.businessSize),
         workPhone: opt(input.workPhone),
         gstTreatment: opt(input.gstTreatment),
         placeOfSupply: opt(input.placeOfSupply),

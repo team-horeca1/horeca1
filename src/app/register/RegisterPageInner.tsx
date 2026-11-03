@@ -321,6 +321,7 @@ export default function RegisterPageInner() {
           businessType: profile.businessType ?? '',
           subType: profile.subType ?? '',
           cuisine: profile.cuisine ?? '',
+          businessSize: profile.businessSize ?? '',
           workPhone: profile.workPhone ?? '',
           password,
           gstTreatment: profile.gstTreatment ?? '',

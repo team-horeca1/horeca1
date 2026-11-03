@@ -19,6 +19,7 @@ const CompleteProfileBody = z.object({
   businessType: z.string().max(50).optional(),
   subType: z.string().max(80).optional(),
   cuisine: z.string().max(120).optional(),
+  businessSize: z.string().max(50).optional(),
   workPhone: optionalStr,
   password: optionalStr,
   gstTreatment: optionalStr,

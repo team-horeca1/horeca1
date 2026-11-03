@@ -51,6 +51,7 @@ export function CompleteProfileOverlay({ isOpen, onClose, onSaved }: CompletePro
           businessType: c.businessType ?? '',
           subType: c.subType ?? '',
           cuisine: c.cuisine ?? '',
+          businessSize: c.businessSize ?? '',
           workPhone: c.workPhone ?? '',
           gstTreatment: c.gstTreatment ?? '',
           placeOfSupply: c.placeOfSupply ?? '',
@@ -95,6 +96,7 @@ export function CompleteProfileOverlay({ isOpen, onClose, onSaved }: CompletePro
           businessType: profile.businessType ?? '',
           subType: profile.subType ?? '',
           cuisine: profile.cuisine ?? '',
+          businessSize: profile.businessSize ?? '',
           workPhone: profile.workPhone ?? '',
           password,
           gstTreatment: profile.gstTreatment ?? '',
@@ -165,8 +167,8 @@ export function CompleteProfileOverlay({ isOpen, onClose, onSaved }: CompletePro
             layout="wide"
             mode="full"
             omitCoreFields
-            visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
-            collapsedSections={['tax', 'address']}
+            visibleSections={{ contact: true, business: true, auth: true, tax: true }}
+            collapsedSections={['tax']}
             showPassword
             password={password}
             onPasswordChange={setPassword}

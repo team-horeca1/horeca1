@@ -538,7 +538,6 @@ export function CustomerProfileForm({
               />
               <SelectOrOwn
                 label="Cuisine / Category"
-                className={SPAN_TWO}
                 value={value.cuisine ?? ''}
                 presets={cuisineOptions}
                 disabled={!value.subType}
@@ -546,6 +545,12 @@ export function CustomerProfileForm({
                 onPick={(cuisine) => set({ cuisine })}
                 onType={(cuisine) => set({ cuisine })}
               />
+              <FormField label="Business Size">
+                <FormSelect value={value.businessSize ?? ''} onChange={v => set({ businessSize: v })}>
+                  <option value="">Select size</option>
+                  {BUSINESS_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                </FormSelect>
+              </FormField>
             </>
           )}
 
@@ -682,12 +687,6 @@ export function CustomerProfileForm({
                 onChange={e => set({ enablePortal: e.target.checked })} className="accent-primary w-4 h-4" />
               Allow portal access
             </label>
-          </FormField>
-          <FormField label="Business Size">
-            <FormSelect value={value.businessSize ?? ''} onChange={v => set({ businessSize: v })}>
-              <option value="">Select size</option>
-              {BUSINESS_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
           </FormField>
         </div>
       )}
