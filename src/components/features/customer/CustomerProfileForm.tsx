@@ -70,12 +70,18 @@ export interface CustomerProfileFormProps {
   layout?: 'default' | 'wide' | 'modal';
   /** Slim 6-field customer signup. Default keeps the full admin / add-business form. */
   mode?: 'register' | 'full';
-  /** Customer complete-profile uses free-text type/sub-type. Admin keeps dropdowns. */
-  businessTypeInput?: 'select' | 'text';
   /** Hide first/last/legal/display/mobile/email — they were collected at signup. */
   omitCoreFields?: boolean;
   /** One contact-person field. Register and admin create use this. */
   singleContact?: boolean;
+}
+
+/** Keep a typed legacy value visible until the customer picks a real option. */
+function optionsWithCurrent(options: readonly string[], current: string | null | undefined): string[] {
+  const cur = (current ?? '').trim();
+  const list = [...options];
+  if (cur && !list.includes(cur)) list.unshift(cur);
+  return list;
 }
 
 function SectionHeader({ icon: Icon, children, spanClass }: { icon: React.ComponentType<{ size?: number; className?: string }>; children: React.ReactNode; spanClass: string }) {
@@ -138,7 +144,6 @@ export function CustomerProfileForm({
   className,
   layout = 'default',
   mode = 'full',
-  businessTypeInput = 'select',
   omitCoreFields = false,
   singleContact = false,
 }: CustomerProfileFormProps) {
@@ -146,7 +151,6 @@ export function CustomerProfileForm({
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
   const isWide = layout === 'wide';
   const isModal = layout === 'modal';
-  const isTextTypes = businessTypeInput === 'text';
   const relaxedContact = isRegisterEmailOtpEnabled() && mode !== 'register' && !omitCoreFields;
   const [sameAsBilling, setSameAsBilling] = useState(() => {
     const bill = (value.billingAddressLine ?? '').trim();
@@ -162,23 +166,19 @@ export function CustomerProfileForm({
   const SPAN_TWO = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2' : 'sm:col-span-2';
 
   const handleBusinessTypeChange = (businessType: string) => {
-    if (isTextTypes) {
-      set({ businessType });
-      return;
-    }
     set({ businessType, subType: '', cuisine: '' });
   };
 
   const handleSubTypeChange = (subType: string) => {
-    if (isTextTypes) {
-      set({ subType });
-      return;
-    }
     set({ subType, cuisine: '' });
   };
 
-  const subTypes = subTypesForBusinessType(value.businessType ?? '');
-  const cuisines = cuisinesForSubType(value.businessType ?? '', value.subType ?? '');
+  const businessTypes = optionsWithCurrent(CUSTOMER_BUSINESS_TYPES, value.businessType);
+  const subTypes = optionsWithCurrent(subTypesForBusinessType(value.businessType ?? ''), value.subType);
+  const cuisineOptions = optionsWithCurrent(
+    cuisinesForSubType(value.businessType ?? '', value.subType ?? ''),
+    value.cuisine,
+  );
 
   if (mode === 'register') {
     return (
@@ -442,57 +442,31 @@ export function CustomerProfileForm({
 
           {visibleSections.business && (
             <>
-              {isTextTypes ? (
-                <>
-                  <TextField
-                    label="Business Type"
-                    value={value.businessType ?? ''}
-                    error={errors.businessType}
-                    onChange={handleBusinessTypeChange}
-                    placeholder="e.g. Restaurant"
-                  />
-                  <TextField
-                    label="Business Sub-Type"
-                    value={value.subType ?? ''}
-                    onChange={handleSubTypeChange}
-                    placeholder="e.g. Fine dining"
-                  />
-                  <TextField
-                    label="Cuisine / Category"
-                    value={value.cuisine ?? ''}
-                    onChange={v => set({ cuisine: v })}
-                    placeholder="e.g. Japanese / Pan Asian"
-                  />
-                </>
-              ) : (
-                <>
-                  <div data-field="businessType">
-                    <FormField label="Business Type" required>
-                      <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
-                        <option value="">Select type</option>
-                        {CUSTOMER_BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </FormSelect>
-                      {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
-                    </FormField>
-                  </div>
-                  <FormField label="Sub-Type">
-                    <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.businessType}>
-                      <option value="">Select sub-type</option>
-                      {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
-                    </FormSelect>
-                  </FormField>
-                  <FormField label="Cuisine / Category" className={SPAN_TWO}>
-                    {cuisines.length > 0 ? (
-                      <FormSelect value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} disabled={!value.subType}>
-                        <option value="">Select cuisine</option>
-                        {cuisines.map(c => <option key={c} value={c}>{c}</option>)}
-                      </FormSelect>
-                    ) : (
-                      <FormInput value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} placeholder="e.g. Japanese / Pan Asian" />
-                    )}
-                  </FormField>
-                </>
-              )}
+              <div data-field="businessType">
+                <FormField label="Business Type" required>
+                  <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
+                    <option value="">Select type</option>
+                    {businessTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </FormSelect>
+                  {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
+                </FormField>
+              </div>
+              <FormField label="Sub-Type">
+                <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.businessType}>
+                  <option value="">Select sub-type</option>
+                  {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                </FormSelect>
+              </FormField>
+              <FormField label="Cuisine / Category" className={SPAN_TWO}>
+                {cuisineOptions.length > 0 ? (
+                  <FormSelect value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} disabled={!value.subType}>
+                    <option value="">Select cuisine</option>
+                    {cuisineOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </FormSelect>
+                ) : (
+                  <FormInput value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} placeholder="e.g. Japanese / Pan Asian" />
+                )}
+              </FormField>
             </>
           )}
 

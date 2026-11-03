@@ -382,6 +382,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     const yourInfoItems = [
         { id: 'edit-profile', label: 'Edit Profile', desc: 'Update your personal details', icon: Pencil, onClick: () => setIsEditProfileOpen(true) },
+        {
+            id: 'business-profile',
+            label: needsCompleteProfile ? 'Complete your profile' : 'Business profile',
+            desc: 'Business type, GST, and cuisine',
+            icon: Building2,
+            onClick: () => setIsCompleteProfileOpen(true),
+        },
         ...(!activeAccountIdForLinks ? [{
             id: 'saved-addresses',
             label: 'Delivery Addresses',
@@ -1072,16 +1079,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             </>
                                         )}
                                     </div>
-                                    {!needsCompleteProfile ? null : (
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsCompleteProfileOpen(true)}
-                                            className="flex items-center gap-2 shrink-0 bg-primary text-white text-[12px] font-bold px-4 py-2.5 rounded-xl hover:bg-primary-dark transition-colors cursor-pointer"
-                                        >
-                                            <Sparkles size={13} />
-                                            Complete your profile
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCompleteProfileOpen(true)}
+                                        className="flex items-center gap-2 shrink-0 bg-primary text-white text-[12px] font-bold px-4 py-2.5 rounded-xl hover:bg-primary-dark transition-colors cursor-pointer"
+                                    >
+                                        <Sparkles size={13} />
+                                        {needsCompleteProfile ? 'Complete your profile' : 'Business profile'}
+                                    </button>
                                 </div>
 
                                 {/* Desktop DiSCCO summary */}

@@ -465,7 +465,6 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
                 onChange={handleProfileChange}
                 layout="modal"
                 omitCoreFields
-                businessTypeInput="select"
                 visibleSections={{ contact: true, business: true, tax: true, admin: true }}
                 errors={fieldErrors}
                 contactPersons={contacts}

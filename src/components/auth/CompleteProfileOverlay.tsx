@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -33,6 +33,35 @@ export function CompleteProfileOverlay({ isOpen, onClose, onSaved }: CompletePro
     setProfile((prev) => ({ ...prev, ...patch }));
     setApiError('');
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setPassword('');
+    setApiError('');
+    fetch('/api/v1/me/profile', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { success?: boolean; data?: { company?: Record<string, string> } } | null) => {
+        if (cancelled || !json?.success || !json.data?.company) return;
+        const c = json.data.company;
+        setProfile({
+          ...EMPTY_CUSTOMER_PROFILE,
+          salutation: c.salutation ?? '',
+          designation: c.designation ?? '',
+          businessType: c.businessType ?? '',
+          subType: c.subType ?? '',
+          cuisine: c.cuisine ?? '',
+          workPhone: c.workPhone ?? '',
+          gstTreatment: c.gstTreatment ?? '',
+          placeOfSupply: c.placeOfSupply ?? '',
+          gstin: c.gstin ?? '',
+          pan: c.pan ?? '',
+          fssaiNumber: c.fssaiNumber ?? '',
+        });
+      })
+      .catch(() => { /* form stays empty */ });
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   const handleFieldBlur = useCallback((field: string, value: string) => {
     const msg = validateFieldBlur(field, value);
@@ -109,8 +138,8 @@ export function CompleteProfileOverlay({ isOpen, onClose, onSaved }: CompletePro
         <div className="flex items-center px-4 md:px-6 py-3 md:py-4 shrink-0 border-b border-gray-100">
           <div className="flex-1 min-w-0 pr-10">
             <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-0.5">Almost there</p>
-            <h2 className="text-[17px] md:text-[20px] font-[700] text-[#181725]">Complete your profile</h2>
-            <p className="text-[12px] text-gray-500 mt-0.5">Optional — you can skip any field and finish later.</p>
+            <h2 className="text-[17px] md:text-[20px] font-[700] text-[#181725]">Business profile</h2>
+            <p className="text-[12px] text-gray-500 mt-0.5">Same details as admin — type, tax, and contact. You can update these anytime.</p>
           </div>
           <button
             type="button"
@@ -135,7 +164,6 @@ export function CompleteProfileOverlay({ isOpen, onClose, onSaved }: CompletePro
             onFieldBlur={handleFieldBlur}
             layout="wide"
             mode="full"
-            businessTypeInput="text"
             omitCoreFields
             visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
             collapsedSections={['tax', 'address']}

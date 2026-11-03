@@ -534,7 +534,6 @@ export default function RegisterPageInner() {
               onFieldBlur={handleFieldBlur}
               layout="wide"
               mode="full"
-              businessTypeInput="text"
               omitCoreFields
               visibleSections={{ contact: true, business: true, auth: true, tax: true }}
               collapsedSections={['tax']}

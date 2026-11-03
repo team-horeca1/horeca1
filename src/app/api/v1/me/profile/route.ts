@@ -5,7 +5,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
-import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
+import {
+  effectiveCustomerBusinessAccountId,
+  effectiveCustomerUserId,
+} from '@/lib/resolveCustomerImpersonation';
+
+const KIND_DEFAULT_TYPES = new Set(['customer', 'vendor', 'brand']);
+
+function profileBusinessType(value: string | null | undefined): string {
+  const t = (value ?? '').trim();
+  if (!t || KIND_DEFAULT_TYPES.has(t)) return '';
+  return t;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -27,27 +38,45 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
     return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
   }
 
-  // Find their business accounts and outlets to see if they resolved pincode/businessName there
-  const member = await prisma.businessAccountMember.findFirst({
-    where: { userId },
-    include: {
-      businessAccount: {
-        include: {
-          outlets: {
-            take: 1
-          }
-        }
-      }
-    }
+  const scopedAccountId = effectiveCustomerBusinessAccountId(ctx);
+  const accountSelect = {
+    legalName: true,
+    displayName: true,
+    billingPincode: true,
+    businessType: true,
+    subType: true,
+    cuisine: true,
+    designation: true,
+    salutation: true,
+    gstTreatment: true,
+    placeOfSupply: true,
+    gstin: true,
+    pan: true,
+    fssaiNumber: true,
+    workPhone: true,
+    outlets: { take: 1, select: { pincode: true } },
+  } as const;
+  let member = await prisma.businessAccountMember.findFirst({
+    where: scopedAccountId
+      ? { userId, businessAccountId: scopedAccountId }
+      : { userId, isPrimary: true },
+    include: { businessAccount: { select: accountSelect } },
   });
+  if (!member) {
+    member = await prisma.businessAccountMember.findFirst({
+      where: { userId },
+      include: { businessAccount: { select: accountSelect } },
+    });
+  }
 
-  const hasBusinessName = !!(user.businessName || member?.businessAccount?.legalName || member?.businessAccount?.displayName);
-  const hasPincode = !!(user.pincode || member?.businessAccount?.billingPincode || member?.businessAccount?.outlets?.[0]?.pincode);
+  const ba = member?.businessAccount;
+  const hasBusinessName = !!(user.businessName || ba?.legalName || ba?.displayName);
+  const hasPincode = !!(user.pincode || ba?.billingPincode || ba?.outlets?.[0]?.pincode);
   const hasFullName = !!user.fullName;
 
   const hasCorePersonalization = hasPincode && hasBusinessName && hasFullName;
-  const businessType = member?.businessAccount?.businessType ?? null;
-  const kindDefaultType = businessType === 'customer' || businessType === 'vendor' || businessType === 'brand' || !businessType;
+  const businessType = ba?.businessType ?? null;
+  const kindDefaultType = !businessType || KIND_DEFAULT_TYPES.has(businessType);
   // Skip during signup leaves profileCompletedAt null and the kind-default type.
   const needsCompleteProfile = !user.profileCompletedAt && kindDefaultType;
 
@@ -63,7 +92,20 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
         phone: !!user.phone,
         pincode: hasPincode,
         businessName: hasBusinessName,
-        gstNumber: !!(user.gstNumber || member?.businessAccount?.gstin),
+        gstNumber: !!(user.gstNumber || ba?.gstin),
+      },
+      company: {
+        salutation: ba?.salutation ?? '',
+        designation: ba?.designation ?? '',
+        businessType: profileBusinessType(ba?.businessType),
+        subType: ba?.subType ?? '',
+        cuisine: ba?.cuisine ?? '',
+        workPhone: ba?.workPhone ?? '',
+        gstTreatment: ba?.gstTreatment ?? '',
+        placeOfSupply: ba?.placeOfSupply ?? '',
+        gstin: ba?.gstin ?? user.gstNumber ?? '',
+        pan: ba?.pan ?? '',
+        fssaiNumber: ba?.fssaiNumber ?? '',
       },
     },
   });
