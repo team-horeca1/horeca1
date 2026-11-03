@@ -219,12 +219,13 @@ export class OrderService {
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
     // Pincode alone cannot place an order. The outlet or its saved address
     // must have a real street (not just the outlet name) and a 6-digit pincode.
+    const outletName = outlet.name;
     let addressOk = hasCompleteDeliveryAddress({
       addressLine: outlet.addressLine,
       city: outlet.city,
       state: outlet.state,
       pincode: outlet.pincode,
-      outletName: outlet.name,
+      outletName,
     });
     if (!addressOk) {
       const savedRows = await prisma.savedAddress.findMany({
@@ -237,7 +238,7 @@ export class OrderService {
         city: row.city,
         state: row.state,
         pincode: row.pincode,
-        outletName: outlet.name,
+        outletName,
       }));
     }
     if (!addressOk) {
