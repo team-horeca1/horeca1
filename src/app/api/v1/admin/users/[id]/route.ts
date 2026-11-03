@@ -105,6 +105,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
                 remarks: true,
                 customFields: true,
                 outlets: {
+                  where: { isActive: true },
                   select: {
                     id: true,
                     name: true,

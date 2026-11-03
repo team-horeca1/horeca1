@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Loader2, MapPin, Plus } from 'lucide-react';
+import { Loader2, MapPin, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 import {
@@ -18,6 +18,7 @@ export interface CustomerOutletRow {
   city: string | null;
   state: string | null;
   pincode: string | null;
+  isActive?: boolean;
 }
 
 interface Billing {
@@ -61,6 +62,31 @@ export function CustomerDeliveryAddresses({
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
   const [value, setValue] = useState<OutletAddressValue | null>(null);
   const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const visible = outlets.filter((o) => o.isActive !== false);
+
+  const remove = async (id: string) => {
+    setRemovingId(id);
+    try {
+      const res = await fetch(`/api/v1/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outlets: [{ id, isActive: false }] }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Could not remove outlet');
+      toast.success('Outlet removed');
+      if (editingId === id) {
+        setEditingId(null);
+        setValue(null);
+      }
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not remove outlet');
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   const open = (outlet: CustomerOutletRow | null) => {
     setEditingId(outlet ? outlet.id : 'new');
@@ -130,25 +156,35 @@ export function CustomerDeliveryAddresses({
         </button>
       </div>
 
-      {outlets.length === 0 && !value && (
+      {visible.length === 0 && !value && (
         <p className="text-[13px] text-gray-500">No outlet yet. Add one before this customer can place an order.</p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {outlets.map((o) => {
-          const street = isRealStreetAddress(o.addressLine) ? o.addressLine : 'Address not filled';
+        {visible.map((o) => {
+          const street = isRealStreetAddress(o.addressLine, o.name) ? o.addressLine : 'Address not filled';
           return (
-            <button
+            <div
               key={o.id}
-              type="button"
-              onClick={() => open(o)}
-              className="text-left p-4 rounded-xl border border-[#E9E3DD] bg-white hover:border-[#6B1D2E]"
+              className="text-left p-4 rounded-xl border border-[#E9E3DD] bg-white"
             >
-              <p className="text-[14px] font-bold text-[#181725]">{o.billingName || o.name || businessName}</p>
-              <p className="text-[12px] text-gray-500 mt-1">{o.name}</p>
-              <p className="text-[12px] text-gray-600 mt-1">{street}</p>
-              <p className="text-[11px] text-gray-400 mt-1">{[o.city, o.state, o.pincode].filter(Boolean).join(' · ')}</p>
-            </button>
+              <div className="flex items-start justify-between gap-2">
+                <button type="button" onClick={() => open(o)} className="min-w-0 text-left">
+                  <p className="text-[14px] font-bold text-[#181725]">{o.name || businessName}</p>
+                  <p className="text-[12px] text-gray-600 mt-1">{street}</p>
+                  <p className="text-[11px] text-gray-400 mt-1">{[o.city, o.state, o.pincode].filter(Boolean).join(' · ')}</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void remove(o.id)}
+                  disabled={removingId === o.id}
+                  className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  aria-label={`Remove ${o.name}`}
+                >
+                  {removingId === o.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                </button>
+              </div>
+            </div>
           );
         })}
       </div>

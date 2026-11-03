@@ -17,6 +17,12 @@ import {
   CustomerProfileForm,
   type CustomerProfileValues,
 } from '@/components/features/customer/CustomerProfileForm';
+import {
+  deliveryFromOutletAddress,
+  OutletAddressForm,
+  type OutletAddressValue,
+} from '@/components/features/customer/OutletAddressForm';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 import { EMPTY_CUSTOMER_PROFILE } from '@/components/features/customer/customerProfileDefaults';
 import {
   validateCustomerProfile,
@@ -27,7 +33,7 @@ import {
 
 const RESEND_COOLDOWN = 60;
 
-type Step = 'form' | 'otp' | 'complete' | 'success';
+type Step = 'form' | 'otp' | 'address' | 'complete' | 'success';
 
 export default function RegisterPageInner() {
   const params = useSearchParams();
@@ -53,7 +59,7 @@ export default function RegisterPageInner() {
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    if (step === 'complete' || step === 'otp' || step === 'success') return;
+    if (step === 'complete' || step === 'address' || step === 'otp' || step === 'success') return;
     if (role === 'customer') {
       window.location.href = '/businesses?add=buyer';
       return;
@@ -70,6 +76,19 @@ export default function RegisterPageInner() {
       : {}),
     ...(prefilledEmail.includes('@') ? { email: prefilledEmail } : {}),
   }));
+  const [addressForm, setAddressForm] = useState<OutletAddressValue>({
+    outletName: '',
+    billingName: '',
+    billingAddressLine: '',
+    billingCity: '',
+    billingState: '',
+    billingPincode: '',
+    sameAsBilling: true,
+    addressLine: '',
+    city: '',
+    state: '',
+    pincode: '',
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -223,10 +242,65 @@ export default function RegisterPageInner() {
         setOtp(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
       } else {
-        setStep('complete');
+        const business = derivedLegalName(profile);
+        const pin = (profile.pincode ?? '').replace(/\D/g, '').slice(0, 6);
+        setAddressForm((prev) => ({
+          ...prev,
+          billingName: prev.billingName || business,
+          billingPincode: prev.billingPincode || pin,
+          pincode: prev.pincode || pin,
+        }));
+        setStep('address');
       }
     } catch { setApiError('Something went wrong. Please try again.'); }
     finally { setIsLoading(false); }
+  };
+
+  const postProfile = async (body: Record<string, unknown>) => {
+    const res = await fetch('/api/v1/me/complete-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    });
+    return res.json() as Promise<{ success?: boolean; error?: { message?: string } | string }>;
+  };
+
+  const handleSaveAddress = async () => {
+    setApiError('');
+    const delivery = deliveryFromOutletAddress(addressForm);
+    if (addressForm.outletName.trim().length < 2 || !isRealStreetAddress(delivery.addressLine, addressForm.outletName)) {
+      setApiError('Enter the outlet name and the full street address.');
+      return;
+    }
+    if (!/^\d{6}$/.test(delivery.pincode) || addressForm.billingCity.trim().length < 2 || addressForm.billingState.trim().length < 2) {
+      setApiError('Enter city, state, and a 6-digit pincode.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const data = await postProfile({
+        outletName: addressForm.outletName.trim(),
+        addressLine: delivery.addressLine.trim(),
+        city: delivery.city.trim(),
+        state: delivery.state.trim(),
+        pincode: delivery.pincode,
+        billingAddressLine: addressForm.billingAddressLine.trim(),
+        billingCity: addressForm.billingCity.trim(),
+        billingState: addressForm.billingState.trim(),
+        billingPincode: addressForm.billingPincode.trim(),
+      });
+      if (!data.success) {
+        const message = typeof data.error === 'string' ? data.error : data.error?.message;
+        setApiError(message || 'Could not save the address');
+        return;
+      }
+      setStep('complete');
+    } catch {
+      setApiError('Could not save the address. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCompleteProfile = async () => {
@@ -240,11 +314,7 @@ export default function RegisterPageInner() {
     setFieldErrors({});
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/me/complete-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+      const data = await postProfile({
           salutation: profile.salutation ?? '',
           designation: profile.designation ?? '',
           businessType: profile.businessType ?? '',
@@ -257,21 +327,10 @@ export default function RegisterPageInner() {
           gstin: (profile.gstin ?? '').toUpperCase().trim(),
           pan: (profile.pan ?? '').toUpperCase().trim(),
           fssaiNumber: profile.fssaiNumber ?? '',
-          outletName: profile.outletName ?? '',
-          addressLine: profile.addressLine ?? profile.billingAddressLine ?? '',
-          flatInfo: profile.flatInfo ?? '',
-          landmark: profile.landmark ?? '',
-          city: profile.city ?? profile.billingCity ?? '',
-          state: profile.state ?? profile.billingState ?? '',
-          pincode: profile.pincode ?? profile.billingPincode ?? '',
-          latitude: profile.latitude ?? null,
-          longitude: profile.longitude ?? null,
-          placeId: profile.placeId ?? null,
-        }),
-      });
-      const data = await res.json();
+        });
       if (!data.success) {
-        setApiError(data.error?.message || data.error || 'Could not save profile');
+        const err = data.error;
+        setApiError((typeof err === 'string' ? err : err?.message) || 'Could not save profile');
         return;
       }
       setStep('success');
@@ -400,18 +459,70 @@ export default function RegisterPageInner() {
     );
   }
 
+  if (step === 'address') {
+    const business = derivedLegalName(profile);
+    return (
+      <div className="flex items-start justify-center px-4 py-5 min-h-[calc(100vh-150px)]">
+        <div className="w-full max-w-[720px] rounded-[20px] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EEEEEE]">
+          <div className="px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-[#F5F5F5]">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-1">Step 2 of 3</p>
+            <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.5rem)] font-[800] text-[#181725] leading-tight">
+              Add a delivery address
+            </h1>
+            <p className="text-[13px] text-gray-500 mt-1">
+              Your account is created. Add the outlet address now, or skip and do it before the first order.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStep('complete')}
+              disabled={isLoading}
+              className="mt-4 w-full h-[48px] rounded-xl border-2 border-primary bg-primary-light text-primary text-[15px] font-extrabold hover:bg-primary hover:text-white transition-colors"
+            >
+              Skip for now
+            </button>
+          </div>
+          <div className="p-5 sm:p-7">
+            {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
+            <OutletAddressForm
+              value={addressForm}
+              onChange={setAddressForm}
+              businessName={business}
+            />
+            <button
+              type="button"
+              onClick={() => void handleSaveAddress()}
+              disabled={isLoading}
+              className={cn(FORM.primaryBtn, 'w-full h-[46px] mt-6')}
+            >
+              {isLoading && <Loader2 size={18} className="animate-spin" />}
+              Save address
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'complete') {
     return (
       <div className="flex items-start justify-center px-4 py-5 min-h-[calc(100vh-150px)]">
         <div className="w-full max-w-[1080px] rounded-[20px] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EEEEEE]">
           <div className="px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-[#F5F5F5]">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-1">Almost there</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-1">Step 3 of 3</p>
             <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.5rem)] font-[800] text-[#181725] leading-tight">
               Complete your profile
             </h1>
             <p className="text-[13px] text-gray-500 mt-1">
-              Optional — helps vendors serve you better. You can do this later from Profile.
+              GST, business type, and the rest can wait. You can fill these later from Profile.
             </p>
+            <button
+              type="button"
+              onClick={goPostLogin}
+              disabled={isLoading}
+              className="mt-4 w-full h-[48px] rounded-xl border-2 border-primary bg-primary-light text-primary text-[15px] font-extrabold hover:bg-primary hover:text-white transition-colors"
+            >
+              Skip for now
+            </button>
           </div>
           <div className="p-5 sm:p-7">
             {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
@@ -424,8 +535,8 @@ export default function RegisterPageInner() {
               mode="full"
               businessTypeInput="text"
               omitCoreFields
-              visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
-              collapsedSections={['tax', 'address']}
+              visibleSections={{ contact: true, business: true, auth: true, tax: true }}
+              collapsedSections={['tax']}
               showPassword
               password={password}
               onPasswordChange={setPassword}
@@ -433,7 +544,7 @@ export default function RegisterPageInner() {
               passwordVisible={showPassword}
               onTogglePassword={() => setShowPassword(v => !v)}
             />
-            <div className="mt-6 flex flex-col gap-2">
+            <div className="mt-6">
               <button
                 type="button"
                 onClick={() => void handleCompleteProfile()}
@@ -442,14 +553,6 @@ export default function RegisterPageInner() {
               >
                 {isLoading && <Loader2 size={18} className="animate-spin" />}
                 Save &amp; continue
-              </button>
-              <button
-                type="button"
-                onClick={goPostLogin}
-                disabled={isLoading}
-                className="w-full py-2.5 text-[13px] font-semibold text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                Skip for now
               </button>
             </div>
           </div>

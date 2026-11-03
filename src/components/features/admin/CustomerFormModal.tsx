@@ -15,6 +15,12 @@ import {
   type CustomerProfileValues,
   type ContactPerson,
 } from '@/components/features/customer/CustomerProfileForm';
+import {
+  deliveryFromOutletAddress,
+  OutletAddressForm,
+  type OutletAddressValue,
+} from '@/components/features/customer/OutletAddressForm';
+import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 import { EMPTY_CUSTOMER_PROFILE } from '@/components/features/customer/customerProfileDefaults';
 import {
   validateCustomerProfile,
@@ -36,6 +42,21 @@ interface Props {
 }
 
 type Tab = 'overview' | 'other' | 'address' | 'contacts' | 'remarks';
+type CreateStep = 'account' | 'address' | 'profile';
+
+const EMPTY_ADDRESS: OutletAddressValue = {
+  outletName: '',
+  billingName: '',
+  billingAddressLine: '',
+  billingCity: '',
+  billingState: '',
+  billingPincode: '',
+  sameAsBilling: true,
+  addressLine: '',
+  city: '',
+  state: '',
+  pincode: '',
+};
 
 const CUSTOMER_FIELD_ORDER = [
   'firstName', 'legalName', 'businessType', 'phone', 'email', 'password',
@@ -57,6 +78,9 @@ function tabForCustomerErrors(errors: Record<string, string>): Tab {
 
 export default function CustomerFormModal({ mode, userId, initial, onClose, onSaved }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
+  const [createStep, setCreateStep] = useState<CreateStep>('account');
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
+  const [addressForm, setAddressForm] = useState<OutletAddressValue>(EMPTY_ADDRESS);
   const [submitting, setSubmitting] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [password, setPassword] = useState('');
@@ -208,6 +232,146 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
     remarks: { remarks: true },
   };
 
+  const handleCreateAccount = async () => {
+    clearErrors();
+    const validation = validateCustomerProfile(profile, 'selfRegisterLite');
+    if (!validation.success) {
+      applyValidationErrors(validation.errors, validation.message, {
+        fieldOrder: CUSTOMER_FIELD_ORDER,
+        dataField: true,
+      });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const userFields = mapToUserFields(profile);
+      const res = await fetch('/api/v1/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: userFields.fullName,
+          phone: userFields.phone,
+          email: userFields.email || undefined,
+          businessName: userFields.businessName || undefined,
+          pincode: userFields.pincode || undefined,
+          role: 'customer',
+          companyProfile: {
+            legalName: userFields.businessName,
+            firstName: profile.firstName,
+            mobilePhone: userFields.phone,
+            email: userFields.email,
+            pincode: userFields.pincode,
+          },
+        }),
+      });
+      const json = await parseJsonResponse<{ success?: boolean; data?: { id?: string }; error?: { message?: string } | string }>(res);
+      if (!json.success) {
+        applyApiError(json, { fieldOrder: CUSTOMER_FIELD_ORDER, dataField: true });
+        return;
+      }
+      const created = json.data;
+      setCreatedUserId(created?.id ?? null);
+      setAddressForm((prev) => ({
+        ...prev,
+        billingName: userFields.businessName || prev.billingName,
+        billingPincode: userFields.pincode || prev.billingPincode,
+        pincode: userFields.pincode || prev.pincode,
+      }));
+      toast.success('Customer created');
+      setCreateStep('address');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create customer');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateAddress = async () => {
+    if (!createdUserId) return;
+    clearErrors();
+    const delivery = deliveryFromOutletAddress(addressForm);
+    if (addressForm.outletName.trim().length < 2 || !isRealStreetAddress(delivery.addressLine, addressForm.outletName)) {
+      toast.error('Enter the outlet name and the full street address');
+      return;
+    }
+    if (!/^\d{6}$/.test(delivery.pincode)) {
+      toast.error('Enter a 6-digit pincode');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/admin/users/${createdUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deliveryAddress: {
+            outletName: addressForm.outletName.trim(),
+            addressLine: delivery.addressLine.trim(),
+            city: delivery.city.trim(),
+            state: delivery.state.trim(),
+            pincode: delivery.pincode,
+          },
+          billingAddress: {
+            addressLine: addressForm.billingAddressLine.trim(),
+            city: addressForm.billingCity.trim(),
+            state: addressForm.billingState.trim(),
+            pincode: addressForm.billingPincode.trim(),
+          },
+        }),
+      });
+      const json = await parseJsonResponse(res);
+      if (!json.success) {
+        applyApiError(json, { toast: true });
+        return;
+      }
+      setProfile((prev) => ({
+        ...prev,
+        outletName: addressForm.outletName.trim(),
+        addressLine: delivery.addressLine.trim(),
+        city: delivery.city.trim(),
+        state: delivery.state.trim(),
+        pincode: delivery.pincode,
+        billingAddressLine: addressForm.billingAddressLine.trim(),
+        billingCity: addressForm.billingCity.trim(),
+        billingState: addressForm.billingState.trim(),
+        billingPincode: addressForm.billingPincode.trim(),
+      }));
+      toast.success('Address saved');
+      setCreateStep('profile');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save address');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateProfile = async () => {
+    if (!createdUserId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/admin/users/${createdUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyProfile: buildCompanyProfile({ ...profile, contactPersons: contacts }) }),
+      });
+      const json = await parseJsonResponse(res);
+      if (!json.success) {
+        applyApiError(json, { toast: true });
+        return;
+      }
+      toast.success('Profile saved');
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save profile');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const finishCreate = () => {
+    onSaved();
+  };
+
   const handleProfileChange = (patch: Partial<CustomerProfileValues>) => {
     setProfile((prev) => {
       const next = { ...prev, ...patch };
@@ -226,6 +390,7 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"><X size={18} /></button>
         </div>
 
+        {mode === 'edit' ? (
         <div className="px-7 pt-2 border-b border-[#EEEEEE] flex gap-2 overflow-x-auto shrink-0 bg-[#FAFAFA]/50">
           {TABS.map(t => (
             <button key={t.k} onClick={() => setTab(t.k)}
@@ -235,17 +400,75 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
             </button>
           ))}
         </div>
+        ) : (
+          <p className="px-7 py-3 text-[13px] font-extrabold text-[#6B1D2E] border-b border-[#EEEEEE]">
+            {createStep === 'account' && '1 of 3 · Create the customer'}
+            {createStep === 'address' && '2 of 3 · Delivery address'}
+            {createStep === 'profile' && '3 of 3 · Complete the profile'}
+          </p>
+        )}
 
         <FormErrorBanner message={bannerError} className="mx-7" />
 
         <div className="p-6 overflow-y-auto flex-1 min-h-0">
+          {mode === 'create' && createStep === 'account' && (
+            <CustomerProfileForm
+              value={profile}
+              onChange={handleProfileChange}
+              mode="register"
+              layout="modal"
+              errors={fieldErrors}
+            />
+          )}
+          {mode === 'create' && createStep === 'address' && (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setCreateStep('profile')}
+                disabled={submitting}
+                className="w-full h-[48px] rounded-xl border-2 border-primary bg-primary-light text-primary text-[15px] font-extrabold"
+              >
+                Skip for now
+              </button>
+              <OutletAddressForm
+                value={addressForm}
+                onChange={setAddressForm}
+                businessName={profile.legalName || profile.companyName || ''}
+              />
+            </div>
+          )}
+          {mode === 'create' && createStep === 'profile' && (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={finishCreate}
+                disabled={submitting}
+                className="w-full h-[48px] rounded-xl border-2 border-primary bg-primary-light text-primary text-[15px] font-extrabold"
+              >
+                Skip for now
+              </button>
+              <CustomerProfileForm
+                value={profile}
+                onChange={handleProfileChange}
+                layout="modal"
+                omitCoreFields
+                businessTypeInput="select"
+                visibleSections={{ contact: true, business: true, tax: true, admin: true }}
+                errors={fieldErrors}
+                contactPersons={contacts}
+                onContactPersonsChange={setContacts}
+              />
+            </div>
+          )}
+          {mode === 'edit' && (
+          <>
           <CustomerProfileForm
             value={profile}
             onChange={handleProfileChange}
             singleContact
             visibleSections={tabSections[tab]}
             errors={fieldErrors}
-            showPassword={mode === 'create' && tab === 'overview'}
+            showPassword={false}
             password={password}
             onPasswordChange={(v) => { setPassword(v); if (fieldErrors.password) clearFieldError('password'); }}
             showPasswordToggle
@@ -266,13 +489,33 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
 
         <div className="px-7 py-4 border-t border-[#EEEEEE] flex justify-end gap-3 shrink-0 bg-[#FAFAFA] rounded-b-[18px]">
           <button onClick={onClose} disabled={submitting} className="px-4.5 py-2.5 text-[13px] font-bold text-gray-500 hover:text-gray-800 hover:bg-gray-100/60 rounded-xl transition-all duration-200">Cancel</button>
-          <button onClick={handleSubmit} disabled={submitting} className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-green-100')}>
+          <button
+            onClick={
+              mode === 'edit'
+                ? handleSubmit
+                : createStep === 'account'
+                  ? handleCreateAccount
+                  : createStep === 'address'
+                    ? handleCreateAddress
+                    : handleCreateProfile
+            }
+            disabled={submitting}
+            className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-green-100')}
+          >
             {submitting && <Loader2 size={14} className="animate-spin" />}
-            {mode === 'create' ? 'Create Customer' : 'Save Changes'}
+            {mode === 'edit'
+              ? 'Save Changes'
+              : createStep === 'account'
+                ? 'Create Customer'
+                : createStep === 'address'
+                  ? 'Save address'
+                  : 'Save profile'}
           </button>
         </div>
       </div>
