@@ -181,15 +181,48 @@ export const PLACEHOLDER_OUTLET_ADDRESS = 'Address pending — complete in accou
 /** Signup writes this on the saved address when the customer skipped a street. */
 const SIGNUP_STREET_LATER = /^Pincode \d{6}\s*[—–-]\s*street later$/i;
 
+function stripTrailingPincode(line: string): string {
+  return line.replace(/\s*[—–,\-]\s*\d{6}\s*$/, '').trim();
+}
+
 /**
  * True when the line is a street the customer (or an old Google pick) actually
- * saved. Placeholder, blank, and pincode-only signup lines are not a street.
+ * saved. A bare pincode, a placeholder, or a line that is only the outlet name
+ * is not a street.
  */
-export function isRealStreetAddress(addressLine: string | null | undefined): boolean {
+export function isRealStreetAddress(
+  addressLine: string | null | undefined,
+  outletName?: string | null,
+): boolean {
   const line = (addressLine ?? '').trim();
   if (line.length < 5) return false;
   if (line === PLACEHOLDER_OUTLET_ADDRESS) return false;
   if (line === 'Address not set' || line === 'Address pending') return false;
   if (SIGNUP_STREET_LATER.test(line)) return false;
+  if (/^\d{6}$/.test(line)) return false;
+  const withoutPin = stripTrailingPincode(line);
+  if (withoutPin.length < 5 || /^\d{6}$/.test(withoutPin)) return false;
+  const name = (outletName ?? '').trim();
+  if (name && withoutPin.toLowerCase() === name.toLowerCase()) return false;
   return true;
+}
+
+/**
+ * An order needs a street plus a 6-digit pincode. City and state are required
+ * unless the street line itself already contains a full place (commas).
+ * Pincode-only, or an outlet name copied into the address, is not enough.
+ */
+export function hasCompleteDeliveryAddress(fields: {
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  outletName?: string | null;
+}): boolean {
+  const pin = (fields.pincode ?? '').replace(/\D/g, '').slice(0, 6);
+  if (!/^\d{6}$/.test(pin)) return false;
+  if (!isRealStreetAddress(fields.addressLine, fields.outletName)) return false;
+  const line = (fields.addressLine ?? '').trim();
+  if (line.includes(',') && line.length >= 15) return true;
+  return (fields.city ?? '').trim().length >= 2 && (fields.state ?? '').trim().length >= 2;
 }

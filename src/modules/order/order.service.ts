@@ -21,8 +21,7 @@ import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.servic
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
-import { isRealStreetAddress, normalizeOutletName } from '@/lib/constants/customerProfile';
-import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import { hasCompleteDeliveryAddress, normalizeOutletName } from '@/lib/constants/customerProfile';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -218,22 +217,31 @@ export class OrderService {
       },
     });
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
-    // A skipped signup has only a placeholder or "Pincode … — street later".
-    // A saved street (typed or an old Google pick) is enough — do not ask them to re-enter it.
-    let streetOk = isRealStreetAddress(outlet.addressLine);
-    if (!streetOk) {
+    // Pincode alone cannot place an order. The outlet or its saved address
+    // must have a real street (not just the outlet name) and a 6-digit pincode.
+    let addressOk = hasCompleteDeliveryAddress({
+      addressLine: outlet.addressLine,
+      city: outlet.city,
+      state: outlet.state,
+      pincode: outlet.pincode,
+      outletName: outlet.name,
+    });
+    if (!addressOk) {
       const savedRows = await prisma.savedAddress.findMany({
         where: { userId, OR: [{ outletId }, { isDefault: true }] },
-        select: { fullAddress: true },
+        select: { fullAddress: true, city: true, state: true, pincode: true },
         take: 10,
       });
-      streetOk = savedRows.some((row) => isRealStreetAddress(row.fullAddress));
+      addressOk = savedRows.some((row) => hasCompleteDeliveryAddress({
+        addressLine: row.fullAddress,
+        city: row.city,
+        state: row.state,
+        pincode: row.pincode,
+        outletName: outlet.name,
+      }));
     }
-    if (!streetOk) {
-      throw Errors.badRequest('Add a delivery outlet and fill the address before placing orders');
-    }
-    if (!hasUsableDeliveryLocation(outlet)) {
-      throw Errors.badRequest('Add a 6-digit delivery pincode before placing orders');
+    if (!addressOk) {
+      throw Errors.badRequest('Add the full delivery address (street, city, state, and pincode) before placing orders');
     }
     // Heal legacy "{display} — Main" → "{display}". Nothing is called Main anymore.
     const healedName = normalizeOutletName(outlet.name);

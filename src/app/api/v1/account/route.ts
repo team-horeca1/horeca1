@@ -15,7 +15,7 @@ import {
   PAN_RE,
 } from '@/lib/validators/vendor-kyc';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
-import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import { hasCompleteDeliveryAddress } from '@/lib/constants/customerProfile';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
 import { VENDOR_ID_COOKIE } from '@/lib/adminImpersonationCookies';
@@ -90,6 +90,8 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
                 id: true,
                 name: true,
                 addressLine: true,
+                city: true,
+                state: true,
                 pincode: true,
                 latitude: true,
                 longitude: true,
@@ -135,8 +137,16 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
             id: o.id,
             name: o.name,
             addressLine: o.addressLine,
+            city: o.city,
+            state: o.state,
             pincode: o.pincode,
-            requiresAddressUpdate: !hasUsableDeliveryLocation(o),
+            requiresAddressUpdate: !hasCompleteDeliveryAddress({
+              addressLine: o.addressLine,
+              city: o.city,
+              state: o.state,
+              pincode: o.pincode,
+              outletName: o.name,
+            }),
           })),
           isPrimary: m.isPrimary,
           joinedAt: m.createdAt,

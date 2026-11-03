@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   defaultOutletName,
+  hasCompleteDeliveryAddress,
   isRealStreetAddress,
   isSyntheticOutletName,
   normalizeOutletName,
@@ -42,8 +43,36 @@ describe('outlet name — no Main', () => {
     expect(isRealStreetAddress('Address pending — complete in account settings')).toBe(false);
     expect(isRealStreetAddress('Address not set')).toBe(false);
     expect(isRealStreetAddress('Pincode 400703 — street later')).toBe(false);
+    expect(isRealStreetAddress('400708')).toBe(false);
+    expect(isRealStreetAddress('VASHI NAKA', 'VASHI NAKA')).toBe(false);
+    expect(isRealStreetAddress('VASHI NAKA — 400708', 'VASHI NAKA')).toBe(false);
     expect(isRealStreetAddress('3XGR+2WX, Jambul Marg')).toBe(true);
     expect(isRealStreetAddress('Shop 4, Jambul Marg, Vashi')).toBe(true);
+  });
+
+  it('requires a whole address, not a pincode, before an order', () => {
+    expect(hasCompleteDeliveryAddress({
+      addressLine: '400708',
+      pincode: '400708',
+      outletName: 'VASHI NAKA',
+    })).toBe(false);
+    expect(hasCompleteDeliveryAddress({
+      addressLine: 'VASHI NAKA',
+      pincode: '400708',
+      outletName: 'VASHI NAKA',
+    })).toBe(false);
+    expect(hasCompleteDeliveryAddress({
+      addressLine: 'shop no 2, road side, Sanpada, Navi Mumbai',
+      pincode: '400705',
+      outletName: 'Fun Square Theater',
+    })).toBe(true);
+    expect(hasCompleteDeliveryAddress({
+      addressLine: 'Shop 12, Jambul Marg',
+      city: 'Navi Mumbai',
+      state: 'Maharashtra',
+      pincode: '400703',
+      outletName: 'Eat Repeat',
+    })).toBe(true);
   });
 
   it('normalizeOutletName heals Main into a plain outlet label', () => {

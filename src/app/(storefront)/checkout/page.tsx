@@ -33,7 +33,7 @@ import {
 import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAbandonAfterVerifyFailure, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
-import { isRealStreetAddress } from '@/lib/constants/customerProfile';
+import { hasCompleteDeliveryAddress } from '@/lib/constants/customerProfile';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
 
@@ -371,11 +371,16 @@ function CheckoutPageContent() {
     }, [sessionStatus, router, searchParams, purchaseAccess.allowed, purchaseAccess.href]);
     const { currentOutlet, activeBusinessAccountId } = useBusinessAccountSwitcher();
     const { selectedAddress } = useAddress();
-    // Block only when there is no real street. A saved Google or typed street
-    // (including legacy "— Main" outlet names) stays orderable.
-    const hasRealStreet = isRealStreetAddress(currentOutlet?.addressLine)
-        || isRealStreetAddress(selectedAddress?.fullAddress);
-    const needsOutletAddress = !hasRealStreet;
+    // A pincode, or an outlet name copied into the address, is not enough.
+    // Street + pincode are required. City and state are required unless the
+    // street line already contains the full place.
+    const needsOutletAddress = !hasCompleteDeliveryAddress({
+        addressLine: currentOutlet?.addressLine || selectedAddress?.fullAddress,
+        city: currentOutlet?.city || selectedAddress?.city,
+        state: currentOutlet?.state || selectedAddress?.state,
+        pincode: currentOutlet?.pincode || selectedAddress?.pincode,
+        outletName: currentOutlet?.name,
+    });
     const checkoutBlocked = needsOutletAddress;
     const [step, setStep] = useState<CheckoutStep>('review');
     const [selectedPayment, setSelectedPayment] = useState('');
@@ -910,7 +915,7 @@ function CheckoutPageContent() {
             return;
         }
         if (needsOutletAddress) {
-            setOrderError('Add a delivery outlet and fill the address before placing the order.');
+            setOrderError('Add the full delivery address (street, city, state, and pincode) before placing the order.');
             return;
         }
         if (selectedPayment === 'po_number' && !poNumberInput.trim()) {
@@ -918,7 +923,7 @@ function CheckoutPageContent() {
             return;
         }
         if (needsOutletAddress) {
-            setOrderError('Add a delivery outlet and fill the address before placing the order.');
+            setOrderError('Add the full delivery address (street, city, state, and pincode) before placing the order.');
             return;
         }
         const missingMode = selectedGroups.find((g) => !modeByVendor[g.vendorId]?.mode);
@@ -1075,7 +1080,7 @@ function CheckoutPageContent() {
     const handleSaveDraft = async () => {
         if (selectedGroups.length === 0) { setOrderError('Select at least one vendor PO to save.'); return; }
         if (needsOutletAddress) {
-            setOrderError('Add a delivery outlet and fill the address before saving a draft.');
+            setOrderError('Add the full delivery address (street, city, state, and pincode) before saving a draft.');
             return;
         }
         setIsPlacingOrder(true);
@@ -1404,7 +1409,7 @@ function CheckoutPageContent() {
                             <div className="text-[13px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
                                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    Add an outlet and fill the address before placing the order. {activeBusinessAccountId && (
+                                    Add the full address (street, city, state, and pincode) before placing the order. {activeBusinessAccountId && (
                                         <Link
                                             href={`/account/${activeBusinessAccountId}/outlets`}
                                             className="underline font-bold hover:text-orange-800"
@@ -1735,7 +1740,7 @@ function CheckoutPageContent() {
                                 <div className="text-[12px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-semibold text-left flex items-start gap-2">
                                     <AlertCircle size={14} className="shrink-0 mt-0.5" />
                                     <span>
-                                        Add an outlet and fill the address before placing the order.
+                                        Add the full address (street, city, state, and pincode) before placing the order.
                                     </span>
                                 </div>
                             )}

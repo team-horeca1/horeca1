@@ -23,6 +23,7 @@ import {
   type BusinessKind,
 } from '@/lib/businessCapability';
 import { toast } from 'sonner';
+import { hasCompleteDeliveryAddress } from '@/lib/constants/customerProfile';
 
 interface Props {
   fallbackLabel: string;
@@ -42,6 +43,25 @@ const DELIVER_TO_SS_PREFIX = 'h1_deliver_to:';
 
 function accountLabel(a: AccountSummary): string {
   return a.displayName ?? a.legalName;
+}
+
+function isPinOnly(value: string | null | undefined): boolean {
+  return /^\d{6}$/.test((value ?? '').trim());
+}
+
+/** Dropdown and the top chip show the outlet name, never a bare pincode. */
+function outletTitle(
+  outlet: { id: string; name: string } | null | undefined,
+  saved: Array<{ outletId?: string; label: string; businessName?: string }>,
+): string {
+  if (!outlet) return 'Add outlet';
+  const match = saved.find((a) => a.outletId === outlet.id);
+  const options = [outlet.name, match?.label, match?.businessName];
+  for (const raw of options) {
+    const name = (raw ?? '').trim();
+    if (name && !isPinOnly(name)) return name;
+  }
+  return outlet.name.trim() || 'Outlet';
 }
 
 function defaultOutletId(account: AccountSummary): string | undefined {
@@ -231,11 +251,7 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
             mode: 'account',
             label: !buyer
               ? (currentKind === 'vendor' ? 'Supplier · browse only' : 'Brand · browse only')
-              : currentOutlet
-                ? (currentOutlet.requiresAddressUpdate
-                  ? 'Add address'
-                  : (currentOutlet.pincode ?? currentOutlet.name))
-                : 'Add outlet',
+              : outletTitle(currentOutlet, savedAddresses),
             business: accountLabel(currentAccount),
             kind: currentKind,
             needsAddress: Boolean(buyer && (currentOutlet?.requiresAddressUpdate || !currentOutlet)),
@@ -267,6 +283,7 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
     buyer,
     fallbackLabel,
     userId,
+    savedAddresses,
   ]);
 
   if (settling) {
@@ -313,12 +330,21 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
   }
 
   const businessName = accountLabel(currentAccount);
-  const needsAddress = Boolean(buyer && (currentOutlet?.requiresAddressUpdate || !currentOutlet));
+  const needsAddress = Boolean(
+    buyer && (
+      !currentOutlet
+      || !hasCompleteDeliveryAddress({
+        addressLine: currentOutlet.addressLine,
+        city: currentOutlet.city,
+        state: currentOutlet.state,
+        pincode: currentOutlet.pincode,
+        outletName: currentOutlet.name,
+      })
+    ),
+  );
   const locLabel = !buyer
     ? (currentKind === 'vendor' ? 'Supplier · browse only' : 'Brand · browse only')
-    : needsAddress
-      ? (currentOutlet ? 'Add address' : 'Add outlet')
-      : (currentOutlet?.pincode ?? currentOutlet?.name ?? 'Add outlet');
+    : outletTitle(currentOutlet, savedAddresses);
   const showPin = buyer && !needsAddress;
   const busy = switching || pickingId !== null;
 
@@ -461,10 +487,16 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
                 )}
               <div className="flex-1 min-w-0">
                 <p className={cn('font-semibold truncate text-text', compact ? 'text-[12px]' : 'text-[13px]')}>
-                  {o.name}
+                  {outletTitle(o, savedAddresses)}
                 </p>
                 <p className="text-[11px] text-text-secondary tabular-nums">
-                  {o.requiresAddressUpdate ? 'Address needed' : (o.pincode ?? '—')}
+                  {hasCompleteDeliveryAddress({
+                    addressLine: o.addressLine,
+                    city: o.city,
+                    state: o.state,
+                    pincode: o.pincode,
+                    outletName: o.name,
+                  }) ? (o.pincode ?? '—') : 'Full address needed'}
                 </p>
               </div>
               {o.id === currentOutlet?.id && <Check size={16} className="text-primary shrink-0" />}

@@ -58,7 +58,7 @@ export interface AccountSummary {
   status: 'active' | 'suspended' | 'deactivated';
   isPrimary: boolean;
   primaryOutletId: string | null;
-  outlets: Array<{ id: string; name: string; addressLine?: string | null; pincode: string | null; requiresAddressUpdate: boolean }>;
+  outlets: Array<{ id: string; name: string; addressLine?: string | null; city?: string | null; state?: string | null; pincode: string | null; requiresAddressUpdate: boolean }>;
   stores?: Array<{ id: string; name: string }>;
   catalogueCount?: number;
 }
@@ -67,6 +67,8 @@ export interface OutletSummary {
   id: string;
   name: string;
   addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
   pincode: string | null;
   requiresAddressUpdate: boolean;
 }
