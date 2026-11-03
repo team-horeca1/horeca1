@@ -155,6 +155,11 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
     const [isCategoriesExpanded, setIsCategoriesExpanded] = React.useState(false);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = React.useState(false);
     const [isLocationOverlayOpen, setIsLocationOverlayOpen] = React.useState(false);
+    React.useEffect(() => {
+        const onOpen = () => setIsLocationOverlayOpen(true);
+        window.addEventListener('horeca-open-location-overlay', onOpen);
+        return () => window.removeEventListener('horeca-open-location-overlay', onOpen);
+    }, []);
     const { session, isAuthenticated, isResolved } = useStableSession();
     const isLoggedIn = isAuthenticated;
     const userRole = session?.user?.role;

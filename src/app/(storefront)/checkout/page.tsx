@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, Clock, CheckCircle2, Shield, User, Loader2, Check, MapPin, AlertCircle, ChevronDown } from 'lucide-react';
@@ -34,6 +34,11 @@ import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAban
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { hasCompleteDeliveryAddress } from '@/lib/constants/customerProfile';
+import { openDeliverMenu } from '@/components/layout/NavContextSelector';
+
+function openAddressEditor() {
+    window.dispatchEvent(new CustomEvent('horeca-open-location-overlay'));
+}
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
 
@@ -200,14 +205,8 @@ function DeliveringToRow() {
         currentAccount,
         currentOutlet,
         activeBusinessAccountId,
-        activeOutletId,
-        switchOutlet,
-        switching,
     } = useBusinessAccountSwitcher();
-    const { savedAddresses, setSelectedAddress } = useAddress();
     const [outletDetails, setOutletDetails] = useState<OutletDetail[]>([]);
-    const [open, setOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Fetch the full outlet records (with addressLine) for the active account.
     useEffect(() => {
@@ -225,18 +224,6 @@ function DeliveringToRow() {
         return () => { cancelled = true; };
     }, [activeBusinessAccountId]);
 
-    // Close on outside click.
-    useEffect(() => {
-        if (!open) return;
-        const onMouseDown = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', onMouseDown);
-        return () => document.removeEventListener('mousedown', onMouseDown);
-    }, [open]);
-
     if (!currentOutlet || !activeBusinessAccountId) return null;
 
     const activeDetail = outletDetails.find((o) => o.id === currentOutlet.id);
@@ -246,10 +233,8 @@ function DeliveringToRow() {
         activeDetail?.state,
         activeDetail?.pincode ?? currentOutlet.pincode ?? null,
     ].filter(Boolean).join(', ');
-    const otherOutlets = outletDetails.filter((o) => o.id !== currentOutlet.id);
-
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 relative" ref={dropdownRef}>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 relative">
             <div className="flex items-start gap-3">
                 <div className="w-9 h-9 shrink-0 rounded-xl bg-primary-light flex items-center justify-center">
                     <MapPin size={16} className="text-primary" />
@@ -270,11 +255,14 @@ function DeliveringToRow() {
                 </div>
                 <button
                     type="button"
-                    onClick={() => setOpen((v) => !v)}
+                    onClick={() => {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        openDeliverMenu();
+                    }}
                     className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary-light/50 text-[12px] font-bold text-gray-700 hover:text-primary transition-colors cursor-pointer"
                 >
                     Change
-                    <ChevronDown size={12} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                    <ChevronDown size={12} />
                 </button>
             </div>
 
@@ -286,68 +274,16 @@ function DeliveringToRow() {
                         <p className="text-[12px] font-bold text-orange-700">This outlet needs a delivery pincode</p>
                         <p className="text-[11px] text-orange-600 mt-0.5">Add a 6-digit pincode before placing the order.</p>
                     </div>
-                    <Link
-                        href={`/account/${activeBusinessAccountId}/outlets`}
+                    <button
+                        type="button"
+                        onClick={openAddressEditor}
                         className="shrink-0 px-3 py-1.5 bg-orange-600 text-white text-[11px] font-bold rounded-lg hover:bg-orange-700 transition-colors"
                     >
-                        Edit Outlet
-                    </Link>
+                        Edit outlet
+                    </button>
                 </div>
             )}
 
-            {open && (
-                <div className="absolute right-4 top-full mt-2 w-[280px] bg-white rounded-xl border border-gray-100 shadow-xl z-[10010] overflow-hidden">
-                    <div className="px-3 py-2 border-b border-gray-100">
-                        <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Switch outlet</p>
-                    </div>
-                    <ul className="max-h-[260px] overflow-y-auto">
-                        {otherOutlets.length === 0 && (
-                            <li className="px-3 py-3 text-[12px] text-gray-400 text-center">
-                                No other outlets in this account
-                            </li>
-                        )}
-                        {otherOutlets.map((o) => (
-                            <li key={o.id}>
-                                <button
-                                    type="button"
-                                    disabled={switching || o.id === activeOutletId}
-                                    onClick={async () => {
-                                        await switchOutlet(o.id);
-                                        // Keep h1_addr in sync with the chosen outlet so
-                                        // place-order stamps the deliver-to store, not a stale primary.
-                                        // No match → clear cookie so resolveStorefrontContext falls through to JWT.
-                                        const match = savedAddresses.find((a) => a.outletId === o.id);
-                                        if (match) setSelectedAddress(match);
-                                        else setSelectedAddress(null);
-                                        setOpen(false);
-                                    }}
-                                    className="w-full flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-left transition-colors"
-                                >
-                                    <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-bold text-[#181725] truncate">{o.name}</p>
-                                        <p className="text-[10px] text-gray-400 truncate">
-                                            {[o.addressLine, o.city, o.pincode].filter(Boolean).join(', ') || 'No address'}
-                                        </p>
-                                        {o.requiresAddressUpdate && (
-                                            <p className="text-[10px] text-amber-600 font-semibold mt-0.5">Address needed</p>
-                                        )}
-                                    </div>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                    <div className="px-3 py-2 border-t border-gray-100">
-                        <Link
-                            href={`/account/${activeBusinessAccountId}/outlets`}
-                            className="text-[11px] font-bold text-primary hover:underline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Manage outlets →
-                        </Link>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
@@ -369,7 +305,7 @@ function CheckoutPageContent() {
             router.replace(purchaseAccess.href || '/businesses?add=buyer');
         }
     }, [sessionStatus, router, searchParams, purchaseAccess.allowed, purchaseAccess.href]);
-    const { currentOutlet, activeBusinessAccountId } = useBusinessAccountSwitcher();
+    const { currentOutlet } = useBusinessAccountSwitcher();
     const { selectedAddress } = useAddress();
     // A pincode, or an outlet name copied into the address, is not enough.
     // Street + pincode are required. City and state are required unless the
@@ -1409,14 +1345,14 @@ function CheckoutPageContent() {
                             <div className="text-[13px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 font-medium flex items-start gap-2">
                                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                    Add the full address (street, city, state, and pincode) before placing the order. {activeBusinessAccountId && (
-                                        <Link
-                                            href={`/account/${activeBusinessAccountId}/outlets`}
-                                            className="underline font-bold hover:text-orange-800"
-                                        >
-                                            Add outlet
-                                        </Link>
-                                    )}
+                                    Add the full address (street, city, state, and pincode) before placing the order.{' '}
+                                    <button
+                                        type="button"
+                                        onClick={openAddressEditor}
+                                        className="underline font-bold hover:text-orange-800"
+                                    >
+                                        Add outlet
+                                    </button>
                                 </div>
                             </div>
                         )}

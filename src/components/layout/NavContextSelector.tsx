@@ -40,6 +40,13 @@ type StickyContext = {
 };
 
 const DELIVER_TO_SS_PREFIX = 'h1_deliver_to:';
+export const OPEN_DELIVER_MENU = 'horeca-open-deliver-menu';
+
+/** Open the navbar Ordering as / Deliver to menu without leaving the page. */
+export function openDeliverMenu() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(OPEN_DELIVER_MENU));
+}
 
 function accountLabel(a: AccountSummary): string {
   return a.displayName ?? a.legalName;
@@ -240,6 +247,12 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
+
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_DELIVER_MENU, onOpen);
+    return () => window.removeEventListener(OPEN_DELIVER_MENU, onOpen);
+  }, []);
 
   const settling = !isResolved || (isAuthenticated && loading);
 
