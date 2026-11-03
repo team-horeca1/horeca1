@@ -22,7 +22,6 @@ import {
     Wallet,
     Copy,
     Check,
-    LayoutDashboard,
     Users,
     SlidersHorizontal,
     MapPin,
@@ -178,7 +177,7 @@ export default function CustomerDetailsPage() {
     const [toggling, setToggling] = useState(false);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'overview' | 'business' | 'addresses' | 'credit' | 'team'>('overview');
+    const [activeTab, setActiveTab] = useState<'business' | 'addresses' | 'credit' | 'team'>('business');
     const [profile, setProfile] = useState<CustomerProfileValues>(EMPTY_CUSTOMER_PROFILE);
     const [refreshKey, setRefreshKey] = useState(0);
     useEffect(() => {
@@ -334,7 +333,6 @@ export default function CustomerDetailsPage() {
     ];
 
     const tabs = [
-        { id: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
         { id: 'business' as const, label: 'Business Profile', icon: Building2 },
         { id: 'addresses' as const, label: 'Delivery addresses', icon: MapPin },
         { id: 'credit' as const, label: 'Credit & Orders', icon: Wallet },
@@ -446,7 +444,7 @@ export default function CustomerDetailsPage() {
                             tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
                         />
                         <AdminEntityTabContent>
-                            {activeTab === 'overview' && (
+                            {activeTab === 'business' && (
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-[#F9FAFB] p-6 rounded-[14px] border border-[#F0F2F5]">
                                         <div className="flex items-center gap-4">
@@ -480,11 +478,6 @@ export default function CustomerDetailsPage() {
                                             <p className="text-[14px] font-bold text-[#181725]">{user.vendor.businessName}</p>
                                         </div>
                                     )}
-                                </div>
-                            )}
-
-                            {activeTab === 'business' && (
-                                <div className="space-y-6">
                                     {editing ? (
                                         <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                             <h3 className="font-extrabold text-[15px] text-[#181725] mb-4">Business profile</h3>
@@ -508,7 +501,6 @@ export default function CustomerDetailsPage() {
                                                     <InfoCardField label="Full Name" value={user.fullName} />
                                                     <InfoCardField label="Email" value={user.email} copyable />
                                                     <InfoCardField label="Phone" value={user.phone} copyable />
-                                                    <InfoCardField label="Joined Date" value={formatDateIndian(user.createdAt)} />
                                                     <InfoCardField label="Pincode" value={user.pincode} />
                                                 </div>
                                             </div>
