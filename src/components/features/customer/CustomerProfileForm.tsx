@@ -76,12 +76,88 @@ export interface CustomerProfileFormProps {
   singleContact?: boolean;
 }
 
-/** Keep a typed legacy value visible until the customer picks a real option. */
-function optionsWithCurrent(options: readonly string[], current: string | null | undefined): string[] {
-  const cur = (current ?? '').trim();
-  const list = [...options];
-  if (cur && !list.includes(cur)) list.unshift(cur);
-  return list;
+const TYPE_MY_OWN = '__type_my_own__';
+
+/**
+ * Preset dropdown plus "Type my own". A saved value that is not in the list
+ * opens the text box so it can be edited instead of disappearing.
+ */
+function SelectOrOwn({
+  label,
+  required,
+  error,
+  value,
+  presets,
+  disabled,
+  placeholder,
+  className,
+  onPick,
+  onType,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  value: string;
+  presets: readonly string[];
+  disabled?: boolean;
+  placeholder: string;
+  className?: string;
+  /** A list choice, or switching into the text box (empty string). Clears dependents. */
+  onPick: (next: string) => void;
+  /** Keystrokes in the custom box. Does not clear the fields below. */
+  onType: (next: string) => void;
+}) {
+  const current = value.trim();
+  const presetKey = presets.join('\n');
+  const [track, setTrack] = useState({ presetKey, mode: 'auto' as 'auto' | 'own' | 'list' });
+  if (track.presetKey !== presetKey) {
+    setTrack({ presetKey, mode: 'auto' });
+  }
+  const mode = track.presetKey === presetKey ? track.mode : 'auto';
+  const inList = current !== '' && presets.includes(current);
+  // No presets (custom business type) means the only useful choice is typing.
+  const own = !disabled && (
+    presets.length === 0
+    || mode === 'own'
+    || (mode === 'auto' && current !== '' && !inList)
+  );
+
+  return (
+    <FormField label={label} required={required} error={error} className={className}>
+      <FormSelect
+        value={own ? TYPE_MY_OWN : current}
+        disabled={disabled}
+        hasError={!!error}
+        onChange={(next) => {
+          if (next === TYPE_MY_OWN) {
+            setTrack({ presetKey, mode: 'own' });
+            onPick('');
+            return;
+          }
+          setTrack({ presetKey, mode: 'list' });
+          onPick(next);
+        }}
+      >
+        <option value="">Select</option>
+        {presets.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+        <option value={TYPE_MY_OWN}>Type my own</option>
+      </FormSelect>
+      {own && (
+        <FormInput
+          value={value}
+          onChange={(next) => {
+            setTrack({ presetKey, mode: 'own' });
+            onType(next);
+          }}
+          placeholder={placeholder}
+          hasError={!!error}
+          className="mt-2"
+        />
+      )}
+    </FormField>
+  );
 }
 
 function SectionHeader({ icon: Icon, children, spanClass }: { icon: React.ComponentType<{ size?: number; className?: string }>; children: React.ReactNode; spanClass: string }) {
@@ -165,20 +241,17 @@ export function CustomerProfileForm({
   const SPAN_FULL = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
   const SPAN_TWO = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2' : 'sm:col-span-2';
 
-  const handleBusinessTypeChange = (businessType: string) => {
+  const handleBusinessTypePick = (businessType: string) => {
     set({ businessType, subType: '', cuisine: '' });
   };
 
-  const handleSubTypeChange = (subType: string) => {
+  const handleSubTypePick = (subType: string) => {
     set({ subType, cuisine: '' });
   };
 
-  const businessTypes = optionsWithCurrent(CUSTOMER_BUSINESS_TYPES, value.businessType);
-  const subTypes = optionsWithCurrent(subTypesForBusinessType(value.businessType ?? ''), value.subType);
-  const cuisineOptions = optionsWithCurrent(
-    cuisinesForSubType(value.businessType ?? '', value.subType ?? ''),
-    value.cuisine,
-  );
+  const businessTypes = CUSTOMER_BUSINESS_TYPES;
+  const subTypes = subTypesForBusinessType(value.businessType ?? '');
+  const cuisineOptions = cuisinesForSubType(value.businessType ?? '', value.subType ?? '');
 
   if (mode === 'register') {
     return (
@@ -443,30 +516,36 @@ export function CustomerProfileForm({
           {visibleSections.business && (
             <>
               <div data-field="businessType">
-                <FormField label="Business Type" required>
-                  <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
-                    <option value="">Select type</option>
-                    {businessTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                  </FormSelect>
-                  {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
-                </FormField>
+                <SelectOrOwn
+                  label="Business Type"
+                  required
+                  error={errors.businessType}
+                  value={value.businessType ?? ''}
+                  presets={businessTypes}
+                  placeholder="Type your business type"
+                  onPick={handleBusinessTypePick}
+                  onType={(businessType) => set({ businessType })}
+                />
               </div>
-              <FormField label="Sub-Type">
-                <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.businessType}>
-                  <option value="">Select sub-type</option>
-                  {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
-                </FormSelect>
-              </FormField>
-              <FormField label="Cuisine / Category" className={SPAN_TWO}>
-                {cuisineOptions.length > 0 ? (
-                  <FormSelect value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} disabled={!value.subType}>
-                    <option value="">Select cuisine</option>
-                    {cuisineOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                  </FormSelect>
-                ) : (
-                  <FormInput value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} placeholder="e.g. Japanese / Pan Asian" />
-                )}
-              </FormField>
+              <SelectOrOwn
+                label="Sub-Type"
+                value={value.subType ?? ''}
+                presets={subTypes}
+                disabled={!value.businessType}
+                placeholder="Type your sub-type"
+                onPick={handleSubTypePick}
+                onType={(subType) => set({ subType })}
+              />
+              <SelectOrOwn
+                label="Cuisine / Category"
+                className={SPAN_TWO}
+                value={value.cuisine ?? ''}
+                presets={cuisineOptions}
+                disabled={!value.subType}
+                placeholder="Type your cuisine"
+                onPick={(cuisine) => set({ cuisine })}
+                onType={(cuisine) => set({ cuisine })}
+              />
             </>
           )}
 
