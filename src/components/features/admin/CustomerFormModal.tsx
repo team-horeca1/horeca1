@@ -300,22 +300,40 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
     }
     setSubmitting(true);
     try {
+      // Same payload shape as CustomerDeliveryAddresses.save — the admin PATCH
+      // gate only recognizes companyProfile / outlets, not deliveryAddress alone.
+      const billingName =
+        addressForm.billingName.trim()
+        && addressForm.billingName.trim() !== (profile.legalName || profile.displayName || '').trim()
+          ? addressForm.billingName.trim()
+          : null;
       const res = await fetch(`/api/v1/admin/users/${createdUserId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          companyProfile: {
+            billingAddressLine: addressForm.billingAddressLine.trim(),
+            billingCity: addressForm.billingCity.trim(),
+            billingState: addressForm.billingState.trim(),
+            billingPincode: addressForm.billingPincode.trim(),
+          },
+          outlets: [
+            {
+              name: addressForm.outletName.trim(),
+              billingName,
+              addressLine: delivery.addressLine.trim(),
+              city: delivery.city.trim() || null,
+              state: delivery.state.trim() || null,
+              pincode: delivery.pincode,
+            },
+          ],
+          // Also send deliveryAddress so primary SavedAddress is synced (section 3.1).
           deliveryAddress: {
             outletName: addressForm.outletName.trim(),
             addressLine: delivery.addressLine.trim(),
             city: delivery.city.trim(),
             state: delivery.state.trim(),
             pincode: delivery.pincode,
-          },
-          billingAddress: {
-            addressLine: addressForm.billingAddressLine.trim(),
-            city: addressForm.billingCity.trim(),
-            state: addressForm.billingState.trim(),
-            pincode: addressForm.billingPincode.trim(),
           },
         }),
       });

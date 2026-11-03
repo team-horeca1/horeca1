@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { useAddress, Address } from '@/context/AddressContext';
-import { isRealStreetAddress } from '@/lib/constants/customerProfile';
+import { isRealStreetAddress, isSyntheticAddressLine } from '@/lib/constants/customerProfile';
 import {
   deliveryFromOutletAddress,
   OutletAddressForm,
@@ -20,9 +20,12 @@ interface EditAddressOverlayProps {
 }
 
 function fromAddress(address: Address, businessName: string): OutletAddressValue {
-  const line = isRealStreetAddress(address.fullAddress) ? address.fullAddress : '';
+  // Only clear system placeholders — never wipe a typed area the user already saved.
+  const line = isSyntheticAddressLine(address.fullAddress) ? '' : (address.fullAddress || '');
+  const outletName =
+    address.label && address.label !== 'Business' ? address.label : '';
   return {
-    outletName: address.label || '',
+    outletName,
     billingName: address.businessName || businessName,
     billingAddressLine: line,
     billingCity: address.city || '',

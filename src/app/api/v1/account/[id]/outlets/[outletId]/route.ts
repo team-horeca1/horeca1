@@ -49,11 +49,13 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.outlet.update({ where: { id: outletId }, data });
 
-      // Update corresponding SavedAddress if one exists
+      // Update corresponding SavedAddress if one exists.
+      // label ← outlet name; businessName ← billing name (do not copy name into both).
       await tx.savedAddress.updateMany({
         where: { outletId: outletId },
         data: {
-          ...(body.name !== undefined && { label: body.name, businessName: body.name }),
+          ...(body.name !== undefined && { label: body.name }),
+          ...(body.billingName !== undefined && { businessName: body.billingName }),
           ...(body.addressLine !== undefined && { fullAddress: body.addressLine, shortAddress: body.addressLine.split(',').slice(0, 2).join(', ') }),
           ...(body.flatInfo !== undefined && { flatInfo: body.flatInfo }),
           ...(body.landmark !== undefined && { landmark: body.landmark }),

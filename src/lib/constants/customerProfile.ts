@@ -132,6 +132,9 @@ const SYNTHETIC_OUTLET_EXACT = new Set([
   'Branch Outlet',
   'Main Outlet',
   'Main',
+  // Default SavedAddress label that leaked into Outlet.name via old field swaps.
+  'Business',
+  'Delivery',
 ]);
 
 const LEGACY_MAIN_SUFFIXES = [' — Main', ' - Main', ' – Main'] as const;
@@ -186,6 +189,24 @@ function stripTrailingPincode(line: string): string {
 }
 
 /**
+ * True for system placeholders only. Used when hydrating edit forms so we do
+ * not wipe a typed area line the user already saved (e.g. "VASHI NAKA").
+ */
+export function isSyntheticAddressLine(
+  addressLine: string | null | undefined,
+): boolean {
+  const line = (addressLine ?? '').trim();
+  if (!line) return true;
+  if (line === PLACEHOLDER_OUTLET_ADDRESS) return true;
+  if (line === 'Address not set' || line === 'Address pending') return true;
+  if (SIGNUP_STREET_LATER.test(line)) return true;
+  if (/^\d{6}$/.test(line)) return true;
+  const withoutPin = stripTrailingPincode(line);
+  if (!withoutPin || /^\d{6}$/.test(withoutPin)) return true;
+  return false;
+}
+
+/**
  * True when the line is a street the customer (or an old Google pick) actually
  * saved. A bare pincode, a placeholder, or a line that is only the outlet name
  * is not a street.
@@ -195,13 +216,10 @@ export function isRealStreetAddress(
   outletName?: string | null,
 ): boolean {
   const line = (addressLine ?? '').trim();
+  if (isSyntheticAddressLine(line)) return false;
   if (line.length < 5) return false;
-  if (line === PLACEHOLDER_OUTLET_ADDRESS) return false;
-  if (line === 'Address not set' || line === 'Address pending') return false;
-  if (SIGNUP_STREET_LATER.test(line)) return false;
-  if (/^\d{6}$/.test(line)) return false;
   const withoutPin = stripTrailingPincode(line);
-  if (withoutPin.length < 5 || /^\d{6}$/.test(withoutPin)) return false;
+  if (withoutPin.length < 5) return false;
   const name = (outletName ?? '').trim();
   if (name && withoutPin.toLowerCase() === name.toLowerCase()) return false;
   return true;

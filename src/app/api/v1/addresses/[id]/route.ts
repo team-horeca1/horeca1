@@ -148,8 +148,9 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
 
         if (existing.outletId) {
           const outletPatch: Record<string, unknown> = {};
-          const outletName = input.businessName ?? input.label;
-          if (outletName !== undefined) outletPatch.name = outletName;
+          // label = outlet/branch name; businessName = billing name (do not swap).
+          if (input.label !== undefined) outletPatch.name = input.label;
+          if (input.businessName !== undefined) outletPatch.billingName = input.businessName;
           if (input.fullAddress !== undefined) outletPatch.addressLine = input.fullAddress;
           if (input.flatInfo !== undefined) outletPatch.flatInfo = input.flatInfo;
           if (input.landmark !== undefined) outletPatch.landmark = input.landmark;
@@ -206,9 +207,9 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     });
     if (!outlet) throw Errors.notFound('Address');
 
-    const outletName = input.businessName ?? input.label ?? outlet.name;
     const outletPatch: Record<string, unknown> = {
-      ...(input.businessName !== undefined || input.label !== undefined ? { name: outletName } : {}),
+      ...(input.label !== undefined ? { name: input.label || outlet.name } : {}),
+      ...(input.businessName !== undefined ? { billingName: input.businessName || null } : {}),
       ...(input.fullAddress !== undefined && { addressLine: input.fullAddress }),
       ...(input.flatInfo !== undefined && { flatInfo: input.flatInfo }),
       ...(input.landmark !== undefined && { landmark: input.landmark }),
@@ -271,8 +272,13 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
           data: {
             userId,
             outletId: outlet.id,
-            label: input.label ?? 'Business',
-            businessName: outletName,
+            // label = outlet name; businessName = billing name (never invent "Business").
+            label: input.label?.trim() || outlet.name || 'Outlet',
+            businessName:
+              (input.businessName ?? '').trim()
+              || (outlet.billingName ?? '').trim()
+              || outlet.name
+              || null,
             fullAddress: input.fullAddress,
             shortAddress: input.shortAddress ?? input.fullAddress.split(',').slice(0, 2).join(', '),
             flatInfo: input.flatInfo,

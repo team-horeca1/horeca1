@@ -40,7 +40,7 @@ export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     if (businessAccountId) {
       const activeAccount = await prisma.businessAccount.findUnique({
         where: { id: businessAccountId },
-        select: { primaryOutletId: true },
+        select: { primaryOutletId: true, legalName: true },
       });
       const outlets = await prisma.outlet.findMany({
         where: { businessAccountId, isActive: true },
@@ -56,7 +56,12 @@ export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
         savedRows.filter((s) => s.outletId).map((s) => [s.outletId!, s]),
       );
       const addresses = outlets.map((o) =>
-        mapOutletToUnifiedAddress(o, savedByOutlet.get(o.id), activeAccount?.primaryOutletId ?? null),
+        mapOutletToUnifiedAddress(
+          o,
+          savedByOutlet.get(o.id),
+          activeAccount?.primaryOutletId ?? null,
+          activeAccount?.legalName ?? null,
+        ),
       );
       return NextResponse.json({ success: true, data: addresses });
     }
@@ -85,8 +90,8 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
         // First real address adopts the empty placeholder primary outlet instead
         // of spawning a duplicate that leaves the primary stuck "Address needed".
         const { outlet } = await adoptOrCreateOutlet(tx, businessAccountId, {
-          // Prefer typed outlet / business name. Never invent "Branch Outlet".
-          name: (input.businessName || '').trim(),
+          // label = outlet name; businessName = billing name (never swap).
+          name: (input.label || input.businessName || '').trim(),
           addressLine: input.fullAddress,
           flatInfo: input.flatInfo,
           landmark: input.landmark,
@@ -98,6 +103,12 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
           placeId: input.placeId,
         });
         outletId = outlet.id;
+        if (input.businessName?.trim() && input.businessName.trim() !== outlet.name) {
+          await tx.outlet.update({
+            where: { id: outlet.id },
+            data: { billingName: input.businessName.trim() },
+          });
+        }
 
         if (input.isDefault) {
           await tx.businessAccount.update({

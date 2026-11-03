@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Loader2, MapPin, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { isRealStreetAddress } from '@/lib/constants/customerProfile';
+import { isRealStreetAddress, isSyntheticAddressLine } from '@/lib/constants/customerProfile';
 import {
   deliveryFromOutletAddress,
   OutletAddressForm,
@@ -29,12 +29,20 @@ interface Billing {
 }
 
 function formForOutlet(outlet: CustomerOutletRow | null, businessName: string, billing: Billing): OutletAddressValue {
-  const line = outlet && isRealStreetAddress(outlet.addressLine) ? outlet.addressLine : '';
-  const same = !outlet || !line || line === billing.line;
+  // Keep typed streets in the form; only hide signup/system placeholders.
+  const line = outlet && !isSyntheticAddressLine(outlet.addressLine) ? outlet.addressLine : '';
+  const billingLine = !isSyntheticAddressLine(billing.line) ? billing.line : '';
+  const same = !outlet || !line || line === billingLine;
+  const outletName =
+    outlet?.name
+    && outlet.name !== 'Business'
+    && outlet.name !== 'Address pending — complete in account settings'
+      ? outlet.name
+      : '';
   return {
-    outletName: outlet?.name && outlet.name !== 'Address pending — complete in account settings' ? outlet.name : '',
+    outletName,
     billingName: outlet?.billingName || businessName,
-    billingAddressLine: billing.line && isRealStreetAddress(billing.line) ? billing.line : (same ? line : billing.line),
+    billingAddressLine: billingLine || (same ? line : ''),
     billingCity: billing.city || outlet?.city || '',
     billingState: billing.state || outlet?.state || '',
     billingPincode: billing.pincode || outlet?.pincode || '',
@@ -125,6 +133,13 @@ export function CustomerDeliveryAddresses({
             billingPincode: value.billingPincode.trim(),
           },
           outlets: [outlet],
+          deliveryAddress: {
+            outletName: value.outletName.trim(),
+            addressLine: delivery.addressLine.trim(),
+            city: delivery.city.trim(),
+            state: delivery.state.trim(),
+            pincode: delivery.pincode.trim(),
+          },
         }),
       });
       const json = await res.json();

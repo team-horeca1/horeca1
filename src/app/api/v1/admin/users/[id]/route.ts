@@ -271,7 +271,15 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       }
     }
 
-    const hasBizAccountUpdates = !!(body.companyProfile || body.outlets || body.vendorMapping);
+    // deliveryAddress / billingAddress are applied in section 3.1 / billing sync —
+    // they must count as a valid update or "Save address" on new-customer step 2 fails.
+    const hasBizAccountUpdates = !!(
+      body.companyProfile
+      || body.outlets
+      || body.vendorMapping
+      || body.deliveryAddress
+      || body.billingAddress
+    );
     if (Object.keys(allowedFields).length === 0 && !hasBizAccountUpdates) {
       throw Errors.badRequest('No valid fields to update');
     }
@@ -399,15 +407,21 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       if (Array.isArray(body.outlets)) {
         const membership = await tx.businessAccountMember.findFirst({
           where: { userId: id, isPrimary: true },
-          select: { businessAccountId: true },
+          select: {
+            businessAccountId: true,
+            businessAccount: { select: { primaryOutletId: true, legalName: true } },
+          },
         });
 
         if (membership) {
           const bizAccountId = membership.businessAccountId;
+          const primaryOutletId = membership.businessAccount.primaryOutletId;
           for (const o of body.outlets) {
-            if (o.id) {
+            let outletId: string | null = o.id || null;
+
+            if (outletId) {
               await tx.outlet.update({
-                where: { id: o.id, businessAccountId: bizAccountId },
+                where: { id: outletId, businessAccountId: bizAccountId },
                 data: {
                   name: o.name !== undefined ? o.name : undefined,
                   code: o.code !== undefined ? o.code : undefined,
@@ -421,20 +435,122 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
                 },
               });
             } else {
-              await tx.outlet.create({
-                data: {
-                  businessAccountId: bizAccountId,
-                  name: o.name,
-                  code: o.code || null,
-                  addressLine: o.addressLine,
-                  city: o.city || null,
-                  state: o.state || null,
-                  pincode: o.pincode || null,
-                  billingName: o.billingName || null,
-                  requiresAddressUpdate: !isRealStreetAddress(o.addressLine),
-                  isActive: typeof o.isActive === 'boolean' ? o.isActive : true,
-                },
-              });
+              // Adopt the primary placeholder on first address; otherwise create
+              // a real additional outlet (admin "Add outlet").
+              const primary = primaryOutletId
+                ? await tx.outlet.findUnique({
+                    where: { id: primaryOutletId },
+                    select: {
+                      id: true,
+                      addressLine: true,
+                      requiresAddressUpdate: true,
+                      name: true,
+                    },
+                  })
+                : null;
+              const primaryIsPlaceholder = !!(
+                primary
+                && (
+                  primary.requiresAddressUpdate
+                  || !isRealStreetAddress(primary.addressLine, primary.name)
+                )
+              );
+
+              if (primaryIsPlaceholder && typeof o.isActive !== 'boolean') {
+                outletId = primary!.id;
+                await tx.outlet.update({
+                  where: { id: primary!.id, businessAccountId: bizAccountId },
+                  data: {
+                    ...(o.name !== undefined ? { name: o.name } : {}),
+                    ...(o.code !== undefined ? { code: o.code } : {}),
+                    ...(o.addressLine !== undefined
+                      ? {
+                          addressLine: o.addressLine,
+                          requiresAddressUpdate: !isRealStreetAddress(o.addressLine),
+                        }
+                      : {}),
+                    ...(o.city !== undefined ? { city: o.city } : {}),
+                    ...(o.state !== undefined ? { state: o.state } : {}),
+                    ...(o.pincode !== undefined ? { pincode: o.pincode } : {}),
+                    ...(o.billingName !== undefined ? { billingName: o.billingName } : {}),
+                  },
+                });
+              } else {
+                const created = await tx.outlet.create({
+                  data: {
+                    businessAccountId: bizAccountId,
+                    name: o.name,
+                    code: o.code || null,
+                    addressLine: o.addressLine,
+                    city: o.city || null,
+                    state: o.state || null,
+                    pincode: o.pincode || null,
+                    billingName: o.billingName || null,
+                    requiresAddressUpdate: !isRealStreetAddress(o.addressLine),
+                    isActive: typeof o.isActive === 'boolean' ? o.isActive : true,
+                  },
+                });
+                outletId = created.id;
+                if (!primaryOutletId) {
+                  await tx.businessAccount.update({
+                    where: { id: bizAccountId },
+                    data: { primaryOutletId: created.id },
+                  });
+                }
+              }
+            }
+
+            // Sync linked SavedAddress so storefront edit never shows an empty street.
+            if (
+              outletId
+              && (o.addressLine !== undefined || o.name !== undefined || o.pincode !== undefined)
+            ) {
+              const outletRow = await tx.outlet.findUnique({ where: { id: outletId } });
+              if (outletRow && o.isActive !== false) {
+                const savedData = {
+                  outletId,
+                  label: outletRow.name || 'Outlet',
+                  businessName:
+                    outletRow.billingName
+                    || membership.businessAccount.legalName
+                    || outletRow.name
+                    || null,
+                  ...(o.addressLine !== undefined
+                    ? {
+                        fullAddress: outletRow.addressLine,
+                        shortAddress: outletRow.addressLine.split(',').slice(0, 2).join(', '),
+                      }
+                    : {}),
+                  ...(o.city !== undefined ? { city: outletRow.city } : {}),
+                  ...(o.state !== undefined ? { state: outletRow.state } : {}),
+                  ...(o.pincode !== undefined ? { pincode: outletRow.pincode } : {}),
+                  isDefault: outletId === (primaryOutletId || outletId),
+                };
+                const existingSaved = await tx.savedAddress.findFirst({
+                  where: { userId: id, outletId },
+                });
+                if (existingSaved) {
+                  await tx.savedAddress.update({
+                    where: { id: existingSaved.id },
+                    data: savedData,
+                  });
+                } else if (outletRow.addressLine && isRealStreetAddress(outletRow.addressLine)) {
+                  await tx.savedAddress.create({
+                    data: {
+                      userId: id,
+                      fullAddress: outletRow.addressLine,
+                      shortAddress: outletRow.addressLine.split(',').slice(0, 2).join(', '),
+                      city: outletRow.city,
+                      state: outletRow.state,
+                      pincode: outletRow.pincode,
+                      latitude: outletRow.latitude ?? 0,
+                      longitude: outletRow.longitude ?? 0,
+                      placeId: outletRow.placeId,
+                      ...savedData,
+                    },
+                  });
+                }
+              }
             }
           }
         }

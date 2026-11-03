@@ -112,7 +112,11 @@ export async function completeCustomerProfile(
     });
 
     if (hasAddress && outletId) {
-      const outlet = mapToPrimaryOutlet({ ...input, outletName: normalizedOutletName });
+      const outlet = mapToPrimaryOutlet({
+        ...input,
+        outletName: normalizedOutletName,
+        billingName: trim(input.billingName) || undefined,
+      });
       const existing = await tx.outlet.findUnique({
         where: { id: outletId },
         select: { name: true },
@@ -136,9 +140,50 @@ export async function completeCustomerProfile(
           latitude: outlet.latitude,
           longitude: outlet.longitude,
           placeId: outlet.placeId,
+          billingName: outlet.billingName,
           requiresAddressUpdate: false,
         },
       });
+
+      // Keep SavedAddress in lockstep — storefront edit reads this row via the bridge.
+      const ba = await tx.businessAccount.findUnique({
+        where: { id: businessAccountId },
+        select: { legalName: true },
+      });
+      const savedPayload = {
+        outletId,
+        label: nextName || 'Outlet',
+        businessName: outlet.billingName || ba?.legalName || nextName || null,
+        fullAddress: outlet.addressLine,
+        shortAddress: outlet.addressLine.split(',').slice(0, 2).join(', '),
+        flatInfo: outlet.flatInfo,
+        landmark: outlet.landmark,
+        city: outlet.city,
+        state: outlet.state,
+        pincode: outlet.pincode,
+        latitude: outlet.latitude ?? 0,
+        longitude: outlet.longitude ?? 0,
+        placeId: outlet.placeId,
+        isDefault: true,
+      };
+      const existingSaved = await tx.savedAddress.findFirst({
+        where: { OR: [{ outletId }, { userId, isDefault: true }] },
+        orderBy: { isDefault: 'desc' },
+      });
+      if (existingSaved) {
+        await tx.savedAddress.updateMany({
+          where: { userId, isDefault: true, id: { not: existingSaved.id } },
+          data: { isDefault: false },
+        });
+        await tx.savedAddress.update({
+          where: { id: existingSaved.id },
+          data: savedPayload,
+        });
+      } else {
+        await tx.savedAddress.create({
+          data: { userId, ...savedPayload },
+        });
+      }
     }
 
     await tx.user.update({

@@ -3,6 +3,7 @@ import {
   defaultOutletName,
   hasCompleteDeliveryAddress,
   isRealStreetAddress,
+  isSyntheticAddressLine,
   isSyntheticOutletName,
   normalizeOutletName,
   stripLegacyMainOutletSuffix,
@@ -33,6 +34,8 @@ describe('outlet name — no Main', () => {
     expect(isSyntheticOutletName('Branch Outlet')).toBe(true);
     expect(isSyntheticOutletName('Main Outlet')).toBe(true);
     expect(isSyntheticOutletName('Main')).toBe(true);
+    expect(isSyntheticOutletName('Business')).toBe(true);
+    expect(isSyntheticOutletName('Delivery')).toBe(true);
     expect(isSyntheticOutletName('Rockville Vashi Branch')).toBe(false);
     expect(isSyntheticOutletName('Vashi')).toBe(false);
   });
@@ -48,6 +51,11 @@ describe('outlet name — no Main', () => {
     expect(isRealStreetAddress('VASHI NAKA — 400708', 'VASHI NAKA')).toBe(false);
     expect(isRealStreetAddress('3XGR+2WX, Jambul Marg')).toBe(true);
     expect(isRealStreetAddress('Shop 4, Jambul Marg, Vashi')).toBe(true);
+    // Form hydrate must keep typed areas; only wipe system placeholders.
+    expect(isSyntheticAddressLine('VASHI NAKA')).toBe(false);
+    expect(isSyntheticAddressLine('THANE NAKA')).toBe(false);
+    expect(isSyntheticAddressLine('Pincode 400708 — street later')).toBe(true);
+    expect(isSyntheticAddressLine('Address pending — complete in account settings')).toBe(true);
   });
 
   it('requires a whole address, not a pincode, before an order', () => {

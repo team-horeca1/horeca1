@@ -6,6 +6,11 @@
  */
 import type { Outlet, SavedAddress } from '@prisma/client';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import {
+  isRealStreetAddress,
+  isSyntheticOutletName,
+  normalizeOutletName,
+} from '@/lib/constants/customerProfile';
 
 export interface UnifiedAddressDto {
   id: string;
@@ -25,27 +30,58 @@ export interface UnifiedAddressDto {
   isDefault: boolean;
 }
 
+/**
+ * Map outlet (+ optional saved row) into the storefront/admin edit form shape.
+ * Outlet name → label. Billing name → businessName.
+ * Prefer a real street from the outlet when the saved row is still a signup placeholder.
+ */
 export function mapOutletToUnifiedAddress(
   outlet: Outlet,
   saved: SavedAddress | null | undefined,
   primaryOutletId: string | null,
+  accountLegalName?: string | null,
 ): UnifiedAddressDto {
-  const outletName = outlet.name;
-  const savedLabel = saved?.label;
-  const label =
-    savedLabel && savedLabel !== outletName
-      ? savedLabel
-      : 'Business';
+  const rawOutletName = (outlet.name || '').trim();
+  const healedOutletName =
+    normalizeOutletName(rawOutletName)
+    || (!isSyntheticOutletName(saved?.label) && saved?.label !== 'Business'
+      ? (saved?.label || '').trim()
+      : '')
+    || '';
+  const billingName =
+    (outlet.billingName || '').trim()
+    || (saved?.businessName || '').trim()
+    || (accountLegalName || '').trim()
+    || healedOutletName;
+
+  const savedLine = (saved?.fullAddress || '').trim();
+  const outletLine = (outlet.addressLine || '').trim();
+  // Prefer a real street from either side. Never prefer a signup placeholder
+  // over a typed outlet.addressLine (that was blanking the edit form).
+  const fullAddress =
+    isRealStreetAddress(outletLine, healedOutletName)
+      ? outletLine
+      : isRealStreetAddress(savedLine, healedOutletName)
+        ? savedLine
+        : outletLine && !savedLine
+          ? outletLine
+          : savedLine || outletLine;
+
+  const shortAddress =
+    saved?.shortAddress
+    && isRealStreetAddress(saved.fullAddress, healedOutletName)
+      ? saved.shortAddress
+      : fullAddress.split(',').slice(0, 2).join(', ');
 
   return {
     id: saved?.id ?? outlet.id,
     outletId: outlet.id,
-    label,
-    businessName: outletName,
-    fullAddress: saved?.fullAddress ?? outlet.addressLine,
-    shortAddress:
-      saved?.shortAddress
-      ?? outlet.addressLine.split(',').slice(0, 2).join(', '),
+    // Form binds outlet name ← label (never the literal "Business").
+    label: healedOutletName || 'Outlet',
+    // Form binds billing name ← businessName.
+    businessName: billingName,
+    fullAddress,
+    shortAddress,
     flatInfo: saved?.flatInfo ?? outlet.flatInfo ?? undefined,
     landmark: saved?.landmark ?? outlet.landmark ?? undefined,
     pincode: saved?.pincode ?? outlet.pincode ?? undefined,

@@ -281,6 +281,7 @@ export default function RegisterPageInner() {
     try {
       const data = await postProfile({
         outletName: addressForm.outletName.trim(),
+        billingName: addressForm.billingName.trim() || undefined,
         addressLine: delivery.addressLine.trim(),
         city: delivery.city.trim(),
         state: delivery.state.trim(),
