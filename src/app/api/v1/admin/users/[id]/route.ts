@@ -556,7 +556,11 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         }
       }
 
-      // 3.1 Update primary outlet & default SavedAddress if deliveryAddress or address fields are specified
+      // 3.1 Update primary outlet & default SavedAddress if deliveryAddress or address fields are specified.
+      // CRITICAL: when body.outlets already wrote a specific outlet, do NOT stamp deliveryAddress
+      // onto the primary — that made every "Add outlet" / edit copy the new name+street onto
+      // the first outlet so both cards showed the same data.
+      const outletsAlreadyHandled = Array.isArray(body.outlets) && body.outlets.length > 0;
       const da = (body.deliveryAddress && typeof body.deliveryAddress === 'object') ? body.deliveryAddress : {};
       const targetAddressLine = da.addressLine || body.addressLine || body.companyProfile?.addressLine;
       const targetOutletName = da.outletName || body.outletName || body.companyProfile?.outletName;
@@ -569,7 +573,10 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       const targetLng = typeof da.longitude === 'number' ? da.longitude : typeof body.longitude === 'number' ? body.longitude : typeof body.companyProfile?.longitude === 'number' ? body.companyProfile.longitude : null;
       const targetPlaceId = da.placeId || body.placeId || body.companyProfile?.placeId;
 
-      if (targetAddressLine || targetCity || targetState || targetPincode || targetOutletName) {
+      if (
+        !outletsAlreadyHandled
+        && (targetAddressLine || targetCity || targetState || targetPincode || targetOutletName)
+      ) {
         const membership = await tx.businessAccountMember.findFirst({
           where: { userId: id, isPrimary: true },
           select: {

@@ -317,6 +317,9 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
             billingState: addressForm.billingState.trim(),
             billingPincode: addressForm.billingPincode.trim(),
           },
+          // outlets[] adopts the placeholder primary + syncs SavedAddress.
+          // Do not send deliveryAddress here — it would re-stamp the primary and
+          // later "Add outlet" saves used to copy the new address onto outlet #1.
           outlets: [
             {
               name: addressForm.outletName.trim(),
@@ -327,14 +330,6 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
               pincode: delivery.pincode,
             },
           ],
-          // Also send deliveryAddress so primary SavedAddress is synced (section 3.1).
-          deliveryAddress: {
-            outletName: addressForm.outletName.trim(),
-            addressLine: delivery.addressLine.trim(),
-            city: delivery.city.trim(),
-            state: delivery.state.trim(),
-            pincode: delivery.pincode,
-          },
         }),
       });
       const json = await parseJsonResponse(res);

@@ -122,6 +122,8 @@ export function CustomerDeliveryAddresses({
         pincode: delivery.pincode.trim(),
       };
       if (editingId && editingId !== 'new') outlet.id = editingId;
+      // Do NOT also send deliveryAddress — section 3.1 would overwrite the primary
+      // outlet with this form and make every outlet show the same name/street.
       const res = await fetch(`/api/v1/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -133,13 +135,6 @@ export function CustomerDeliveryAddresses({
             billingPincode: value.billingPincode.trim(),
           },
           outlets: [outlet],
-          deliveryAddress: {
-            outletName: value.outletName.trim(),
-            addressLine: delivery.addressLine.trim(),
-            city: delivery.city.trim(),
-            state: delivery.state.trim(),
-            pincode: delivery.pincode.trim(),
-          },
         }),
       });
       const json = await res.json();
