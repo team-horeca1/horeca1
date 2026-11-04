@@ -348,7 +348,7 @@ export class DeliveryLinkService {
     }
   }
 
-  /** Public view payload — never includes the customer OTP code. */
+  /** Public view payload - never includes the customer OTP code. */
   async getPublicView(token: string) {
     const loaded = await this.loadByToken(token);
     await this.healFulfilmentIfOrderDelivered(loaded.fulfilmentId);
@@ -590,7 +590,7 @@ export class DeliveryLinkService {
         });
       });
     } catch (err) {
-      // Fulfilment + token already committed above — still return public view
+      // Fulfilment + token already committed above - still return public view
       // so the boy UI can flip to Delivered without a hard refresh.
       console.error('[DeliveryLink] post-complete order sync failed:', err);
     }
@@ -661,7 +661,7 @@ export class DeliveryLinkService {
         },
       });
 
-      // Order stays shipped — never complete on fail attempt.
+      // Order stays shipped - never complete on fail attempt.
       await recordOrderEvent(tx, {
         orderId: row.orderId,
         actorId: null,
@@ -805,7 +805,7 @@ export class DeliveryLinkService {
     return row;
   }
 
-  /** Page 1 — open deliveries + return pickups for this boy. */
+  /** Page 1 - open deliveries + return pickups for this boy. */
   async getBoyPortalList(token: string) {
     const boy = await this.loadBoyToken(token);
     await this.healBoyDesyncedDeliveries(boy.deliveryResourceId);
@@ -1001,7 +1001,7 @@ export class DeliveryLinkService {
     this.assertDeliveryActionable(fulfilmentStatus, orderStatus);
   }
 
-  /** Page 2 — single order POD view (same shape as legacy getPublicView). */
+  /** Page 2 - single order POD view (same shape as legacy getPublicView). */
   async getBoyPortalOrderView(token: string, fulfilmentId: string) {
     await this.healFulfilmentIfOrderDelivered(fulfilmentId);
     const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
