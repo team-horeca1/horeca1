@@ -33,6 +33,7 @@ import { AdminAccountTeamPanel } from '@/components/features/admin/AdminAccountT
 import { CustomerDeliveryAddresses } from '@/components/features/admin/CustomerDeliveryAddresses';
 import { CustomerProfileForm, EMPTY_CUSTOMER_PROFILE, type CustomerProfileValues } from '@/components/features/customer/CustomerProfileForm';
 import { buildCompanyProfile, mapToUserFields } from '@/lib/customerProfileMapper';
+import { accountFacingName } from '@/lib/displayIdentity';
 import {
     AdminEntityDetailHeader,
     AdminEntityStatsRow,
@@ -221,7 +222,7 @@ export default function CustomerDetailsPage() {
             email: user.email || '',
             phone: user.phone || '',
             mobilePhone: user.phone || '',
-            gstin: user.gstNumber || ba?.gstin || '',
+            gstin: ba?.gstin || user.gstNumber || '',
             pan: ba?.pan || '',
             fssaiNumber: ba?.fssaiNumber || '',
             designation: ba?.designation || '',
@@ -323,6 +324,11 @@ export default function CustomerDetailsPage() {
 
     const avatarUrl = user.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.fullName)}`;
     const primaryBa = user.accountMemberships?.find((m) => m.isPrimary)?.businessAccount;
+    const accountLabel = accountFacingName({
+        displayName: primaryBa?.displayName,
+        legalName: primaryBa?.legalName,
+        fallback: user.businessName,
+    });
     const creditWalletCount = user.creditWallets?.length ?? 0;
 
     const stats = [
@@ -416,8 +422,8 @@ export default function CustomerDetailsPage() {
                     </span>
                 }
                 subtitle={
-                    user.businessName ? (
-                        <p className="text-[13px] text-[#6B7280] font-medium mt-2">{user.businessName}</p>
+                    accountLabel ? (
+                        <p className="text-[13px] text-[#6B7280] font-medium mt-2">{accountLabel}</p>
                     ) : undefined
                 }
                 contact={
@@ -512,8 +518,8 @@ export default function CustomerDetailsPage() {
                                                     Company Registration Details
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                    <InfoCardField label="Business Name" value={user.businessName || primaryBa?.displayName || primaryBa?.legalName} />
-                                                    <InfoCardField label="GSTIN / GST Number" value={user.gstNumber || primaryBa?.gstin} copyable />
+                                                    <InfoCardField label="Business Name" value={accountLabel} />
+                                                    <InfoCardField label="GSTIN / GST Number" value={primaryBa?.gstin || user.gstNumber} copyable />
                                                     <InfoCardField label="FSSAI License Number" value={primaryBa?.fssaiNumber} copyable />
                                                     <InfoCardField label="PAN Card" value={primaryBa?.pan} copyable />
                                                     <InfoCardField label="Designation" value={primaryBa?.designation} />

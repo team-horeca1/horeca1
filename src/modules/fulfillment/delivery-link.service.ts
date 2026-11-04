@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
+import { formatAddressLines } from '@/lib/displayIdentity';
 import {
   formatDeliveryFailReason,
   toDeliveryUiStatus,
@@ -65,23 +66,21 @@ function isClosedOrderStatus(status: string): boolean {
   return (CLOSED_ORDER_STATUSES as readonly string[]).includes(status);
 }
 
-function formatAddress(snapshot: unknown): {
+/** Public-view address payload; the text itself comes from `formatAddressLines`. */
+function readSnapshotAddress(snapshot: unknown): {
   lines: string[];
   pincode: string | null;
   label: string | null;
+  full: string;
 } {
   const snap = (snapshot ?? null) as SnapshotAddr | null;
-  if (!snap) return { lines: [], pincode: null, label: null };
-  const lines = [
-    snap.flatInfo,
-    snap.addressLine,
-    snap.landmark ? `Near ${snap.landmark}` : null,
-    [snap.city, snap.state].filter(Boolean).join(', ') || null,
-  ].filter((p): p is string => !!p && p.trim().length > 0);
+  if (!snap) return { lines: [], pincode: null, label: null, full: '' };
+  const withoutPin = formatAddressLines({ ...snap, pincode: null });
   return {
-    lines,
+    lines: withoutPin ? [withoutPin] : [],
     pincode: snap.pincode ?? null,
     label: snap.name?.trim() || null,
+    full: formatAddressLines(snap),
   };
 }
 
@@ -349,7 +348,7 @@ export class DeliveryLinkService {
     }
   }
 
-  /** Public view payload — never includes the customer OTP code. */
+  /** Public view payload � never includes the customer OTP code. */
   async getPublicView(token: string) {
     const loaded = await this.loadByToken(token);
     await this.healFulfilmentIfOrderDelivered(loaded.fulfilmentId);
@@ -367,7 +366,7 @@ export class DeliveryLinkService {
       row.fulfilment.status === 'out_for_delivery' &&
       !orderClosed;
 
-    const address = formatAddress(row.order.deliveryAddressSnapshot);
+    const address = readSnapshotAddress(row.order.deliveryAddressSnapshot);
     const customerName =
       row.order.user.fullName ||
       row.order.user.businessName ||
@@ -410,7 +409,7 @@ export class DeliveryLinkService {
           label: address.label,
           lines: address.lines,
           pincode: address.pincode,
-          full: [...address.lines, address.pincode].filter(Boolean).join(', '),
+          full: address.full,
         },
         items: row.fulfilment.items.map((item) => ({
           id: item.id,
@@ -591,7 +590,7 @@ export class DeliveryLinkService {
         });
       });
     } catch (err) {
-      // Fulfilment + token already committed above — still return public view
+      // Fulfilment + token already committed above � still return public view
       // so the boy UI can flip to Delivered without a hard refresh.
       console.error('[DeliveryLink] post-complete order sync failed:', err);
     }
@@ -662,7 +661,7 @@ export class DeliveryLinkService {
         },
       });
 
-      // Order stays shipped — never complete on fail attempt.
+      // Order stays shipped � never complete on fail attempt.
       await recordOrderEvent(tx, {
         orderId: row.orderId,
         actorId: null,
@@ -680,7 +679,7 @@ export class DeliveryLinkService {
     return this.getPublicView(token);
   }
 
-  // ─── Boy portal (shared link per DeliveryResource) ─────────────────────────
+  // --- Boy portal (shared link per DeliveryResource) -------------------------
 
   /** Ensure one active portal token for the boy; reuse if still valid. */
   async ensureBoyToken(
@@ -750,7 +749,7 @@ export class DeliveryLinkService {
     });
   }
 
-  /** Resolve legacy per-order token → boy portal **list** when possible. */
+  /** Resolve legacy per-order token ? boy portal **list** when possible. */
   async resolveLegacyToBoyPortal(token: string): Promise<{
     boyPath: string;
     fulfilmentId: string;
@@ -806,7 +805,7 @@ export class DeliveryLinkService {
     return row;
   }
 
-  /** Page 1 — open deliveries + return pickups for this boy. */
+  /** Page 1 � open deliveries + return pickups for this boy. */
   async getBoyPortalList(token: string) {
     const boy = await this.loadBoyToken(token);
     await this.healBoyDesyncedDeliveries(boy.deliveryResourceId);
@@ -884,7 +883,7 @@ export class DeliveryLinkService {
         logoUrl: boy.vendor.logoUrl,
       },
       orders: fulfilments.map((f) => {
-        const address = formatAddress(f.order.deliveryAddressSnapshot);
+        const address = readSnapshotAddress(f.order.deliveryAddressSnapshot);
         const customerName =
           f.order.user.fullName ||
           f.order.user.businessName ||
@@ -901,7 +900,7 @@ export class DeliveryLinkService {
           paymentMethod: f.order.paymentMethod,
           customerName,
           customerPhone: f.order.user.phone,
-          addressSummary: [...address.lines, address.pincode].filter(Boolean).join(', ') || null,
+          addressSummary: address.full || null,
           path: deliveryBoyOrderPath(boy.token, f.id),
         };
       }),
@@ -909,7 +908,7 @@ export class DeliveryLinkService {
         .map((r) => {
           const pickupToken = r.pickupAccessTokens[0]?.token;
           if (!pickupToken) return null;
-          const address = formatAddress(r.order.deliveryAddressSnapshot);
+          const address = readSnapshotAddress(r.order.deliveryAddressSnapshot);
           const customerName =
             r.order.user.fullName ||
             r.order.user.businessName ||
@@ -923,7 +922,7 @@ export class DeliveryLinkService {
             status: r.status,
             customerName,
             customerPhone: r.order.user.phone,
-            addressSummary: [...address.lines, address.pincode].filter(Boolean).join(', ') || null,
+            addressSummary: address.full || null,
             path: returnPickupLinkPath(pickupToken),
           };
         })
@@ -1002,7 +1001,7 @@ export class DeliveryLinkService {
     this.assertDeliveryActionable(fulfilmentStatus, orderStatus);
   }
 
-  /** Page 2 — single order POD view (same shape as legacy getPublicView). */
+  /** Page 2 � single order POD view (same shape as legacy getPublicView). */
   async getBoyPortalOrderView(token: string, fulfilmentId: string) {
     await this.healFulfilmentIfOrderDelivered(fulfilmentId);
     const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
@@ -1012,7 +1011,7 @@ export class DeliveryLinkService {
         ? toDeliveryUiStatus('delivered')
         : toDeliveryUiStatus(fulfilment.status);
     const actionable = fulfilment.status === 'out_for_delivery' && !orderClosed;
-    const address = formatAddress(fulfilment.order.deliveryAddressSnapshot);
+    const address = readSnapshotAddress(fulfilment.order.deliveryAddressSnapshot);
     const customerName =
       fulfilment.order.user.fullName ||
       fulfilment.order.user.businessName ||
@@ -1060,7 +1059,7 @@ export class DeliveryLinkService {
           label: address.label,
           lines: address.lines,
           pincode: address.pincode,
-          full: [...address.lines, address.pincode].filter(Boolean).join(', '),
+          full: address.full,
         },
         items: fulfilment.items.map((item) => ({
           id: item.id,

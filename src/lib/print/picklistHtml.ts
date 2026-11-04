@@ -1,5 +1,7 @@
 /** Shared printable PICK SLIP HTML (Orders picklist + delivery boy print). */
 
+import { formatAddressLines, type AddressParts } from '@/lib/displayIdentity';
+
 export type PicklistHtmlItem = {
   productName: string;
   sku?: string | null;
@@ -11,7 +13,12 @@ export type PicklistHtmlInput = {
   orderNumber: string;
   customerName: string;
   customerPhone?: string | null;
+  /** Outlet title shown under the customer name (see `outletTitle`). */
+  outletName?: string | null;
+  /** Pre-formatted address text. Ignored when `addressParts` is provided. */
   address?: string | null;
+  /** Structured delivery snapshot — formatted with `formatAddressLines` (includes landmark). */
+  addressParts?: AddressParts | null;
   items: PicklistHtmlItem[];
   /** When true, include auto-print script (vendor API window). */
   autoPrint?: boolean;
@@ -30,9 +37,11 @@ export function buildPicklistHtml(input: PicklistHtmlInput): string {
   const orderNumber = escapeHtml(input.orderNumber);
   const customerName = escapeHtml(input.customerName || 'Customer');
   const phone = input.customerPhone ? escapeHtml(input.customerPhone) : '';
-  const address = input.address?.trim()
-    ? escapeHtml(input.address.trim())
-    : null;
+  const addressText = input.addressParts
+    ? formatAddressLines(input.addressParts)
+    : (input.address ?? '').trim();
+  const address = addressText ? escapeHtml(addressText) : null;
+  const outletName = input.outletName?.trim() ? escapeHtml(input.outletName.trim()) : '';
 
   const rows = input.items
     .map((item, idx) => {
@@ -48,6 +57,7 @@ export function buildPicklistHtml(input: PicklistHtmlInput): string {
     ? `Customer: ${customerName} · ${phone}`
     : `Customer: ${customerName}`;
 
+  const outletBlock = outletName ? `<p>Outlet: ${outletName}</p>` : '';
   const addressBlock = address ? `<p>Address: ${address}</p>` : '';
   const printScript = input.autoPrint
     ? '<script>window.onload=()=>window.print()</script>'
@@ -57,7 +67,7 @@ export function buildPicklistHtml(input: PicklistHtmlInput): string {
 <style>body{font-family:monospace;font-size:12px;padding:24px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #000;padding:4px}h1{font-size:18px;margin:0 0 12px}</style></head>
 <body><h1>PICK SLIP — ${orderNumber}</h1>
 <p>${customerLine}</p>
-${addressBlock}
+${outletBlock}${addressBlock}
 <table><thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Pack</th><th>Qty</th><th>Picked</th></tr></thead><tbody>${rows}</tbody></table>
 ${printScript}</body></html>`;
 }

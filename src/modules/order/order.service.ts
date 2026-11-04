@@ -23,6 +23,12 @@ import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { hasCompleteDeliveryAddress, normalizeOutletName } from '@/lib/constants/customerProfile';
 import {
+  buildOrderBillingSnapshot,
+  buyerBillingName,
+  supplierBillFrom,
+  supplierShipFrom,
+} from '@/lib/displayIdentity';
+import {
   promotionService,
   evaluateVendorPromo,
   evaluateBxgyForCart,
@@ -211,12 +217,25 @@ export class OrderService {
     let outlet = await prisma.outlet.findFirst({
       where: { id: outletId, businessAccountId },
       select: {
-        name: true, addressLine: true, flatInfo: true, landmark: true,
+        name: true, billingName: true, addressLine: true, flatInfo: true, landmark: true,
         city: true, state: true, pincode: true, latitude: true, longitude: true,
         placeId: true, requiresAddressUpdate: true,
       },
     });
     if (!outlet) throw Errors.badRequest('Active outlet not found for this account');
+
+    const buyerAccount = await prisma.businessAccount.findUnique({
+      where: { id: businessAccountId },
+      select: {
+        legalName: true,
+        displayName: true,
+        gstin: true,
+        billingAddressLine: true,
+        billingCity: true,
+        billingState: true,
+        billingPincode: true,
+      },
+    });
     // Pincode alone cannot place an order. The outlet or its saved address
     // must have a real street (not just the outlet name) and a 6-digit pincode.
     const outletName = outlet.name;
@@ -254,6 +273,23 @@ export class OrderService {
       outlet = { ...outlet, name: healedName };
     }
     const deliveryAddressSnapshot: Prisma.InputJsonValue = { ...outlet };
+
+    // Per-vendor billing snapshots are built inside the loop (supplier fields differ).
+    const buyerSnapBase = {
+      buyerBillingName: buyerBillingName({
+        outletBillingName: outlet.billingName,
+        legalName: buyerAccount?.legalName,
+        displayName: buyerAccount?.displayName,
+      }),
+      buyerGstin: buyerAccount?.gstin ?? null,
+      buyerBilling: {
+        addressLine: buyerAccount?.billingAddressLine ?? '',
+        city: buyerAccount?.billingCity ?? '',
+        state: buyerAccount?.billingState ?? '',
+        pincode: buyerAccount?.billingPincode ?? '',
+      },
+    };
+
     // Location pricing follows the chosen "Deliver to" address (server-trusted
     // via the address id cookie), so the order total matches the cart/storefront.
     const deliveryGeo = await getDeliveryGeo(userId);
@@ -681,6 +717,39 @@ export class OrderService {
         // Unique per PO in a multi-vendor checkout (Date.now() alone can collide in a tight loop).
         const orderNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}-${String(orders.length + 1).padStart(2, '0')}`;
 
+        // Freeze buyer + supplier invoice identity so later profile edits
+        // cannot change historical invoices / order cards.
+        const vendorForSnap = await tx.vendor.findUnique({
+          where: { id: vo.vendorId },
+          select: {
+            businessName: true,
+            tradeName: true,
+            gstNumber: true,
+            addressLine: true,
+            city: true,
+            state: true,
+            addressPincode: true,
+            pickupAddressLine: true,
+            pickupCity: true,
+            pickupState: true,
+            pickupPincode: true,
+            businessAccount: {
+              select: { legalName: true, displayName: true, gstin: true },
+            },
+          },
+        });
+        const billingSnapshot = buildOrderBillingSnapshot({
+          ...buyerSnapBase,
+          supplierLegalName:
+            vendorForSnap?.businessAccount?.legalName?.trim()
+            || vendorForSnap?.businessName?.trim()
+            || vendorForSnap?.tradeName?.trim()
+            || 'Supplier',
+          supplierGstin: vendorForSnap?.gstNumber || vendorForSnap?.businessAccount?.gstin || null,
+          supplierBillFrom: supplierBillFrom(vendorForSnap),
+          supplierShipFrom: supplierShipFrom(vendorForSnap),
+        });
+
         // Create order — salespersonId snapshotted from VendorCustomer
         // (null if no rep assigned) so commission attribution survives later
         // reassignment of the customer's salesperson.
@@ -693,6 +762,7 @@ export class OrderService {
             outletId,
             fulfillmentOutletId: p.fulfillmentOutletId,
             deliveryAddressSnapshot,
+            billingSnapshot,
             status: isDraft ? 'draft' : 'pending',
             // Section 7 Platform Rule: live orders are auto-accepted at place.
             acceptedAt: isDraft ? null : new Date(),
@@ -1371,6 +1441,7 @@ export class OrderService {
           outletId: order.outletId,
           fulfillmentOutletId: order.fulfillmentOutletId,
           deliveryAddressSnapshot: order.deliveryAddressSnapshot as Prisma.InputJsonValue,
+          billingSnapshot: (order.billingSnapshot ?? undefined) as Prisma.InputJsonValue | undefined,
           status: 'pending',
           acceptedAt: order.acceptedAt ?? new Date(),
           subtotal: childSubtotal, totalAmount: childSubtotal,
@@ -2693,6 +2764,7 @@ export class OrderService {
           outletId: ret.order.outletId,
           fulfillmentOutletId,
           deliveryAddressSnapshot: ret.order.deliveryAddressSnapshot as Prisma.InputJsonValue,
+          billingSnapshot: (ret.order.billingSnapshot ?? undefined) as Prisma.InputJsonValue | undefined,
           status: 'pending',
           acceptedAt: new Date(),
           subtotal,

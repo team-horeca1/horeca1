@@ -25,12 +25,15 @@ import { EMPTY_CUSTOMER_PROFILE } from '@/components/features/customer/customerP
 import {
   validateCustomerProfile,
   derivedFullName,
+  derivedLegalName,
   primaryPhoneDigits,
 } from '@/lib/validators/customer-profile';
 import { buildCompanyProfile, mapToUserFields } from '@/lib/customerProfileMapper';
 
 export interface CustomerFormInitial extends CustomerProfileValues {
   contactPersons?: ContactPerson[];
+  /** Outlet being edited; without it the admin API adopts the placeholder primary or adds an outlet. */
+  outletId?: string;
 }
 
 interface Props {
@@ -186,13 +189,33 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           }),
         });
       } else {
+        // Same shape as CustomerDeliveryAddresses.save: billing on companyProfile,
+        // delivery + Bill-To name on outlets[]. Sending deliveryAddress alone would
+        // re-stamp the primary outlet and never reach the billing fields.
+        const legalName = derivedLegalName(profile).trim();
+        const typedBillingName = (profile.billingName ?? '').trim();
+        const outletRow = {
+          ...(initial?.outletId ? { id: initial.outletId } : {}),
+          name: deliveryAddress.outletName ?? '',
+          billingName: typedBillingName && typedBillingName !== legalName ? typedBillingName : null,
+          addressLine: deliveryAddress.addressLine ?? '',
+          city: deliveryAddress.city ?? null,
+          state: deliveryAddress.state ?? null,
+          pincode: deliveryAddress.pincode ?? null,
+        };
+        const hasDeliveryStreet = isRealStreetAddress(outletRow.addressLine, outletRow.name);
         res = await fetch(`/api/v1/admin/users/${userId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            deliveryAddress,
-            billingAddress,
-            companyProfile,
+            companyProfile: {
+              ...companyProfile,
+              billingAddressLine: billingAddress.addressLine ?? null,
+              billingCity: billingAddress.city ?? null,
+              billingState: billingAddress.state ?? null,
+              billingPincode: billingAddress.pincode ?? null,
+            },
+            ...(hasDeliveryStreet ? { outlets: [outletRow] } : {}),
           }),
         });
       }

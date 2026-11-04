@@ -14,6 +14,14 @@ import {
   resolveSupplyType,
   splitGstTax,
 } from '@/lib/gstPlaceOfSupply';
+import {
+  formatAddressLines,
+  formatAddressShort,
+  buyerBillingName,
+  parseOrderBillingSnapshot,
+  supplierBillFrom,
+  supplierShipFrom,
+} from '@/lib/displayIdentity';
 
 // --------------------------------------------------------------------------
 // Main export
@@ -26,7 +34,17 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     include: {
       user: true,
       vendor: { include: { user: true } },
-      outlet: { select: { id: true, name: true, addressLine: true, city: true, state: true, pincode: true } },
+      outlet: {
+        select: {
+          id: true,
+          name: true,
+          billingName: true,
+          addressLine: true,
+          city: true,
+          state: true,
+          pincode: true,
+        },
+      },
       businessAccount: {
         select: {
           gstin: true,
@@ -50,14 +68,6 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     },
   });
 
-  // Buyer ship-to fallback only — primary source is order.deliveryAddressSnapshot.
-  const buyerSavedAddr = await prisma.savedAddress.findFirst({
-    where: { userId: order.userId, isDefault: true },
-  }) ?? await prisma.savedAddress.findFirst({
-    where: { userId: order.userId },
-    orderBy: { createdAt: 'desc' },
-  });
-
   type SnapshotAddr = {
     name?: string | null;
     addressLine?: string | null;
@@ -68,28 +78,23 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     pincode?: string | null;
   };
   const snap = (order.deliveryAddressSnapshot ?? null) as SnapshotAddr | null;
+  const frozen = parseOrderBillingSnapshot(order.billingSnapshot);
 
-  const composeParts = (...parts: Array<string | null | undefined>) =>
-    parts.map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+  const shipToAddressText = formatAddressLines(snap) || '—';
+  const shipToPincode = snap?.pincode?.trim() || '—';
+  const shipToState = snap?.state?.trim() || '—';
 
-  const snapStreet = composeParts(snap?.addressLine, snap?.flatInfo, snap?.landmark).join(', ');
-  const snapCityLine = composeParts(
-    snap?.city,
-    snap?.state ? `${snap.state}${snap.pincode ? `-${snap.pincode}` : ''}` : snap?.pincode,
-  ).join(', ');
-  const snapAddressText = composeParts(snapStreet, snapCityLine).join(', ');
-
-  const buyerBusinessName =
-    order.businessAccount?.displayName?.trim() ||
-    order.businessAccount?.legalName?.trim() ||
-    order.user.businessName?.trim() ||
-    order.user.fullName;
+  const buyerBusinessName = frozen?.buyer.billingName
+    || buyerBillingName({
+      outletBillingName: order.outlet?.billingName,
+      legalName: order.businessAccount?.legalName,
+      displayName: order.businessAccount?.displayName,
+      fallback: order.user.fullName,
+    });
   const liveOutletName = order.outlet?.name?.trim() || '';
   const snapOutletName = snap?.name?.trim() || '';
   const sameAsBusiness = (name: string) =>
     !!buyerBusinessName && name.toLowerCase() === buyerBusinessName.toLowerCase();
-  // The outlet line is the branch name. A snapshot that only copied the
-  // business name (bikaner) must not hide a real outlet name (VASHI KITCHEN).
   const buyerOutletName =
     (liveOutletName && !sameAsBusiness(liveOutletName) ? liveOutletName : '') ||
     (snapOutletName && !sameAsBusiness(snapOutletName) ? snapOutletName : '') ||
@@ -97,20 +102,26 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     snapOutletName ||
     buyerBusinessName;
 
-  const buyerAddressText =
-    snapAddressText ||
-    buyerSavedAddr?.fullAddress?.trim() ||
-    '— (buyer: add address in profile)';
-  const buyerPincode = snap?.pincode?.trim() || buyerSavedAddr?.pincode || '—';
-  const buyerStateForSupply =
-    snap?.state?.trim() ||
-    order.businessAccount?.billingState ||
-    buyerSavedAddr?.state ||
-    '—';
-  const buyerGstin =
-    order.businessAccount?.gstin ||
-    order.user.gstNumber ||
-    '—';
+  // Bill To = frozen billing address (or live BA for legacy orders). Never the delivery street.
+  const billToAddressText = frozen
+    ? formatAddressShort(frozen.buyer)
+    : formatAddressShort({
+      addressLine: order.businessAccount?.billingAddressLine,
+      city: order.businessAccount?.billingCity,
+      state: order.businessAccount?.billingState,
+      pincode: order.businessAccount?.billingPincode,
+    }) || '—';
+  const billToPincode = frozen?.buyer.pincode
+    || order.businessAccount?.billingPincode?.trim()
+    || '—';
+  const billToState = frozen?.buyer.state
+    || order.businessAccount?.billingState?.trim()
+    || '—';
+  const buyerGstin = frozen?.buyer.gstin
+    || order.businessAccount?.gstin
+    || order.user.gstNumber
+    || '—';
+  const buyerStateForSupply = billToState !== '—' ? billToState : shipToState;
 
   // ── 2. Build line-item data ──────────────────────────────────────────────
   // Partial fulfilment: when a vendor accepts only part of an order, the order
@@ -134,30 +145,23 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
   const totalTax = items.reduce((s, i) => s + i.taxAmount, 0);
   const grandTotal = totalTaxable + totalTax;
 
-  // Seller: registered office first, then warehouse/pickup.
-  const vendorRegisteredParts = composeParts(
-    order.vendor.addressLine,
-    order.vendor.city,
-    order.vendor.state
-      ? `${order.vendor.state}${order.vendor.addressPincode ? `-${order.vendor.addressPincode}` : ''}`
-      : order.vendor.addressPincode,
-  );
-  const vendorPickupParts = composeParts(
-    order.vendor.pickupAddressLine,
-    order.vendor.pickupCity,
-    order.vendor.pickupState
-      ? `${order.vendor.pickupState}${order.vendor.pickupPincode ? `-${order.vendor.pickupPincode}` : ''}`
-      : order.vendor.pickupPincode,
-  );
-  const vendorAddrText =
-    vendorRegisteredParts.length > 0
-      ? vendorRegisteredParts.join(', ')
-      : vendorPickupParts.length > 0
-        ? vendorPickupParts.join(', ')
-        : '— Address not on file (vendor: set it in Settings)';
-  const vendorGstin = order.vendor.gstNumber || order.vendor.user?.gstNumber || '—';
+  const vendorBillFromText = frozen
+    ? formatAddressShort(frozen.supplier.billFrom)
+    : formatAddressShort(supplierBillFrom(order.vendor));
+  const vendorShipFromText = frozen
+    ? formatAddressShort(frozen.supplier.shipFrom)
+    : formatAddressShort(supplierShipFrom(order.vendor));
+  const vendorBillFromDisplay = vendorBillFromText || '— Address not on file (vendor: set it in Settings)';
+  const vendorShipFromDisplay = vendorShipFromText || vendorBillFromDisplay;
+  const vendorLegalName = frozen?.supplier.legalName
+    || order.vendor.businessName
+    || 'Supplier';
+  const vendorGstin = frozen?.supplier.gstin
+    || order.vendor.gstNumber
+    || order.vendor.user?.gstNumber
+    || '—';
   const sellerStateValue =
-    order.vendor.state || order.vendor.pickupState || null;
+    (frozen?.supplier.billFrom.state || order.vendor.state || order.vendor.pickupState) || null;
 
   // Place of supply: seller (vendor address / GSTIN) vs buyer (ship-to / GSTIN).
   const sellerState = resolveState({
@@ -319,19 +323,19 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
 
     // ── Bill From / Shipped From boxes ──────────────────────────────────────
     doc.font('Helvetica').fontSize(8.5);
-    const partyAddrH = doc.heightOfString(vendorAddrText, { width: PAGE_W - 115 });
-    const partyH = Math.max(58, 20 + partyAddrH + 16);
-    const drawParty = (yStart: number, label: string) => {
+    const drawParty = (yStart: number, label: string, addrText: string) => {
+      const partyAddrH = doc.heightOfString(addrText, { width: PAGE_W - 115 });
+      const partyH = Math.max(58, 20 + partyAddrH + 16);
       doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, yStart, PAGE_W, partyH).stroke();
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
       doc.text(`${label} :`, LEFT + 5, yStart + 6, { lineBreak: false });
       doc.font('Helvetica').fontSize(9);
-      doc.text(order.vendor.businessName, LEFT + 100, yStart + 6, { width: PAGE_W - 110, lineBreak: false });
+      doc.text(vendorLegalName, LEFT + 100, yStart + 6, { width: PAGE_W - 110, lineBreak: false });
       const addrY = yStart + 22;
       doc.font('Helvetica-Bold').fontSize(9);
       doc.text('Address  :', LEFT + 5, addrY, { lineBreak: false });
       doc.font('Helvetica').fontSize(8.5);
-      doc.text(vendorAddrText, LEFT + 100, addrY, {
+      doc.text(addrText, LEFT + 100, addrY, {
         width: PAGE_W - 115,
         height: partyAddrH,
       });
@@ -340,16 +344,13 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       doc.text('GSTIN  :', LEFT + 5, gstinY, { lineBreak: false });
       doc.font('Helvetica').fontSize(9);
       doc.text(vendorGstin, LEFT + 100, gstinY, { width: PAGE_W - 110, lineBreak: false });
+      return partyH;
     };
 
-    drawParty(y, 'Bill From');
-    y += partyH;
-    drawParty(y, 'Shipped From');
-    y += partyH + 4;
+    y += drawParty(y, 'Bill From', vendorBillFromDisplay);
+    y += drawParty(y, 'Shipped From', vendorShipFromDisplay) + 4;
 
-    // ── Bill To / Ship To (2-col) ───────────────────────────────────────────
-    // Box height follows the wrapped address so GSTIN stays inside the box
-    // and cannot run into the items table.
+    // ── Bill To / Ship To (2-col) — billing vs delivery ─────────────────────
     const halfW = PAGE_W / 2;
     doc.font('Helvetica-Bold').fontSize(8.5);
     const buyerLabelW = doc.widthOfString('Place of Supply :') + 10;
@@ -357,28 +358,45 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     doc.font('Helvetica').fontSize(8.5);
     const buyerLineH = (value: string) =>
       Math.max(11, doc.heightOfString(value || '—', { width: buyerValueW }));
+
+    type BuyerBox = {
+      address: string;
+      pincode: string;
+      placeOfSupply: string;
+    };
+    const billToBox: BuyerBox = {
+      address: billToAddressText,
+      pincode: billToPincode,
+      placeOfSupply: buyerStateForSupply,
+    };
+    const shipToBox: BuyerBox = {
+      address: shipToAddressText,
+      pincode: shipToPincode,
+      placeOfSupply: shipToState !== '—' ? shipToState : buyerStateForSupply,
+    };
+    const maxAddrH = Math.max(buyerLineH(billToBox.address), buyerLineH(shipToBox.address));
     const buyerH =
       8 +
       12 +
       buyerLineH(buyerBusinessName) + 3 +
       buyerLineH(buyerOutletName) + 3 +
-      buyerLineH(buyerAddressText) + 3 +
-      buyerLineH(buyerPincode) + 3 +
+      maxAddrH + 3 +
+      buyerLineH(billToBox.pincode) + 3 +
       buyerLineH(buyerStateForSupply) + 3 +
       buyerLineH(buyerGstin) + 8;
 
-    const drawBuyer = (xStart: number, label: string) => {
+    const drawBuyer = (xStart: number, label: string, box: BuyerBox) => {
       doc.lineWidth(0.6).strokeColor('#000').rect(xStart, y, halfW, buyerH).stroke();
       const lx = xStart + 6;
       const vx = xStart + 6 + buyerLabelW;
       let by = y + 6;
 
-      const line = (k: string, v: string) => {
+      const line = (k: string, v: string, hOverride?: number) => {
         const shown = v || '—';
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000');
         doc.text(k, lx, by, { lineBreak: false });
         doc.font('Helvetica').fontSize(8.5);
-        const h = buyerLineH(shown);
+        const h = hOverride ?? buyerLineH(shown);
         doc.text(shown, vx, by, { width: buyerValueW, height: h });
         by += h + 3;
       };
@@ -388,14 +406,14 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       by += 12;
       line('Business :', buyerBusinessName);
       line('Outlet :', buyerOutletName);
-      line('Address :', buyerAddressText);
-      line('Pincode :', buyerPincode);
-      line('Place of Supply :', buyerStateForSupply);
+      line('Address :', box.address, maxAddrH);
+      line('Pincode :', box.pincode);
+      line('Place of Supply :', box.placeOfSupply);
       line('GSTIN :', buyerGstin);
     };
 
-    drawBuyer(LEFT, 'Bill To');
-    drawBuyer(LEFT + halfW, 'Ship To');
+    drawBuyer(LEFT, 'Bill To', billToBox);
+    drawBuyer(LEFT + halfW, 'Ship To', shipToBox);
     y += buyerH + 6;
 
     // ── Items table ─────────────────────────────────────────────────────────

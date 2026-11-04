@@ -6,6 +6,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { buildPicklistHtml } from '@/lib/print/picklistHtml';
+import { accountFacingName, outletTitle, type AddressParts } from '@/lib/displayIdentity';
 
 function extractOrderId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/').filter(Boolean);
@@ -21,7 +22,9 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const order = await prisma.order.findFirst({
       where: { id: orderId, vendorId },
       include: {
-        user: { select: { fullName: true, phone: true, businessName: true } },
+        user: { select: { fullName: true, phone: true } },
+        businessAccount: { select: { legalName: true, displayName: true } },
+        outlet: { select: { name: true, pincode: true } },
         items: {
           include: { product: { select: { sku: true, packSize: true, unit: true } } },
         },
@@ -29,32 +32,20 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     });
     if (!order) throw Errors.notFound('Order');
 
-    const snap = order.deliveryAddressSnapshot as
-      | {
-          addressLine?: string | null;
-          flatInfo?: string | null;
-          landmark?: string | null;
-          city?: string | null;
-          state?: string | null;
-          pincode?: string | null;
-        }
-      | null;
-
-    const addressParts = snap
-      ? [
-          snap.flatInfo,
-          snap.addressLine,
-          snap.landmark ? `Near ${snap.landmark}` : null,
-          [snap.city, snap.state].filter(Boolean).join(', ') || null,
-          snap.pincode,
-        ].filter((p): p is string => !!p && p.trim().length > 0)
-      : [];
+    const snap = order.deliveryAddressSnapshot as AddressParts | null;
 
     const html = buildPicklistHtml({
       orderNumber: order.orderNumber,
-      customerName: order.user.fullName || order.user.businessName || 'Customer',
+      customerName: accountFacingName({
+        displayName: order.businessAccount.displayName,
+        legalName: order.businessAccount.legalName,
+        fallback: order.user.fullName || 'Customer',
+      }),
       customerPhone: order.user.phone,
-      address: addressParts.length ? addressParts.join(', ') : null,
+      outletName: order.outlet
+        ? outletTitle({ name: order.outlet.name, pincode: order.outlet.pincode })
+        : null,
+      addressParts: snap,
       autoPrint: true,
       items: order.items.map((item) => {
         const qty = order.isPartial ? (item.fulfilledQty ?? item.quantity) : item.quantity;

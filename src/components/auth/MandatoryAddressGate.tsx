@@ -20,6 +20,7 @@ import { usePathname } from 'next/navigation';
 import { useStableSession } from '@/hooks/useStableSession';
 import { useAddress, type Address } from '@/context/AddressContext';
 import { AddNewAddressOverlay } from '@/components/layout/AddNewAddressOverlay';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import {
   isUsableSavedAddress,
   readAddressGateSkipped,
@@ -34,6 +35,7 @@ const EXCLUDED_PREFIXES = ['/login', '/register', '/admin', '/vendor', '/brand',
 export function MandatoryAddressGate() {
   const { session, isAuthenticated, update } = useStableSession();
   const { savedAddresses, isLoadingAddresses, addAddress, setSelectedAddress } = useAddress();
+  const { currentAccount } = useBusinessAccountSwitcher();
   const pathname = usePathname() ?? '';
   const [open, setOpen] = useState(false);
   const [skipped, setSkipped] = useState(false);
@@ -106,6 +108,7 @@ export function MandatoryAddressGate() {
       onSave={handleSave}
       dismissible={false}
       allowSkip
+      businessName={currentAccount?.legalName || currentAccount?.displayName || ''}
     />
   );
 }

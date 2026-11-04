@@ -1,5 +1,7 @@
 /** Shared types for vendor order workbench / workspace. */
 
+import type { AddressParts } from '@/lib/displayIdentity';
+
 export interface WorkbenchUser {
   id: string;
   fullName: string;
@@ -85,7 +87,7 @@ export interface WorkbenchOrder {
   notes: string | null;
   createdAt: string;
   isPartial: boolean;
-  deliveryAddressSnapshot: Record<string, unknown> | null;
+  deliveryAddressSnapshot: AddressParts | null;
   user: WorkbenchUser;
   items: WorkbenchItem[];
   shipments?: WorkbenchShipment[];

@@ -68,6 +68,12 @@ export async function completeCustomerProfile(
 
   const addressLine = trim(input.addressLine || input.billingAddressLine);
   const hasAddress = !!addressLine || !!pincode;
+  // Account billing prefers the billing fields; delivery is only the fallback.
+  const billingLine = trim(input.billingAddressLine) || addressLine;
+  const billingPincode = trim(input.billingPincode) || pincode;
+  if (billingPincode && !PINCODE_RE.test(billingPincode)) {
+    throw Errors.badRequest('Billing pincode must be 6 digits');
+  }
   const outletId = member?.businessAccount.primaryOutletId ?? null;
 
   const normalizedOutletName = normalizeOutletName(outletName);
@@ -103,18 +109,24 @@ export async function completeCustomerProfile(
         fssaiNumber: opt(input.fssaiNumber),
         ...(hasAddress
           ? {
-              billingAddressLine: addressLine || null,
-              billingCity: opt(input.city || input.billingCity),
-              billingState: opt(input.state || input.billingState),
-              billingPincode: pincode || null,
+              billingAddressLine: billingLine || null,
+              billingCity: opt(input.billingCity || input.city),
+              billingState: opt(input.billingState || input.state),
+              billingPincode: billingPincode || null,
             }
           : {}),
       },
     });
 
     if (hasAddress && outletId) {
+      const ba = await tx.businessAccount.findUnique({
+        where: { id: businessAccountId },
+        select: { legalName: true },
+      });
       const outlet = mapToPrimaryOutlet({
         ...input,
+        // Lets the mapper drop a billingName that merely repeats the account name.
+        legalName: input.legalName || ba?.legalName || undefined,
         outletName: normalizedOutletName,
         billingName: trim(input.billingName) || undefined,
       });
@@ -147,10 +159,6 @@ export async function completeCustomerProfile(
       });
 
       // Keep SavedAddress in lockstep — storefront edit reads this row via the bridge.
-      const ba = await tx.businessAccount.findUnique({
-        where: { id: businessAccountId },
-        select: { legalName: true },
-      });
       const savedPayload = {
         outletId,
         label: nextName || 'Outlet',

@@ -28,6 +28,13 @@ import { toast } from 'sonner';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { InitiateReturnModal } from '@/components/features/orders/InitiateReturnModal';
 import {
+    accountFacingName,
+    buyerBillingName,
+    formatAddressLines,
+    parseOrderBillingSnapshot,
+    type AddressParts,
+} from '@/lib/displayIdentity';
+import {
     ORDER_STATUS_OPTIONS,
     ORDER_STATUS_STYLE,
     orderStatusLabel,
@@ -101,13 +108,20 @@ interface OrderData {
     paymentStatus: string;
     paymentMethod: string | null;
     customerPoNumber?: string | null;
-    deliveryAddressSnapshot: any;
+    deliveryAddressSnapshot: AddressParts | null;
+    billingSnapshot?: unknown;
     notes: string | null;
     createdAt: string;
     updatedAt: string;
     vendor: OrderVendor;
     user: OrderUser;
-    outlet?: { id: string; name: string } | null;
+    outlet?: { id: string; name: string; billingName?: string | null } | null;
+    businessAccount?: {
+        id: string;
+        legalName: string;
+        displayName: string | null;
+        gstin: string | null;
+    } | null;
     items: OrderItem[];
     payments: OrderPayment[];
     deliverySlot: DeliverySlot | null;
@@ -160,21 +174,6 @@ function formatCurrency(amount: number): string {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
     }).format(amount);
-}
-
-function formatSnapshotAddress(snapshot: any): { address: string; pincode: string | null } {
-    if (!snapshot) return { address: 'Not specified', pincode: null };
-    const parts = [
-        snapshot.flatInfo,
-        snapshot.addressLine,
-        snapshot.landmark ? `Near ${snapshot.landmark}` : null,
-        snapshot.city,
-        snapshot.state
-    ].filter(Boolean);
-    return {
-        address: parts.length > 0 ? parts.join(', ') : 'Not specified',
-        pincode: snapshot.pincode || null
-    };
 }
 
 export default function OrderDetailsPage() {
@@ -410,6 +409,30 @@ export default function OrderDetailsPage() {
         order.status !== 'cancelled' &&
         isOfflinePaymentMethod(order.paymentMethod);
 
+    const frozenBilling = parseOrderBillingSnapshot(order.billingSnapshot);
+    const billToName = frozenBilling?.buyer.billingName.trim()
+        || buyerBillingName({
+            outletBillingName: order.outlet?.billingName,
+            legalName: order.businessAccount?.legalName,
+            displayName: order.businessAccount?.displayName,
+            fallback: order.user.businessName ?? order.user.fullName,
+        });
+    const accountLabel = accountFacingName({
+        displayName: order.businessAccount?.displayName,
+        legalName: order.businessAccount?.legalName,
+        fallback: order.user.businessName,
+    });
+    const billToGstin = frozenBilling?.buyer.gstin ?? order.businessAccount?.gstin ?? null;
+    const billToAddress = frozenBilling
+        ? formatAddressLines({
+            addressLine: frozenBilling.buyer.addressLine,
+            city: frozenBilling.buyer.city,
+            state: frozenBilling.buyer.state,
+            pincode: frozenBilling.buyer.pincode,
+        })
+        : '';
+    const deliveryAddress = formatAddressLines(order.deliveryAddressSnapshot);
+
     return (
         <div className="space-y-6 pb-12 px-4 md:px-0">
             {/* Page Header */}
@@ -463,16 +486,30 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Customer Profile</h4>
-                                    <p className="text-[13px] font-bold text-[#374151] truncate">{order.outlet?.name || order.user.businessName || order.user.fullName}</p>
+                                    <p className="text-[10px] uppercase font-bold text-[#9CA3AF]">{frozenBilling ? 'Bill To (invoice)' : 'Bill To'}</p>
+                                    <p className="text-[13px] font-bold text-[#374151] truncate">{billToName || order.user.fullName}</p>
+                                    {billToAddress && (
+                                        <p className="text-[11px] text-[#6B7280] line-clamp-2 font-medium mt-0.5">{billToAddress}</p>
+                                    )}
+                                    {order.outlet?.name && (
+                                        <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">Outlet: {order.outlet.name}</p>
+                                    )}
                                     <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.fullName}</p>
                                     <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.email}</p>
                                     {order.user.phone && <p className="text-[11px] text-[#9CA3AF] font-semibold font-mono mt-0.5">{order.user.phone}</p>}
                                 </div>
                             </div>
-                            {order.user.businessName && (
+                            {(accountLabel || billToGstin) && (
                                 <div className="mt-3 pt-2 border-t border-[#F3F4F6]">
-                                    <span className="text-[10px] uppercase font-bold text-[#9CA3AF]">Business:</span>
-                                    <span className="text-[12px] font-semibold text-[#4B5563] block truncate">{order.user.businessName}</span>
+                                    {accountLabel && (
+                                        <>
+                                            <span className="text-[10px] uppercase font-bold text-[#9CA3AF]">Business:</span>
+                                            <span className="text-[12px] font-semibold text-[#4B5563] block truncate">{accountLabel}</span>
+                                        </>
+                                    )}
+                                    {billToGstin && (
+                                        <span className="text-[11px] font-semibold text-[#6B7280] block font-mono mt-0.5">GSTIN: {billToGstin}</span>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -485,17 +522,9 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Delivery Destination</h4>
-                                    {(() => {
-                                        const snapAddr = formatSnapshotAddress(order.deliveryAddressSnapshot);
-                                        return (
-                                            <>
-                                                <p className="text-[12px] font-semibold text-[#4B5563] line-clamp-2 leading-relaxed">{snapAddr.address}</p>
-                                                {snapAddr.pincode && (
-                                                    <p className="text-[11px] font-bold text-[#374151] mt-1 inline-block bg-[#F3F4F6] px-1.5 py-0.5 rounded">Pin: {snapAddr.pincode}</p>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
+                                    <p className="text-[12px] font-semibold text-[#4B5563] line-clamp-3 leading-relaxed">
+                                        {deliveryAddress || 'Not specified'}
+                                    </p>
                                 </div>
                             </div>
                             {order.deliverySlot && (

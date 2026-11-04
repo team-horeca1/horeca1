@@ -12,6 +12,7 @@ import { assertAccountMember, assertCanMutateAccount, isAdminActingAsBusinessAcc
 import { adoptOrCreateOutlet, softDeactivateDuplicateActiveOutlets } from '@/lib/outletWrites';
 import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
+import { billingFieldsShape, persistAccountBilling } from '@/lib/customerBilling';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -47,6 +48,8 @@ const CreateBody = z.object({
   longitude: z.number().nullable().optional(),
   placeId: z.string().max(500).nullable().optional(),
   billingName: z.string().max(255).nullable().optional(),
+  // Optional account billing address, persisted on BusinessAccount.billing*.
+  ...billingFieldsShape,
 });
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
@@ -74,11 +77,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         billingName: body.billingName,
       });
 
+      await persistAccountBilling(tx, id, body);
+
       // Keep the linked SavedAddress in sync. Use the outlet's own name (preserved
       // on an adopted primary) so the two never drift apart.
       const savedData = {
         label: outlet.name || 'Branch Outlet',
-        businessName: outlet.name,
+        // businessName = Bill-To override (null → falls back to the account name).
+        businessName: outlet.billingName,
         fullAddress: body.addressLine,
         shortAddress: body.addressLine.split(',').slice(0, 2).join(', '),
         flatInfo: body.flatInfo,

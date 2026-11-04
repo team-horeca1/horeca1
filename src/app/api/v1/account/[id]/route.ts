@@ -32,6 +32,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
         id: true, legalName: true, displayName: true, gstin: true, pan: true,
         businessType: true, isCustomer: true, isVendor: true, isBrand: true, status: true,
         primaryOutletId: true, createdAt: true, updatedAt: true,
+        billingAddressLine: true, billingCity: true, billingState: true, billingPincode: true,
         outlets: {
           where: { isActive: true },
           orderBy: { createdAt: 'asc' },

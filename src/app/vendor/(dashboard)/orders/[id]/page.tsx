@@ -14,6 +14,13 @@ import { toast } from 'sonner';
 import { CancelRequestBanner } from '@/components/features/vendor/orders/CancelRequestBanner';
 import { LinkedWorkspacesCard } from '@/components/features/vendor/orders/LinkedWorkspacesCard';
 import { InitiateReturnModal } from '@/components/features/orders/InitiateReturnModal';
+import {
+    accountFacingName,
+    buyerBillingName,
+    formatAddressLines,
+    parseOrderBillingSnapshot,
+    type AddressParts,
+} from '@/lib/displayIdentity';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,10 +110,17 @@ interface OrderData {
     deliveryNotes: string | null;
     ewayBillNo: string | null;
     isPartial: boolean;
-    deliveryAddressSnapshot: any;
+    deliveryAddressSnapshot: AddressParts | null;
+    billingSnapshot?: unknown;
     vendor: OrderVendor;
     user: OrderUser;
-    outlet?: { id: string; name: string } | null;
+    outlet?: { id: string; name: string; billingName?: string | null } | null;
+    businessAccount?: {
+        id: string;
+        legalName: string;
+        displayName: string | null;
+        gstin: string | null;
+    } | null;
     abandonedAt?: string | null;
     items: OrderItem[];
     payments: OrderPayment[];
@@ -199,18 +213,27 @@ function getPaymentStatusBadgeClasses(status: string): string {
     }
 }
 
-function formatSnapshotAddress(snapshot: any): { address: string; pincode: string | null } {
-    if (!snapshot) return { address: 'Not specified', pincode: null };
-    const parts = [
-        snapshot.flatInfo,
-        snapshot.addressLine,
-        snapshot.landmark ? `Near ${snapshot.landmark}` : null,
-        snapshot.city,
-        snapshot.state
-    ].filter(Boolean);
+/** Buyer identity for cards + pick slip — frozen snapshot first, then BusinessAccount, never User.businessName first. */
+function resolveOrderIdentity(order: OrderData) {
+    const frozenBilling = parseOrderBillingSnapshot(order.billingSnapshot);
+    const billToName =
+        frozenBilling?.buyer.billingName.trim()
+        || buyerBillingName({
+            outletBillingName: order.outlet?.billingName,
+            legalName: order.businessAccount?.legalName,
+            displayName: order.businessAccount?.displayName,
+            fallback: order.user.businessName ?? order.user.fullName,
+        });
+    const accountLabel = accountFacingName({
+        displayName: order.businessAccount?.displayName,
+        legalName: order.businessAccount?.legalName,
+        fallback: order.user.businessName,
+    });
     return {
-        address: parts.length > 0 ? parts.join(', ') : 'Not specified',
-        pincode: snapshot.pincode || null
+        billToName,
+        accountLabel,
+        gstin: frozenBilling?.buyer.gstin ?? order.businessAccount?.gstin ?? null,
+        deliveryAddress: formatAddressLines(order.deliveryAddressSnapshot),
     };
 }
 
@@ -714,6 +737,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
 
 function PrintPicklist({ order }: { order: OrderData }) {
     const totalQty = order.items.reduce((sum, item) => sum + item.quantity, 0);
+    const identity = resolveOrderIdentity(order);
 
     return (
         <>
@@ -740,8 +764,10 @@ function PrintPicklist({ order }: { order: OrderData }) {
                 {/* Deliver To */}
                 <div className="mb-4">
                     <p className="font-bold underline mb-1">Deliver To:</p>
+                    {identity.accountLabel && <p className="font-bold">{identity.accountLabel}</p>}
+                    {order.outlet?.name && <p>Outlet: {order.outlet.name}</p>}
                     <p>{order.user.fullName}</p>
-                    {order.user.businessName && <p>{order.user.businessName}</p>}
+                    {identity.deliveryAddress && <p className="mt-1">{identity.deliveryAddress}</p>}
                     {order.user.phone && <p>{order.user.phone}</p>}
                     {order.user.email && <p>{order.user.email}</p>}
                     {order.deliverySlot && (
@@ -1068,6 +1094,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
         'partially_delivered',
     ].includes(order.status);
     const canCreatePicklist = ['confirmed', 'processing', 'ready_for_dispatch', 'shipped'].includes(order.status);
+    const identity = resolveOrderIdentity(order);
 
     return (
         <div className="space-y-6 pb-12 px-4 md:px-0">
@@ -1239,16 +1266,26 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Customer Profile</h4>
-                                    <p className="text-[13px] font-bold text-[#374151] truncate">{order.outlet?.name || order.user.businessName || order.user.fullName}</p>
+                                    <p className="text-[13px] font-bold text-[#374151] truncate">{identity.billToName || order.user.fullName}</p>
+                                    {order.outlet?.name && (
+                                        <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">Outlet: {order.outlet.name}</p>
+                                    )}
                                     <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.fullName}</p>
                                     <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.email}</p>
                                     {order.user.phone && <p className="text-[11px] text-[#9CA3AF] font-semibold font-mono mt-0.5">{order.user.phone}</p>}
                                 </div>
                             </div>
-                            {order.user.businessName && (
+                            {(identity.accountLabel || identity.gstin) && (
                                 <div className="mt-3 pt-2 border-t border-[#F3F4F6]">
-                                    <span className="text-[10px] uppercase font-bold text-[#9CA3AF]">Business:</span>
-                                    <span className="text-[12px] font-semibold text-[#4B5563] block truncate">{order.user.businessName}</span>
+                                    {identity.accountLabel && (
+                                        <>
+                                            <span className="text-[10px] uppercase font-bold text-[#9CA3AF]">Business:</span>
+                                            <span className="text-[12px] font-semibold text-[#4B5563] block truncate">{identity.accountLabel}</span>
+                                        </>
+                                    )}
+                                    {identity.gstin && (
+                                        <span className="text-[11px] font-semibold text-[#6B7280] block font-mono mt-0.5">GSTIN: {identity.gstin}</span>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1261,17 +1298,9 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Delivery Destination</h4>
-                                    {(() => {
-                                        const snapAddr = formatSnapshotAddress(order.deliveryAddressSnapshot);
-                                        return (
-                                            <>
-                                                <p className="text-[12px] font-semibold text-[#4B5563] line-clamp-2 leading-relaxed">{snapAddr.address}</p>
-                                                {snapAddr.pincode && (
-                                                    <p className="text-[11px] font-bold text-[#374151] mt-1 inline-block bg-[#F3F4F6] px-1.5 py-0.5 rounded">Pin: {snapAddr.pincode}</p>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
+                                    <p className="text-[12px] font-semibold text-[#4B5563] line-clamp-3 leading-relaxed">
+                                        {identity.deliveryAddress || 'Not specified'}
+                                    </p>
                                 </div>
                             </div>
                             {order.deliverySlot && (

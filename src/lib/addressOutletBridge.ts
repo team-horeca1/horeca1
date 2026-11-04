@@ -28,6 +28,18 @@ export interface UnifiedAddressDto {
   longitude: number;
   placeId?: string;
   isDefault: boolean;
+  /** Account-level billing address (shared across outlets). */
+  billingAddressLine?: string;
+  billingCity?: string;
+  billingState?: string;
+  billingPincode?: string;
+}
+
+export interface AccountBillingFields {
+  billingAddressLine?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPincode?: string | null;
 }
 
 /**
@@ -40,6 +52,7 @@ export function mapOutletToUnifiedAddress(
   saved: SavedAddress | null | undefined,
   primaryOutletId: string | null,
   accountLegalName?: string | null,
+  accountBilling?: AccountBillingFields | null,
 ): UnifiedAddressDto {
   const rawOutletName = (outlet.name || '').trim();
   const healedOutletName =
@@ -91,6 +104,14 @@ export function mapOutletToUnifiedAddress(
     longitude: saved?.longitude ?? outlet.longitude ?? 0,
     placeId: saved?.placeId ?? outlet.placeId ?? undefined,
     isDefault: outlet.id === primaryOutletId,
+    ...(accountBilling?.billingAddressLine?.trim()
+      ? {
+          billingAddressLine: accountBilling.billingAddressLine.trim(),
+          billingCity: accountBilling.billingCity?.trim() || undefined,
+          billingState: accountBilling.billingState?.trim() || undefined,
+          billingPincode: accountBilling.billingPincode?.trim() || undefined,
+        }
+      : {}),
   };
 }
 

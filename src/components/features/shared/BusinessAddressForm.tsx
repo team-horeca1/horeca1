@@ -34,6 +34,11 @@ export interface BusinessAddressFormProps {
   showLocationName?: boolean;
   locationNameLabel?: string;
   locationNameRequired?: boolean;
+  /** Show billing-name field (customers / invoice Bill-To name). */
+  showBillingName?: boolean;
+  billingNameLabel?: string;
+  billingNamePlaceholder?: string;
+  billingNameHint?: string;
   /** When true, mark core address fields as required visually. */
   required?: boolean;
   /** Hide Same-as-billing checkbox (billing-only surfaces). Default true when mode is billing+delivery. */
@@ -78,6 +83,10 @@ export function BusinessAddressForm({
   showLocationName = false,
   locationNameLabel = 'Location name',
   locationNameRequired = false,
+  showBillingName = false,
+  billingNameLabel = 'Billing name',
+  billingNamePlaceholder = 'Business name',
+  billingNameHint,
   required = true,
   showSameAsToggle,
   className,
@@ -134,6 +143,18 @@ export function BusinessAddressForm({
           onChange={(v) => commit({ locationName: v })}
           placeholder="e.g. Mumbai HQ"
           dataField="locationName"
+        />
+      )}
+
+      {showBillingName && (
+        <TextField
+          label={billingNameLabel}
+          value={value.billingName}
+          error={errors.billingName}
+          onChange={(v) => commit({ billingName: v })}
+          placeholder={billingNamePlaceholder}
+          hint={billingNameHint}
+          dataField="billingName"
         />
       )}
 

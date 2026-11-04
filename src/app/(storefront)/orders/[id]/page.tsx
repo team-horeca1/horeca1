@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw, KeyRound, Zap, Wallet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw, KeyRound, Zap, Wallet, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
@@ -20,6 +20,7 @@ import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel } from '@/l
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { isAbandonedCart } from '@/lib/abandonedOrder';
+import { formatAddressLines, type AddressParts } from '@/lib/displayIdentity';
 
 interface ApiOrderItem {
     id: string;
@@ -62,6 +63,8 @@ interface ApiOrder {
     deliveryOtp?: string | null;
     deliveryOtpExpiresAt?: string | null;
     deliveryOtpVerifiedAt?: string | null;
+    /** Frozen at checkout (Order.deliveryAddressSnapshot). */
+    deliveryAddressSnapshot?: (AddressParts & { name?: string | null }) | null;
     vendor: ApiOrderVendor;
     items: ApiOrderItem[];
     review?: { rating: number; comment?: string } | null;
@@ -434,6 +437,8 @@ export default function OrderDetailPage() {
         !order.deliveryOtpVerifiedAt;
 
     const deliveryConfirmed = !!order.deliveryOtpVerifiedAt;
+    const deliveryAddressText = formatAddressLines(order.deliveryAddressSnapshot);
+    const deliveryAddressName = order.deliveryAddressSnapshot?.name?.trim() ?? '';
 
     return (
         <div className="min-h-screen bg-[#F2F3F2]">
@@ -493,6 +498,22 @@ export default function OrderDetailPage() {
                                 <p className="text-[12px] text-gray-400 mt-0.5">{fmtDate(order.createdAt)} · {fmtTime(order.createdAt)}</p>
                             </div>
                         </div>
+
+                        {/* Delivery address (frozen snapshot from checkout) */}
+                        {deliveryAddressText && (
+                            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-start gap-3" data-testid="order-delivery-address">
+                                <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
+                                    <MapPin size={18} className="text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] text-gray-400 font-medium mb-0.5">Delivery address</p>
+                                    {deliveryAddressName && (
+                                        <p className="text-[14px] font-black text-[#181725] truncate">{deliveryAddressName}</p>
+                                    )}
+                                    <p className="text-[13px] text-gray-600 font-medium leading-snug mt-0.5">{deliveryAddressText}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Delivery OTP — share with agent while out for delivery */}
                         {showDeliveryOtp && (

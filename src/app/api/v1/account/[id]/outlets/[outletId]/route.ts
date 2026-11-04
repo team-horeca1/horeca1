@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertCanMutateAccount } from '@/lib/accountAccess';
 import { isRealStreetAddress } from '@/lib/constants/customerProfile';
+import { billingFieldsShape, persistAccountBilling } from '@/lib/customerBilling';
 
 const PatchBody = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -26,6 +27,8 @@ const PatchBody = z.object({
   isActive: z.boolean().optional(),
   requiresAddressUpdate: z.boolean().optional(),
   billingName: z.string().max(255).nullable().optional(),
+  // Optional account billing address, persisted on BusinessAccount.billing*.
+  ...billingFieldsShape,
 });
 
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
@@ -38,9 +41,14 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     });
     if (!existing) throw Errors.notFound('Outlet');
     const body = PatchBody.parse(await req.json());
+    // Billing fields belong to the BusinessAccount, not the Outlet row.
+    const {
+      billingAddressLine, billingCity, billingState, billingPincode,
+      ...outletFields
+    } = body;
 
     // A typed street clears "address needed". A pincode alone does not.
-    const data: Record<string, unknown> = { ...body };
+    const data: Record<string, unknown> = { ...outletFields };
     if (body.requiresAddressUpdate === undefined) {
       const incomingLine = body.addressLine === undefined ? existing.addressLine : body.addressLine;
       data.requiresAddressUpdate = !isRealStreetAddress(incomingLine);
@@ -48,6 +56,9 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.outlet.update({ where: { id: outletId }, data });
+      await persistAccountBilling(tx, id, {
+        billingAddressLine, billingCity, billingState, billingPincode,
+      });
 
       // Update corresponding SavedAddress if one exists.
       // label ← outlet name; businessName ← billing name (do not copy name into both).

@@ -7,6 +7,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
+import { formatAddressLines } from '@/lib/displayIdentity';
 import {
   RETURN_EVENT_ACTIONS,
   formatReturnPickupFailReason,
@@ -43,23 +44,21 @@ export function returnPickupLinkAbsoluteUrl(token: string): string {
   return `${base}${returnPickupLinkPath(token)}`;
 }
 
-function formatAddress(snapshot: unknown): {
+/** Public-view address payload; the text itself comes from `formatAddressLines`. */
+function readSnapshotAddress(snapshot: unknown): {
   lines: string[];
   pincode: string | null;
   label: string | null;
+  full: string;
 } {
   const snap = (snapshot ?? null) as SnapshotAddr | null;
-  if (!snap) return { lines: [], pincode: null, label: null };
-  const lines = [
-    snap.flatInfo,
-    snap.addressLine,
-    snap.landmark ? `Near ${snap.landmark}` : null,
-    [snap.city, snap.state].filter(Boolean).join(', ') || null,
-  ].filter((p): p is string => !!p && p.trim().length > 0);
+  if (!snap) return { lines: [], pincode: null, label: null, full: '' };
+  const withoutPin = formatAddressLines({ ...snap, pincode: null });
   return {
-    lines,
+    lines: withoutPin ? [withoutPin] : [],
     pincode: snap.pincode ?? null,
     label: snap.name?.trim() || null,
+    full: formatAddressLines(snap),
   };
 }
 
@@ -336,7 +335,7 @@ export class ReturnPickupLinkService {
     const addressSource =
       row.returnRequest.pickupAddress?.trim() ||
       null;
-    const snapAddress = formatAddress(row.returnRequest.order.deliveryAddressSnapshot);
+    const snapAddress = readSnapshotAddress(row.returnRequest.order.deliveryAddressSnapshot);
     const addressLines = addressSource
       ? [addressSource]
       : snapAddress.lines;
@@ -386,7 +385,9 @@ export class ReturnPickupLinkService {
           label: snapAddress.label,
           lines: addressLines,
           pincode: snapAddress.pincode,
-          full: [...addressLines, snapAddress.pincode].filter(Boolean).join(', '),
+          full: addressSource
+            ? [addressSource, snapAddress.pincode].filter(Boolean).join(', ')
+            : snapAddress.full,
         },
         items: row.returnRequest.items
           .filter((i) => i.decision === 'approved' || i.decision === 'partial' || i.decision === 'pending')

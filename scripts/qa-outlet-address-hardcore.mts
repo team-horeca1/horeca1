@@ -151,6 +151,9 @@ async function main() {
   const accounts = (get.json.data as { accountMemberships?: Array<{
     businessAccount?: {
       legalName?: string;
+      billingAddressLine?: string | null;
+      billingCity?: string | null;
+      billingPincode?: string | null;
       outlets?: Array<{
         id: string;
         name: string;
@@ -162,10 +165,13 @@ async function main() {
       }>;
     };
   }> })?.accountMemberships;
-  const outlets = accounts?.[0]?.businessAccount?.outlets?.filter((o) => o.isActive !== false) ?? [];
+  const ba = accounts?.[0]?.businessAccount;
+  const outlets = ba?.outlets?.filter((o) => o.isActive !== false) ?? [];
   assert(outlets.length === 1, 'exactly one active outlet (no duplicate)', `count=${outlets.length}`);
   const primary = outlets[0];
   assert(!!primary, 'primary outlet exists');
+  assert(ba?.billingAddressLine === 'VASHI NAKA', 'BA billingAddressLine persisted', ba?.billingAddressLine || '');
+  assert(ba?.billingPincode === '400703', 'BA billingPincode persisted', ba?.billingPincode || '');
   if (primary) {
     assert(
       primary.addressLine === 'VASHI NAKA',

@@ -76,10 +76,11 @@ export function mapToBusinessAccount(
   const legalName = derivedLegalName(p) || 'My Business';
   const displayName = derivedDisplayName(p);
   const contact = resolveContactNames(p);
-  const addressLine = resolvedAddressLine(p);
-  const city = str(p.city || p.billingCity);
-  const state = str(p.state || p.billingState);
-  const pincode = str(p.pincode || p.billingPincode);
+  // BusinessAccount.billing* prefers the billing form fields; delivery is only a fallback.
+  const addressLine = str(p.billingAddressLine) ?? resolvedAddressLine(p);
+  const city = str(p.billingCity || p.city);
+  const state = str(p.billingState || p.state);
+  const pincode = str(p.billingPincode || p.pincode);
   const phone = primaryPhoneDigits(p);
 
   const data: Record<string, unknown> = {

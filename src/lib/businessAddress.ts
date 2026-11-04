@@ -15,6 +15,8 @@ export type AddressLine = {
 export type BusinessAddressValue = {
   /** Optional label (outlet / HQ name). Used in single mode and some supplier creates. */
   locationName: string;
+  /** Invoice / Bill-To name for this outlet (customers). */
+  billingName: string;
   billingAddressLine: string;
   billingCity: string;
   billingState: string;
@@ -29,6 +31,7 @@ export type BusinessAddressValue = {
 
 export const EMPTY_BUSINESS_ADDRESS: BusinessAddressValue = {
   locationName: '',
+  billingName: '',
   billingAddressLine: '',
   billingCity: '',
   billingState: '',
@@ -109,7 +112,7 @@ export function withSameAsBillingSync(value: BusinessAddressValue): BusinessAddr
 export function fromBillingAndPickup(
   billing: Partial<AddressLine> | null | undefined,
   pickup: Partial<AddressLine> | null | undefined,
-  opts?: { locationName?: string },
+  opts?: { locationName?: string; billingName?: string },
 ): BusinessAddressValue {
   const b = normalizeAddressLine(billing);
   const p = normalizeAddressLine(pickup);
@@ -117,6 +120,7 @@ export function fromBillingAndPickup(
   const same = pickupEmpty || addressesEqual(b, p);
   return {
     locationName: (opts?.locationName ?? '').trim(),
+    billingName: (opts?.billingName ?? '').trim(),
     billingAddressLine: b.addressLine,
     billingCity: b.city,
     billingState: b.state,
@@ -132,11 +136,12 @@ export function fromBillingAndPickup(
 /** Single-location hydrate (brands). Billing and delivery are the same. */
 export function fromSingleAddress(
   address: Partial<AddressLine> | null | undefined,
-  opts?: { locationName?: string },
+  opts?: { locationName?: string; billingName?: string },
 ): BusinessAddressValue {
   const a = normalizeAddressLine(address);
   return {
     locationName: (opts?.locationName ?? '').trim(),
+    billingName: (opts?.billingName ?? '').trim(),
     billingAddressLine: a.addressLine,
     billingCity: a.city,
     billingState: a.state,
@@ -146,6 +151,51 @@ export function fromSingleAddress(
     city: a.city,
     state: a.state,
     pincode: a.pincode,
+  };
+}
+
+/**
+ * Canonical customer save shape used by admin Addresses tab and storefront overlays.
+ * Billing goes on the BusinessAccount; delivery goes on the Outlet.
+ */
+export function toCustomerOutletPayload(
+  value: BusinessAddressValue,
+  opts?: { accountLegalName?: string },
+): {
+  companyProfile: {
+    billingAddressLine: string;
+    billingCity: string;
+    billingState: string;
+    billingPincode: string;
+  };
+  outlet: {
+    name: string;
+    billingName: string | null;
+    addressLine: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+} {
+  const billing = normalizeAddressLine(billingOf(value));
+  const delivery = normalizeAddressLine(effectiveDelivery(value));
+  const legal = (opts?.accountLegalName ?? '').trim();
+  const billingName = value.billingName.trim();
+  return {
+    companyProfile: {
+      billingAddressLine: billing.addressLine,
+      billingCity: billing.city,
+      billingState: billing.state,
+      billingPincode: billing.pincode,
+    },
+    outlet: {
+      name: value.locationName.trim() || 'Outlet',
+      billingName: billingName && billingName !== legal ? billingName : null,
+      addressLine: delivery.addressLine,
+      city: delivery.city,
+      state: delivery.state,
+      pincode: delivery.pincode,
+    },
   };
 }
 

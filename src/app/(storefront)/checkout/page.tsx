@@ -34,6 +34,7 @@ import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, shouldAban
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { hasCompleteDeliveryAddress } from '@/lib/constants/customerProfile';
+import { formatAddressLines, outletTitle } from '@/lib/displayIdentity';
 import { openDeliverMenu } from '@/components/layout/NavContextSelector';
 
 function openAddressEditor() {
@@ -194,6 +195,8 @@ interface OutletDetail {
     id: string;
     name: string;
     addressLine: string;
+    flatInfo?: string | null;
+    landmark?: string | null;
     city: string | null;
     state: string | null;
     pincode: string | null;
@@ -227,12 +230,23 @@ function DeliveringToRow() {
     if (!currentOutlet || !activeBusinessAccountId) return null;
 
     const activeDetail = outletDetails.find((o) => o.id === currentOutlet.id);
-    const addressLine = [
-        activeDetail?.addressLine,
-        activeDetail?.city,
-        activeDetail?.state,
-        activeDetail?.pincode ?? currentOutlet.pincode ?? null,
-    ].filter(Boolean).join(', ');
+    const addressParts = {
+        flatInfo: activeDetail?.flatInfo,
+        addressLine: activeDetail?.addressLine ?? currentOutlet.addressLine,
+        landmark: activeDetail?.landmark,
+        city: activeDetail?.city ?? currentOutlet.city,
+        state: activeDetail?.state ?? currentOutlet.state,
+        pincode: activeDetail?.pincode ?? currentOutlet.pincode ?? null,
+    };
+    const addressLine = formatAddressLines(addressParts);
+    const addressComplete = hasCompleteDeliveryAddress({
+        addressLine: addressParts.addressLine,
+        city: addressParts.city,
+        state: addressParts.state,
+        pincode: addressParts.pincode,
+        outletName: currentOutlet.name,
+    });
+    const outletLabel = outletTitle({ name: currentOutlet.name, pincode: addressParts.pincode });
     return (
         <div className="bg-white rounded-2xl border border-gray-100 p-4 relative">
             <div className="flex items-start gap-3">
@@ -242,15 +256,18 @@ function DeliveringToRow() {
                 <div className="flex-1 min-w-0">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Delivering to</p>
                     <p className="text-[14px] font-bold text-[#181725] truncate mt-0.5">
-                        {currentOutlet.name}
+                        {outletLabel}
                         {currentAccount?.displayName && (
                             <span className="text-gray-400 font-medium"> · {currentAccount.displayName}</span>
                         )}
                     </p>
-                    {addressLine ? (
-                        <p className="text-[11px] text-gray-500 font-medium truncate mt-0.5">{addressLine}</p>
-                    ) : (
-                        <p className="text-[11px] text-amber-600 font-semibold mt-0.5">No address on this outlet</p>
+                    {addressLine && (
+                        <p className="text-[11px] text-gray-500 font-medium line-clamp-2 mt-0.5">{addressLine}</p>
+                    )}
+                    {!addressComplete && (
+                        <p className="text-[11px] text-amber-600 font-semibold mt-0.5">
+                            {addressLine ? 'Add a street address and 6-digit pincode to deliver here' : 'No address on this outlet'}
+                        </p>
                     )}
                 </div>
                 <button

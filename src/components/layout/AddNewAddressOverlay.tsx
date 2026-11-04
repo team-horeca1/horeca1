@@ -8,8 +8,10 @@ import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 import {
   deliveryFromOutletAddress,
   OutletAddressForm,
+  toBusinessValue,
   type OutletAddressValue,
 } from '@/components/features/customer/OutletAddressForm';
+import { toCustomerOutletPayload } from '@/lib/businessAddress';
 
 interface AddNewAddressOverlayProps {
   isOpen: boolean;
@@ -65,6 +67,9 @@ export function AddNewAddressOverlay({
     setSaving(true);
     try {
       const line = delivery.addressLine.trim();
+      const { companyProfile } = toCustomerOutletPayload(toBusinessValue(value), {
+        accountLegalName: businessName,
+      });
       await onSave({
         label: value.outletName.trim(),
         businessName: value.billingName.trim() || businessName || undefined,
@@ -76,6 +81,11 @@ export function AddNewAddressOverlay({
         city: delivery.city.trim() || undefined,
         state: delivery.state.trim() || undefined,
         isDefault: false,
+        // Billing is saved on the BusinessAccount by POST /api/v1/addresses.
+        billingAddressLine: companyProfile.billingAddressLine || undefined,
+        billingCity: companyProfile.billingCity || undefined,
+        billingState: companyProfile.billingState || undefined,
+        billingPincode: companyProfile.billingPincode || undefined,
       });
     } finally {
       setSaving(false);

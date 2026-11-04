@@ -39,6 +39,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { outletTitle } from '@/lib/displayIdentity';
 import { supplierDashboardPath } from '@/lib/businessCapability';
 import { summarizePermissions } from '@/lib/permissions/portalFeatures';
 import { useAddress } from '@/context/AddressContext';
@@ -591,7 +592,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         ?? savedAddresses[0]
         ?? null;
     const deliverToLabel = deliverToAddress
-        ? (deliverToAddress.businessName || deliverToAddress.label || deliverToAddress.shortAddress || '').trim()
+        ? outletTitle({
+            name: deliverToAddress.label,
+            pincode: deliverToAddress.pincode,
+            fallback: deliverToAddress.businessName || deliverToAddress.shortAddress,
+        })
         : '';
     const deliverToLine = deliverToAddress
         ? (deliverToAddress.fullAddress || deliverToAddress.shortAddress || '').trim()

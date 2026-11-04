@@ -58,7 +58,10 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             businessName: true,
           },
         },
-        outlet: { select: { id: true, name: true } },
+        outlet: { select: { id: true, name: true, billingName: true } },
+        businessAccount: {
+          select: { id: true, legalName: true, displayName: true, gstin: true },
+        },
         items: {
           select: {
             id: true,

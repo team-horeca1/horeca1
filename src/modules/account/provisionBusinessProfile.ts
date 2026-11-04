@@ -191,6 +191,7 @@ export async function provisionBusinessProfile(
       latitude: input.primaryOutlet.latitude ?? null,
       longitude: input.primaryOutlet.longitude ?? null,
       placeId: input.primaryOutlet.placeId ?? null,
+      billingName: input.primaryOutlet.billingName?.trim() || null,
       requiresAddressUpdate: !(input.primaryOutlet.latitude && input.primaryOutlet.longitude),
     },
     select: { id: true },

@@ -13,6 +13,11 @@ import {
   effectiveCustomerUserId,
 } from '@/lib/resolveCustomerImpersonation';
 import type { AuthContext } from '@/middleware/auth';
+import {
+  billingFieldsShape,
+  billingNameOverride,
+  persistAccountBilling,
+} from '@/lib/customerBilling';
 
 /**
  * Storefront /addresses may receive an Outlet id (GET maps outlets when the
@@ -30,7 +35,12 @@ async function assertCanEditDeliveryLocation(
 
 const updateSchema = z.object({
   label: z.string().min(1).max(50).optional(),
+  /** Outlet name; wins over `label` when both are sent. */
+  outletName: z.string().min(1).max(50).optional(),
   businessName: z.string().max(255).nullable().optional(),
+  /** Bill-To name; wins over `businessName` when both are sent. */
+  billingName: z.string().max(255).nullable().optional(),
+  ...billingFieldsShape,
   fullAddress: z.string().min(1).optional(),
   shortAddress: z.string().max(255).nullable().optional(),
   flatInfo: z.string().max(255).nullable().optional(),
@@ -128,6 +138,24 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     const userId = effectiveCustomerUserId(ctx);
     const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
 
+    // outletName/billingName are explicit aliases of label/businessName.
+    const nextLabel = input.outletName ?? input.label;
+    const nextBillingName =
+      input.billingName !== undefined ? input.billingName : input.businessName;
+    const legalName = businessAccountId
+      ? (await prisma.businessAccount.findUnique({
+          where: { id: businessAccountId },
+          select: { legalName: true },
+        }))?.legalName ?? null
+      : null;
+    // Outlet.billingName is an override: null when blank / same as the account name.
+    const outletBillingName =
+      nextBillingName === undefined
+        ? undefined
+        : businessAccountId
+          ? billingNameOverride(nextBillingName, legalName)
+          : (nextBillingName ?? '').trim() || null;
+
     const existing = await prisma.savedAddress.findFirst({
       where: { id, userId },
     });
@@ -149,8 +177,8 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
         if (existing.outletId) {
           const outletPatch: Record<string, unknown> = {};
           // label = outlet/branch name; businessName = billing name (do not swap).
-          if (input.label !== undefined) outletPatch.name = input.label;
-          if (input.businessName !== undefined) outletPatch.billingName = input.businessName;
+          if (nextLabel !== undefined) outletPatch.name = nextLabel;
+          if (outletBillingName !== undefined) outletPatch.billingName = outletBillingName;
           if (input.fullAddress !== undefined) outletPatch.addressLine = input.fullAddress;
           if (input.flatInfo !== undefined) outletPatch.flatInfo = input.flatInfo;
           if (input.landmark !== undefined) outletPatch.landmark = input.landmark;
@@ -174,13 +202,21 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
           if (Object.keys(outletPatch).length > 0) {
             await tx.outlet.update({ where: { id: existing.outletId }, data: outletPatch });
           }
+          // Billing lives on the BusinessAccount — only touch it for our own outlet.
+          if (businessAccountId) {
+            const owned = await tx.outlet.findFirst({
+              where: { id: existing.outletId, businessAccountId },
+              select: { id: true },
+            });
+            if (owned) await persistAccountBilling(tx, businessAccountId, input);
+          }
         }
 
         return tx.savedAddress.update({
           where: { id },
           data: {
-            ...(input.label !== undefined && { label: input.label }),
-            ...(input.businessName !== undefined && { businessName: input.businessName }),
+            ...(nextLabel !== undefined && { label: nextLabel }),
+            ...(nextBillingName !== undefined && { businessName: nextBillingName }),
             ...(input.fullAddress !== undefined && { fullAddress: input.fullAddress }),
             ...(input.shortAddress !== undefined && { shortAddress: input.shortAddress }),
             ...(input.flatInfo !== undefined && { flatInfo: input.flatInfo }),
@@ -208,8 +244,8 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     if (!outlet) throw Errors.notFound('Address');
 
     const outletPatch: Record<string, unknown> = {
-      ...(input.label !== undefined ? { name: input.label || outlet.name } : {}),
-      ...(input.businessName !== undefined ? { billingName: input.businessName || null } : {}),
+      ...(nextLabel !== undefined ? { name: nextLabel || outlet.name } : {}),
+      ...(outletBillingName !== undefined ? { billingName: outletBillingName } : {}),
       ...(input.fullAddress !== undefined && { addressLine: input.fullAddress }),
       ...(input.flatInfo !== undefined && { flatInfo: input.flatInfo }),
       ...(input.landmark !== undefined && { landmark: input.landmark }),
@@ -244,14 +280,15 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
       }
 
       const u = await tx.outlet.update({ where: { id: outlet.id }, data: outletPatch });
+      await persistAccountBilling(tx, businessAccountId, input);
 
       const linked = await tx.savedAddress.findFirst({ where: { outletId: outlet.id, userId } });
       if (linked) {
         await tx.savedAddress.update({
           where: { id: linked.id },
           data: {
-            ...(input.label !== undefined && { label: input.label }),
-            ...(input.businessName !== undefined && { businessName: input.businessName }),
+            ...(nextLabel !== undefined && { label: nextLabel }),
+            ...(nextBillingName !== undefined && { businessName: nextBillingName }),
             ...(input.fullAddress !== undefined && {
               fullAddress: input.fullAddress,
               shortAddress: input.shortAddress ?? input.fullAddress.split(',').slice(0, 2).join(', '),
@@ -273,9 +310,9 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
             userId,
             outletId: outlet.id,
             // label = outlet name; businessName = billing name (never invent "Business").
-            label: input.label?.trim() || outlet.name || 'Outlet',
+            label: nextLabel?.trim() || outlet.name || 'Outlet',
             businessName:
-              (input.businessName ?? '').trim()
+              (nextBillingName ?? '').trim()
               || (outlet.billingName ?? '').trim()
               || outlet.name
               || null,

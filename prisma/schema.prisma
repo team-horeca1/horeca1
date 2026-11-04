@@ -872,6 +872,8 @@ model Order {
   // Vendor warehouse that fulfills this order (may differ from customer delivery outlet).
   fulfillmentOutletId       String?      @map("fulfillment_outlet_id") @db.Uuid
   deliveryAddressSnapshot   Json         @map("delivery_address_snapshot")
+  /// Frozen buyer + supplier Bill To / Ship To / Bill From / Shipped From at checkout.
+  billingSnapshot           Json?        @map("billing_snapshot")
   status                    OrderStatus  @default(pending)
   subtotal                  Decimal      @db.Decimal(12, 2)
   promoDiscount             Decimal      @default(0) @map("promo_discount") @db.Decimal(10, 2)

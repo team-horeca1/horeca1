@@ -114,5 +114,7 @@ export const PrimaryOutletSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   placeId: z.string().optional(),
+  /** Bill-To override for this outlet (customers). Null/omitted = account name. */
+  billingName: z.string().max(255).nullable().optional(),
 });
 export type PrimaryOutletInput = z.infer<typeof PrimaryOutletSchema>;

@@ -9,13 +9,23 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { adoptOrCreateOutlet } from '@/lib/outletWrites';
 import { mapOutletToUnifiedAddress } from '@/lib/addressOutletBridge';
 import {
+  billingFieldsShape,
+  billingNameOverride,
+  persistAccountBilling,
+} from '@/lib/customerBilling';
+import {
   effectiveCustomerBusinessAccountId,
   effectiveCustomerUserId,
 } from '@/lib/resolveCustomerImpersonation';
 
 const createSchema = z.object({
   label: z.string().min(1).max(50).default('Other'),
+  /** Outlet name; falls back to `label` when omitted. */
+  outletName: z.string().max(50).optional(),
   businessName: z.string().max(255).optional(),
+  /** Bill-To name; falls back to `businessName` when omitted. */
+  billingName: z.string().max(255).optional(),
+  ...billingFieldsShape,
   fullAddress: z.string().min(1),
   shortAddress: z.string().max(255).optional(),
   flatInfo: z.string().max(255).optional(),
@@ -40,7 +50,14 @@ export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     if (businessAccountId) {
       const activeAccount = await prisma.businessAccount.findUnique({
         where: { id: businessAccountId },
-        select: { primaryOutletId: true, legalName: true },
+        select: {
+          primaryOutletId: true,
+          legalName: true,
+          billingAddressLine: true,
+          billingCity: true,
+          billingState: true,
+          billingPincode: true,
+        },
       });
       const outlets = await prisma.outlet.findMany({
         where: { businessAccountId, isActive: true },
@@ -61,6 +78,14 @@ export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
           savedByOutlet.get(o.id),
           activeAccount?.primaryOutletId ?? null,
           activeAccount?.legalName ?? null,
+          activeAccount
+            ? {
+                billingAddressLine: activeAccount.billingAddressLine,
+                billingCity: activeAccount.billingCity,
+                billingState: activeAccount.billingState,
+                billingPincode: activeAccount.billingPincode,
+              }
+            : null,
         ),
       );
       return NextResponse.json({ success: true, data: addresses });
@@ -83,15 +108,26 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     const userId = effectiveCustomerUserId(ctx);
     const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
 
+    // label/outletName = outlet name; businessName/billingName = Bill-To name (never swap).
+    const outletName = (input.outletName || input.label || '').trim();
+    const billingName = (input.billingName ?? input.businessName)?.trim() || undefined;
+
     const address = await prisma.$transaction(async (tx) => {
       let outletId: string | undefined;
 
       if (businessAccountId) {
+        const account = await tx.businessAccount.findUnique({
+          where: { id: businessAccountId },
+          select: { legalName: true },
+        });
         // First real address adopts the empty placeholder primary outlet instead
         // of spawning a duplicate that leaves the primary stuck "Address needed".
         const { outlet } = await adoptOrCreateOutlet(tx, businessAccountId, {
-          // label = outlet name; businessName = billing name (never swap).
-          name: (input.label || input.businessName || '').trim(),
+          name: outletName || (input.businessName ?? '').trim(),
+          billingName:
+            billingName === undefined
+              ? undefined
+              : billingNameOverride(billingName, account?.legalName),
           addressLine: input.fullAddress,
           flatInfo: input.flatInfo,
           landmark: input.landmark,
@@ -103,12 +139,9 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
           placeId: input.placeId,
         });
         outletId = outlet.id;
-        if (input.businessName?.trim() && input.businessName.trim() !== outlet.name) {
-          await tx.outlet.update({
-            where: { id: outlet.id },
-            data: { billingName: input.businessName.trim() },
-          });
-        }
+
+        // Billing lives on the BusinessAccount (shared across outlets).
+        await persistAccountBilling(tx, businessAccountId, input);
 
         if (input.isDefault) {
           await tx.businessAccount.update({
@@ -145,8 +178,8 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
         data: {
           userId,
           outletId: outletId,
-          label: input.label,
-          businessName: input.businessName,
+          label: outletName || input.label,
+          businessName: billingName,
           fullAddress: input.fullAddress,
           shortAddress: input.shortAddress,
           flatInfo: input.flatInfo,

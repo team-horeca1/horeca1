@@ -34,6 +34,11 @@ export interface Address {
     state?: string;
     placeId?: string;
     isDefault?: boolean;
+    /** Account-level billing address (BusinessAccount.billing*), saved with the outlet form. */
+    billingAddressLine?: string;
+    billingCity?: string;
+    billingState?: string;
+    billingPincode?: string;
 }
 
 interface AddressContextType {
@@ -115,6 +120,10 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 state: a.state as string | undefined,
                 placeId: a.placeId as string | undefined,
                 isDefault: a.isDefault as boolean,
+                billingAddressLine: (a.billingAddressLine as string | undefined) ?? undefined,
+                billingCity: (a.billingCity as string | undefined) ?? undefined,
+                billingState: (a.billingState as string | undefined) ?? undefined,
+                billingPincode: (a.billingPincode as string | undefined) ?? undefined,
             }));
         } catch {
             return [];
@@ -300,6 +309,10 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                         longitude: address.longitude,
                         placeId: address.placeId,
                         isDefault: address.isDefault ?? false,
+                        billingAddressLine: address.billingAddressLine,
+                        billingCity: address.billingCity,
+                        billingState: address.billingState,
+                        billingPincode: address.billingPincode,
                     }),
                 });
                 if (!res.ok) {
@@ -327,6 +340,10 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                     state: json.data.state ?? undefined,
                     placeId: json.data.placeId ?? undefined,
                     isDefault: json.data.isDefault,
+                    billingAddressLine: address.billingAddressLine,
+                    billingCity: address.billingCity,
+                    billingState: address.billingState,
+                    billingPincode: address.billingPincode,
                 };
                 setSavedAddresses(prev => {
                     const filtered = address.isDefault ? prev.map(a => ({ ...a, isDefault: false })) : prev;

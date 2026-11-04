@@ -7,10 +7,13 @@ import { isRealStreetAddress } from '@/lib/constants/customerProfile';
 import {
   deliveryFromOutletAddress,
   OutletAddressForm,
+  toBusinessValue,
   type OutletAddressValue,
 } from '@/components/features/customer/OutletAddressForm';
+import { fromBillingAndPickup, toCustomerOutletPayload, type AddressLine } from '@/lib/businessAddress';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { notifyAccountsRefresh } from '@/lib/addressUsability';
+import { accountFacingName } from '@/lib/displayIdentity';
 import { FormErrorBanner } from '@/components/ui/form';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
@@ -36,6 +39,8 @@ interface Outlet {
 type OutletDraft = {
   id?: string;
   name: string;
+  /** Per-outlet Bill-To override (empty = use the account name). */
+  billingName: string;
   addressLine: string;
   flatInfo: string;
   landmark: string;
@@ -48,7 +53,7 @@ type OutletDraft = {
 };
 
 const EMPTY_DRAFT: OutletDraft = {
-  name: '', addressLine: '', flatInfo: '', landmark: '',
+  name: '', billingName: '', addressLine: '', flatInfo: '', landmark: '',
   city: '', state: '', pincode: '',
   latitude: null, longitude: null, placeId: null,
 };
@@ -57,6 +62,7 @@ function outletToDraft(o: Outlet): OutletDraft {
   return {
     id: o.id,
     name: o.name,
+    billingName: o.billingName ?? '',
     addressLine: o.addressLine === 'Address pending — complete in account settings' ? '' : o.addressLine,
     flatInfo: o.flatInfo ?? '',
     landmark: o.landmark ?? '',
@@ -90,10 +96,13 @@ export function OutletsOverlay({
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<OutletDraft | null>(null); // null = closed, has .id = editing, no .id = creating
+  const [accountBilling, setAccountBilling] = useState<AddressLine | null>(null);
   const { refresh: refreshAccounts, accounts } = useBusinessAccountSwitcher();
-  const businessName = accounts.find((a) => a.id === accountId)?.legalName
-    || accounts.find((a) => a.id === accountId)?.displayName
-    || '';
+  const activeAccount = accounts.find((a) => a.id === accountId);
+  const businessName = accountFacingName({
+    displayName: activeAccount?.displayName,
+    legalName: activeAccount?.legalName,
+  });
   const { refreshAddresses } = useAddress();
   const openedInitialRef = useRef<string | null>(null);
 
@@ -107,9 +116,31 @@ export function OutletsOverlay({
   const load = () => {
     if (!accountId) return;
     Promise.resolve().then(() => setLoading(true));
+    // Account billing prefills the editor; failure just means an empty prefill.
+    const billingLoaded = fetch(`/api/v1/account/${accountId}`)
+      .then(async (r) => {
+        const json = (await r.json()) as {
+          success?: boolean;
+          data?: {
+            billingAddressLine?: string | null;
+            billingCity?: string | null;
+            billingState?: string | null;
+            billingPincode?: string | null;
+          };
+        };
+        if (!r.ok || !json.success || !json.data) return;
+        setAccountBilling({
+          addressLine: json.data.billingAddressLine ?? '',
+          city: json.data.billingCity ?? '',
+          state: json.data.billingState ?? '',
+          pincode: json.data.billingPincode ?? '',
+        });
+      })
+      .catch(() => undefined);
     fetch(`/api/v1/account/${accountId}/outlets`)
       .then(async (r) => {
         const json = await r.json();
+        await billingLoaded;
         if (!r.ok || !json.success) {
           toast.error(json.error?.message ?? 'Could not load warehouses');
           return;
@@ -250,6 +281,8 @@ export function OutletsOverlay({
           accountId={accountId}
           draft={editing}
           businessName={businessName}
+          legalName={activeAccount?.legalName || businessName}
+          accountBilling={accountBilling}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); afterMutation(); }}
         />
@@ -258,25 +291,60 @@ export function OutletsOverlay({
   );
 }
 
-function OutletEditorModal({ accountId, draft, businessName, onClose, onSaved }: {
-  accountId: string; draft: OutletDraft; businessName: string; onClose: () => void; onSaved: () => void;
-}) {
-  const isEdit = !!draft.id;
-  const { setSelectedAddress } = useAddress();
+function initialEditorValue(
+  draft: OutletDraft,
+  businessName: string,
+  accountBilling: AddressLine | null,
+  legalName?: string,
+): OutletAddressValue {
   const line = isRealStreetAddress(draft.addressLine) ? draft.addressLine : '';
-  const [value, setValue] = useState<OutletAddressValue>({
-    outletName: draft.name,
-    billingName: businessName,
-    billingAddressLine: line,
-    billingCity: draft.city,
-    billingState: draft.state,
-    billingPincode: draft.pincode,
-    sameAsBilling: true,
+  const delivery: AddressLine = {
     addressLine: line,
     city: draft.city,
     state: draft.state,
     pincode: draft.pincode,
+  };
+  const hasBilling = Boolean(accountBilling?.addressLine.trim());
+  // Billing: saved account billing, else (editing) the outlet's own address.
+  const billing: AddressLine = hasBilling && accountBilling
+    ? accountBilling
+    : delivery;
+  const merged = fromBillingAndPickup(billing, delivery, {
+    locationName: draft.name,
+    // Outlet override first; invoice Bill-To defaults to legal name.
+    billingName: draft.billingName || legalName || businessName,
   });
+  // New outlet with saved billing: keep billing prefilled but let delivery differ.
+  const sameAsBilling = draft.id || !hasBilling ? merged.sameAsBilling : false;
+  return {
+    outletName: merged.locationName,
+    billingName: merged.billingName,
+    billingAddressLine: merged.billingAddressLine,
+    billingCity: merged.billingCity,
+    billingState: merged.billingState,
+    billingPincode: merged.billingPincode,
+    sameAsBilling,
+    addressLine: sameAsBilling ? merged.addressLine : delivery.addressLine,
+    city: sameAsBilling ? merged.city : delivery.city,
+    state: sameAsBilling ? merged.state : delivery.state,
+    pincode: sameAsBilling ? merged.pincode : delivery.pincode,
+  };
+}
+
+function OutletEditorModal({ accountId, draft, businessName, legalName, accountBilling, onClose, onSaved }: {
+  accountId: string;
+  draft: OutletDraft;
+  businessName: string;
+  legalName: string;
+  accountBilling: AddressLine | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = !!draft.id;
+  const { setSelectedAddress } = useAddress();
+  const [value, setValue] = useState<OutletAddressValue>(() =>
+    initialEditorValue(draft, businessName, accountBilling, legalName),
+  );
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -294,9 +362,10 @@ function OutletEditorModal({ accountId, draft, businessName, onClose, onSaved }:
         ? `/api/v1/account/${accountId}/outlets/${draft.id}`
         : `/api/v1/account/${accountId}/outlets`;
       const method = isEdit ? 'PATCH' : 'POST';
-      const billingOverride = value.billingName.trim() && value.billingName.trim() !== businessName.trim()
-        ? value.billingName.trim()
-        : null;
+      const { companyProfile, outlet: outletPayload } = toCustomerOutletPayload(
+        toBusinessValue(value),
+        { accountLegalName: businessName },
+      );
       const body = {
         name: value.outletName.trim(),
         addressLine: delivery.addressLine.trim(),
@@ -305,7 +374,13 @@ function OutletEditorModal({ accountId, draft, businessName, onClose, onSaved }:
         city: delivery.city.trim() || null,
         state: delivery.state.trim() || null,
         pincode: delivery.pincode.trim() || null,
-        billingName: billingOverride,
+        // Outlet Bill-To override (null when blank / same as the account name).
+        billingName: outletPayload.billingName,
+        // Account billing address — persisted on BusinessAccount.billing*.
+        billingAddressLine: companyProfile.billingAddressLine || null,
+        billingCity: companyProfile.billingCity || null,
+        billingState: companyProfile.billingState || null,
+        billingPincode: companyProfile.billingPincode || null,
         ...(draft.latitude !== null && draft.longitude !== null && { latitude: draft.latitude, longitude: draft.longitude }),
         ...(draft.placeId !== null && { placeId: draft.placeId }),
       };

@@ -7,8 +7,10 @@ import { isRealStreetAddress, isSyntheticAddressLine } from '@/lib/constants/cus
 import {
   deliveryFromOutletAddress,
   OutletAddressForm,
+  toBusinessValue,
   type OutletAddressValue,
 } from '@/components/features/customer/OutletAddressForm';
+import { fromBillingAndPickup, toCustomerOutletPayload } from '@/lib/businessAddress';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -24,18 +26,38 @@ function fromAddress(address: Address, businessName: string): OutletAddressValue
   const line = isSyntheticAddressLine(address.fullAddress) ? '' : (address.fullAddress || '');
   const outletName =
     address.label && address.label !== 'Business' ? address.label : '';
-  return {
-    outletName,
-    billingName: address.businessName || businessName,
-    billingAddressLine: line,
-    billingCity: address.city || '',
-    billingState: address.state || '',
-    billingPincode: address.pincode || '',
-    sameAsBilling: true,
+  const delivery = {
     addressLine: line,
     city: address.city || '',
     state: address.state || '',
     pincode: address.pincode || '',
+  };
+  // Prefill the account billing address when one is saved; otherwise billing = delivery.
+  const hasBilling = Boolean(address.billingAddressLine?.trim());
+  const billing = hasBilling
+    ? {
+        addressLine: address.billingAddressLine ?? '',
+        city: address.billingCity ?? '',
+        state: address.billingState ?? '',
+        pincode: address.billingPincode ?? '',
+      }
+    : delivery;
+  const merged = fromBillingAndPickup(billing, delivery, {
+    locationName: outletName,
+    billingName: address.businessName || businessName,
+  });
+  return {
+    outletName: merged.locationName,
+    billingName: merged.billingName,
+    billingAddressLine: merged.billingAddressLine,
+    billingCity: merged.billingCity,
+    billingState: merged.billingState,
+    billingPincode: merged.billingPincode,
+    sameAsBilling: merged.sameAsBilling,
+    addressLine: merged.addressLine,
+    city: merged.city,
+    state: merged.state,
+    pincode: merged.pincode,
   };
 }
 
@@ -65,7 +87,14 @@ export function EditAddressOverlay({ address, businessName = '', onClose }: Edit
     setIsSaving(true);
     try {
       const line = delivery.addressLine.trim();
+      const { companyProfile } = toCustomerOutletPayload(toBusinessValue(value), {
+        accountLegalName: businessName,
+      });
       await updateAddress(address.id, {
+        billingAddressLine: companyProfile.billingAddressLine || undefined,
+        billingCity: companyProfile.billingCity || undefined,
+        billingState: companyProfile.billingState || undefined,
+        billingPincode: companyProfile.billingPincode || undefined,
         label: value.outletName.trim() || address.label,
         businessName: value.billingName.trim() || undefined,
         fullAddress: line,

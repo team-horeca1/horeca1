@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { personFirstCustomerLabel } from '@/lib/customerLabel';
+import { formatAddressLines } from '@/lib/displayIdentity';
 import { CancelRequestBanner } from './CancelRequestBanner';
 import { LinkedWorkspacesCard } from './LinkedWorkspacesCard';
 import { ATTENTION_LABELS, type AttentionReasonCode } from '@/lib/orderAttention';
@@ -507,9 +508,7 @@ export function OrderWorkbenchPanel({
           </div>
           {addr && (
             <p className="mt-2 text-[12px] leading-snug text-[#7C7C7C]">
-              {[addr.flatInfo, addr.addressLine, addr.city, addr.state, addr.pincode]
-                .filter((x) => typeof x === 'string' && x)
-                .join(', ') || 'Delivery address on file'}
+              {formatAddressLines(addr) || 'Delivery address on file'}
             </p>
           )}
         </div>

@@ -11,6 +11,7 @@ import { ACCOUNT_SWITCHER_OPEN_EVENT } from '@/lib/accountSwitcherEvents';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { businessKindLabel, kindFromFlags } from '@/lib/businessCapability';
 import { cn } from '@/lib/utils';
+import { outletTitle } from '@/lib/displayIdentity';
 
 type Portal = 'vendor' | 'brand' | 'customer' | 'admin';
 
@@ -166,7 +167,7 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
           ) : currentOutlet ? (
             <span className="text-[11px] text-[#666] flex items-center gap-1 truncate max-w-[180px]">
               <MapPin size={10} className="shrink-0" />
-              <span className="truncate">{currentOutlet.pincode ?? currentOutlet.name}</span>
+              <span className="truncate">{outletTitle({ name: currentOutlet.name, pincode: currentOutlet.pincode })}</span>
             </span>
           ) : (
             <span className="text-[11px] text-[#666] truncate max-w-[180px]">{conf.label}</span>

@@ -83,28 +83,6 @@ export function CreateBusinessAccountModal({
     setBusinessType(initialType);
   }, [isOpen, initialType]);
 
-  useEffect(() => {
-    if (!/^\d{6}$/.test(profile.pincode ?? profile.billingPincode ?? '')) return;
-    const city = profile.city ?? profile.billingCity ?? '';
-    const state = profile.state ?? profile.billingState ?? '';
-    if (city.trim() && state.trim()) return;
-    const pincode = profile.pincode ?? profile.billingPincode ?? '';
-    fetch(`https://api.postalpincode.in/pincode/${pincode}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const po = data?.[0]?.PostOffice?.[0];
-        if (!po) return;
-        setProfile(prev => ({
-          ...prev,
-          city: prev.city?.trim() ? prev.city : (po.District || po.Division || ''),
-          billingCity: prev.billingCity?.trim() ? prev.billingCity : (po.District || po.Division || ''),
-          state: prev.state?.trim() ? prev.state : (po.State || ''),
-          billingState: prev.billingState?.trim() ? prev.billingState : (po.State || ''),
-        }));
-      })
-      .catch(() => {});
-  }, [profile.pincode, profile.billingPincode]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const pincodeValid = /^\d{6}$/.test(profile.pincode ?? profile.billingPincode ?? '');
   const hasCoords = profile.latitude != null && profile.longitude != null;
 
@@ -187,10 +165,11 @@ export function CreateBusinessAccountModal({
       workPhone: profile.workPhone?.trim() || undefined,
       mobilePhone: (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10) || undefined,
       email: profile.email?.trim() || undefined,
-      billingAddressLine: profile.addressLine ?? profile.billingAddressLine,
-      billingCity: profile.city ?? profile.billingCity,
-      billingState: profile.state ?? profile.billingState,
-      billingPincode: profile.pincode ?? profile.billingPincode,
+      // Billing form fields win; fall back to delivery only when billing is blank.
+      billingAddressLine: profile.billingAddressLine || profile.addressLine || undefined,
+      billingCity: profile.billingCity || profile.city || undefined,
+      billingState: profile.billingState || profile.state || undefined,
+      billingPincode: profile.billingPincode || profile.pincode || undefined,
       isCustomer,
       isVendor,
       isBrand: false,
@@ -202,6 +181,7 @@ export function CreateBusinessAccountModal({
         pincode: outlet.pincode ?? undefined,
         flatInfo: outlet.flatInfo ?? undefined,
         landmark: outlet.landmark ?? undefined,
+        billingName: outlet.billingName,
         ...(profile.latitude != null && profile.longitude != null && {
           latitude: profile.latitude,
           longitude: profile.longitude,
