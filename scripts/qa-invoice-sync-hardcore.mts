@@ -77,7 +77,7 @@ async function main() {
     return { res, json, text };
   };
 
-  const phone = `9${stamp}`.slice(0, 10);
+  const phone = `98${stamp}`.slice(0, 10);
   const create = await api('/api/v1/admin/users', {
     method: 'POST',
     body: JSON.stringify({
@@ -89,7 +89,13 @@ async function main() {
     }),
   });
   const userId = create.json.data?.id as string | undefined;
-  assert(!!create.json.success && !!userId, 'create customer');
+  assert(
+    !!create.json.success && !!userId,
+    'create customer',
+    typeof create.json.error === 'string'
+      ? create.json.error
+      : create.json.error?.message || JSON.stringify(create.json).slice(0, 200),
+  );
 
   if (!userId) {
     process.exit(1);

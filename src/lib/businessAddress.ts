@@ -48,20 +48,39 @@ export function blankAddressLine(): AddressLine {
 }
 
 export function addressesEqual(a: AddressLine, b: AddressLine): boolean {
+  const left = persistAddressLine(a);
+  const right = persistAddressLine(b);
   return (
-    a.addressLine.trim() === b.addressLine.trim()
-    && a.city.trim() === b.city.trim()
-    && a.state.trim() === b.state.trim()
-    && a.pincode.trim() === b.pincode.trim()
+    left.addressLine === right.addressLine
+    && left.city === right.city
+    && left.state === right.state
+    && left.pincode === right.pincode
   );
 }
 
+/**
+ * Normalize for form hydrate / in-memory use.
+ * Do NOT trim street/city/state here — controlled inputs rebuild via
+ * fromBillingAndPickup on every keystroke, and trimming eats typed spaces.
+ * Persist/export helpers call `persistAddressLine` which does trim.
+ */
 export function normalizeAddressLine(raw: Partial<AddressLine> | null | undefined): AddressLine {
   return {
-    addressLine: (raw?.addressLine ?? '').trim(),
-    city: (raw?.city ?? '').trim(),
-    state: (raw?.state ?? '').trim(),
+    addressLine: raw?.addressLine ?? '',
+    city: raw?.city ?? '',
+    state: raw?.state ?? '',
     pincode: (raw?.pincode ?? '').replace(/\D/g, '').slice(0, 6),
+  };
+}
+
+/** Trim + pincode clean for API payloads and equality checks against saved data. */
+export function persistAddressLine(raw: Partial<AddressLine> | null | undefined): AddressLine {
+  const n = normalizeAddressLine(raw);
+  return {
+    addressLine: n.addressLine.trim(),
+    city: n.city.trim(),
+    state: n.state.trim(),
+    pincode: n.pincode,
   };
 }
 
@@ -119,8 +138,9 @@ export function fromBillingAndPickup(
   const pickupEmpty = !p.addressLine && !p.city && !p.state && !p.pincode;
   const same = pickupEmpty || addressesEqual(b, p);
   return {
-    locationName: (opts?.locationName ?? '').trim(),
-    billingName: (opts?.billingName ?? '').trim(),
+    // Keep raw name strings — trimming here breaks mid-word spaces while typing.
+    locationName: opts?.locationName ?? '',
+    billingName: opts?.billingName ?? '',
     billingAddressLine: b.addressLine,
     billingCity: b.city,
     billingState: b.state,
@@ -140,8 +160,8 @@ export function fromSingleAddress(
 ): BusinessAddressValue {
   const a = normalizeAddressLine(address);
   return {
-    locationName: (opts?.locationName ?? '').trim(),
-    billingName: (opts?.billingName ?? '').trim(),
+    locationName: opts?.locationName ?? '',
+    billingName: opts?.billingName ?? '',
     billingAddressLine: a.addressLine,
     billingCity: a.city,
     billingState: a.state,
@@ -177,8 +197,8 @@ export function toCustomerOutletPayload(
     pincode: string;
   };
 } {
-  const billing = normalizeAddressLine(billingOf(value));
-  const delivery = normalizeAddressLine(effectiveDelivery(value));
+  const billing = persistAddressLine(billingOf(value));
+  const delivery = persistAddressLine(effectiveDelivery(value));
   const legal = (opts?.accountLegalName ?? '').trim();
   const billingName = value.billingName.trim();
   return {
@@ -205,8 +225,8 @@ export function toVendorNestedPayload(value: BusinessAddressValue): {
   pickupAddress: AddressLine;
   primaryOutlet: AddressLine & { name?: string };
 } {
-  const billing = normalizeAddressLine(billingOf(value));
-  const pickup = normalizeAddressLine(effectiveDelivery(value));
+  const billing = persistAddressLine(billingOf(value));
+  const pickup = persistAddressLine(effectiveDelivery(value));
   return {
     billingAddress: billing,
     pickupAddress: pickup,
@@ -229,8 +249,8 @@ export function toVendorFlatPayload(value: BusinessAddressValue): {
   pickupState: string;
   pickupPincode: string;
 } {
-  const billing = normalizeAddressLine(billingOf(value));
-  const pickup = normalizeAddressLine(effectiveDelivery(value));
+  const billing = persistAddressLine(billingOf(value));
+  const pickup = persistAddressLine(effectiveDelivery(value));
   return {
     addressLine: billing.addressLine,
     city: billing.city,
@@ -256,7 +276,7 @@ export function toBrandBillingPayload(value: BusinessAddressValue): {
   billingPincode: string;
   outletName?: string;
 } {
-  const a = normalizeAddressLine(billingOf(value));
+  const a = persistAddressLine(billingOf(value));
   return {
     addressLine: a.addressLine,
     billingAddressLine: a.addressLine,

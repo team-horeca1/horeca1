@@ -39,6 +39,21 @@ describe('businessAddress', () => {
     expect(v.billingAddressLine).toBe('Plot 1');
   });
 
+  it('hydrate keeps trailing spaces so controlled inputs can type them', () => {
+    const v = fromBillingAndPickup(
+      { addressLine: 'Plot 22 ', city: 'Navi ', state: 'Maharashtra', pincode: '400001' },
+      {},
+      { locationName: 'Mumbai ', billingName: 'Legal ' },
+    );
+    expect(v.billingAddressLine).toBe('Plot 22 ');
+    expect(v.billingCity).toBe('Navi ');
+    expect(v.locationName).toBe('Mumbai ');
+    expect(v.billingName).toBe('Legal ');
+    // Persist path still trims.
+    expect(toVendorFlatPayload(v).addressLine).toBe('Plot 22');
+    expect(toVendorFlatPayload(v).city).toBe('Navi');
+  });
+
   it('withSameAsBillingSync copies billing into delivery', () => {
     const synced = withSameAsBillingSync({
       ...EMPTY_BUSINESS_ADDRESS,
