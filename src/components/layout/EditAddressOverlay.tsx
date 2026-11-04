@@ -42,13 +42,15 @@ function fromAddress(address: Address, businessName: string): OutletAddressValue
         pincode: address.billingPincode ?? '',
       }
     : delivery;
+  // Prefer saved Bill-To; fall back to account legal/display so the field is never blank.
+  const resolvedBillingName = (address.businessName || '').trim() || businessName.trim();
   const merged = fromBillingAndPickup(billing, delivery, {
     locationName: outletName,
-    billingName: address.businessName || businessName,
+    billingName: resolvedBillingName,
   });
   return {
     outletName: merged.locationName,
-    billingName: merged.billingName,
+    billingName: merged.billingName || resolvedBillingName,
     billingAddressLine: merged.billingAddressLine,
     billingCity: merged.billingCity,
     billingState: merged.billingState,

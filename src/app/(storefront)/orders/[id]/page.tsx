@@ -20,7 +20,11 @@ import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel } from '@/l
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { isAbandonedCart } from '@/lib/abandonedOrder';
-import { formatAddressLines, type AddressParts } from '@/lib/displayIdentity';
+import {
+    formatAddressLines,
+    parseOrderBillingSnapshot,
+    type AddressParts,
+} from '@/lib/displayIdentity';
 
 interface ApiOrderItem {
     id: string;
@@ -65,6 +69,8 @@ interface ApiOrder {
     deliveryOtpVerifiedAt?: string | null;
     /** Frozen at checkout (Order.deliveryAddressSnapshot). */
     deliveryAddressSnapshot?: (AddressParts & { name?: string | null }) | null;
+    /** Frozen Bill-To + supplier identity at checkout. */
+    billingSnapshot?: unknown;
     vendor: ApiOrderVendor;
     items: ApiOrderItem[];
     review?: { rating: number; comment?: string } | null;
@@ -439,6 +445,16 @@ export default function OrderDetailPage() {
     const deliveryConfirmed = !!order.deliveryOtpVerifiedAt;
     const deliveryAddressText = formatAddressLines(order.deliveryAddressSnapshot);
     const deliveryAddressName = order.deliveryAddressSnapshot?.name?.trim() ?? '';
+    const frozenBilling = parseOrderBillingSnapshot(order.billingSnapshot);
+    const billToAddressText = frozenBilling
+        ? formatAddressLines({
+            addressLine: frozenBilling.buyer.addressLine,
+            city: frozenBilling.buyer.city,
+            state: frozenBilling.buyer.state,
+            pincode: frozenBilling.buyer.pincode,
+        })
+        : '';
+    const billToName = frozenBilling?.buyer.billingName.trim() || '';
 
     return (
         <div className="min-h-screen bg-[#F2F3F2]">
@@ -499,19 +515,42 @@ export default function OrderDetailPage() {
                             </div>
                         </div>
 
-                        {/* Delivery address (frozen snapshot from checkout) */}
-                        {deliveryAddressText && (
-                            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-start gap-3" data-testid="order-delivery-address">
-                                <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
-                                    <MapPin size={18} className="text-primary" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] text-gray-400 font-medium mb-0.5">Delivery address</p>
-                                    {deliveryAddressName && (
-                                        <p className="text-[14px] font-black text-[#181725] truncate">{deliveryAddressName}</p>
-                                    )}
-                                    <p className="text-[13px] text-gray-600 font-medium leading-snug mt-0.5">{deliveryAddressText}</p>
-                                </div>
+                        {/* Bill To + Delivery (frozen snapshots from checkout) */}
+                        {(billToName || billToAddressText || deliveryAddressText) && (
+                            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3" data-testid="order-address-block">
+                                {(billToName || billToAddressText) && (
+                                    <div className="flex items-start gap-3" data-testid="order-bill-to">
+                                        <div className="w-10 h-10 rounded-xl bg-[#F8E8EC] flex items-center justify-center shrink-0">
+                                            <CreditCard size={18} className="text-[#6B1D2E]" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] text-gray-400 font-medium mb-0.5">Bill To (invoice)</p>
+                                            {billToName && (
+                                                <p className="text-[14px] font-black text-[#181725] truncate">{billToName}</p>
+                                            )}
+                                            {billToAddressText && (
+                                                <p className="text-[13px] text-gray-600 font-medium leading-snug mt-0.5">{billToAddressText}</p>
+                                            )}
+                                            {frozenBilling?.buyer.gstin && (
+                                                <p className="text-[12px] text-gray-500 font-mono mt-0.5">GSTIN: {frozenBilling.buyer.gstin}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {deliveryAddressText && (
+                                    <div className={cn('flex items-start gap-3', (billToName || billToAddressText) && 'pt-3 border-t border-gray-100')} data-testid="order-delivery-address">
+                                        <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
+                                            <MapPin size={18} className="text-primary" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] text-gray-400 font-medium mb-0.5">Delivery address</p>
+                                            {deliveryAddressName && (
+                                                <p className="text-[14px] font-black text-[#181725] truncate">{deliveryAddressName}</p>
+                                            )}
+                                            <p className="text-[13px] text-gray-600 font-medium leading-snug mt-0.5">{deliveryAddressText}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 

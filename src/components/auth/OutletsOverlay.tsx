@@ -58,11 +58,12 @@ const EMPTY_DRAFT: OutletDraft = {
   latitude: null, longitude: null, placeId: null,
 };
 
-function outletToDraft(o: Outlet): OutletDraft {
+function outletToDraft(o: Outlet, accountLegalName = ''): OutletDraft {
   return {
     id: o.id,
     name: o.name,
-    billingName: o.billingName ?? '',
+    // Null override means "use account legal name" — hydrate that so the form is not blank.
+    billingName: (o.billingName || '').trim() || accountLegalName.trim(),
     addressLine: o.addressLine === 'Address pending — complete in account settings' ? '' : o.addressLine,
     flatInfo: o.flatInfo ?? '',
     landmark: o.landmark ?? '',
@@ -154,7 +155,7 @@ export function OutletsOverlay({
           const match = list.find((o) => o.id === initialOutletId);
           if (match) {
             openedInitialRef.current = initialOutletId;
-            setEditing(outletToDraft(match));
+            setEditing(outletToDraft(match, activeAccount?.legalName || businessName));
             return;
           }
         }
@@ -255,7 +256,7 @@ export function OutletsOverlay({
                   </div>
                   <div className="absolute right-4 top-4 flex items-center gap-1">
                     <button
-                      onClick={() => setEditing(outletToDraft(o))}
+                      onClick={() => setEditing(outletToDraft(o, activeAccount?.legalName || businessName))}
                       className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-500 hover:text-gray-900 transition-colors"
                       title="Edit outlet"
                     >

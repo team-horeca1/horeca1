@@ -229,8 +229,18 @@ function resolveOrderIdentity(order: OrderData) {
         legalName: order.businessAccount?.legalName,
         fallback: order.user.businessName,
     });
+    const billToAddress = frozenBilling
+        ? formatAddressLines({
+            addressLine: frozenBilling.buyer.addressLine,
+            city: frozenBilling.buyer.city,
+            state: frozenBilling.buyer.state,
+            pincode: frozenBilling.buyer.pincode,
+        })
+        : '';
     return {
         billToName,
+        billToAddress,
+        hasFrozenBilling: !!frozenBilling,
         accountLabel,
         gstin: frozenBilling?.buyer.gstin ?? order.businessAccount?.gstin ?? null,
         deliveryAddress: formatAddressLines(order.deliveryAddressSnapshot),
@@ -761,7 +771,15 @@ function PrintPicklist({ order }: { order: OrderData }) {
                     </div>
                 </div>
 
-                {/* Deliver To */}
+                {/* Bill To (frozen) + Deliver To */}
+                {(identity.billToName || identity.billToAddress) && (
+                    <div className="mb-4">
+                        <p className="font-bold underline mb-1">Bill To:</p>
+                        {identity.billToName && <p className="font-bold">{identity.billToName}</p>}
+                        {identity.billToAddress && <p className="mt-1">{identity.billToAddress}</p>}
+                        {identity.gstin && <p>GSTIN: {identity.gstin}</p>}
+                    </div>
+                )}
                 <div className="mb-4">
                     <p className="font-bold underline mb-1">Deliver To:</p>
                     {identity.accountLabel && <p className="font-bold">{identity.accountLabel}</p>}
@@ -1266,7 +1284,11 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Customer Profile</h4>
+                                    <p className="text-[10px] uppercase font-bold text-[#9CA3AF]">{identity.hasFrozenBilling ? 'Bill To (invoice)' : 'Bill To'}</p>
                                     <p className="text-[13px] font-bold text-[#374151] truncate">{identity.billToName || order.user.fullName}</p>
+                                    {identity.billToAddress && (
+                                        <p className="text-[11px] text-[#6B7280] line-clamp-2 font-medium mt-0.5">{identity.billToAddress}</p>
+                                    )}
                                     {order.outlet?.name && (
                                         <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">Outlet: {order.outlet.name}</p>
                                     )}
