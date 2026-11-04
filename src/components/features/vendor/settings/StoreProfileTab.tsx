@@ -4,6 +4,12 @@ import { Store } from 'lucide-react';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
 import { cn } from '@/lib/utils';
 import { VendorSettingsSaveBar } from './VendorSettingsSaveBar';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+  fromBillingAndPickup,
+  toVendorFlatPayload,
+  type BusinessAddressValue,
+} from '@/lib/businessAddress';
 
 export interface StoreProfileTabProps {
   businessName: string;
@@ -32,6 +38,14 @@ export interface StoreProfileTabProps {
   setStateName: (v: string) => void;
   addressPincode: string;
   setAddressPincode: (v: string) => void;
+  pickupAddressLine: string;
+  setPickupAddressLine: (v: string) => void;
+  pickupCity: string;
+  setPickupCity: (v: string) => void;
+  pickupState: string;
+  setPickupState: (v: string) => void;
+  pickupPincode: string;
+  setPickupPincode: (v: string) => void;
   gstNumber: string;
   setGstNumber: (v: string) => void;
   saving: boolean;
@@ -48,7 +62,10 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
     vendorType, setVendorType, minOrderValue, setMinOrderValue,
     creditEnabled, setCreditEnabled,
     addressLine, setAddressLine, city, setCity, stateName, setStateName,
-    addressPincode, setAddressPincode, gstNumber, setGstNumber,
+    addressPincode, setAddressPincode,
+    pickupAddressLine, setPickupAddressLine, pickupCity, setPickupCity,
+    pickupState, setPickupState, pickupPincode, setPickupPincode,
+    gstNumber, setGstNumber,
     saving, saved, onSave, readOnly = false,
   } = props;
 
@@ -56,6 +73,23 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
     'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40',
     readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
   );
+
+  const addressValue: BusinessAddressValue = fromBillingAndPickup(
+    { addressLine, city, state: stateName, pincode: addressPincode },
+    { addressLine: pickupAddressLine, city: pickupCity, state: pickupState, pincode: pickupPincode },
+  );
+
+  const handleAddressChange = (next: BusinessAddressValue) => {
+    const flat = toVendorFlatPayload(next);
+    setAddressLine(flat.addressLine);
+    setCity(flat.city);
+    setStateName(flat.state);
+    setAddressPincode(flat.addressPincode);
+    setPickupAddressLine(flat.pickupAddressLine);
+    setPickupCity(flat.pickupCity);
+    setPickupState(flat.pickupState);
+    setPickupPincode(flat.pickupPincode);
+  };
 
   return (
     <div className="space-y-6">
@@ -164,41 +198,20 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
         </div>
       </div>
 
-      <div className="pt-4 border-t border-[#EEEEEE]">
-        <h3 className="text-[15px] font-bold text-[#181725] mb-1">Registered business address</h3>
-        <p className="text-[12px] text-[#7C7C7C] mb-4">Bill From / Shipped From on tax invoices</p>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Street / building</label>
-            <textarea
-              value={addressLine}
-              onChange={(e) => setAddressLine(e.target.value)}
-              rows={2}
-              disabled={readOnly}
-              className={cn(
-                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 resize-none',
-                readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
-              )}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[13px] font-bold text-[#181725] mb-1.5">City</label>
-              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} disabled={readOnly} className={fieldClass} />
-            </div>
-            <div>
-              <label className="block text-[13px] font-bold text-[#181725] mb-1.5">State</label>
-              <input type="text" value={stateName} onChange={(e) => setStateName(e.target.value)} disabled={readOnly} className={fieldClass} />
-            </div>
-            <div>
-              <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Pincode</label>
-              <input type="text" inputMode="numeric" maxLength={6} value={addressPincode} onChange={(e) => setAddressPincode(e.target.value.replace(/[^\d]/g, ''))} disabled={readOnly} className={fieldClass} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[13px] font-bold text-[#181725] mb-1.5">GSTIN</label>
-            <input type="text" value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} maxLength={15} disabled={readOnly} className={cn(fieldClass, 'font-mono')} />
-          </div>
+      <div className={cn('pt-4 border-t border-[#EEEEEE]', readOnly && 'pointer-events-none opacity-80')}>
+        <h3 className="text-[15px] font-bold text-[#181725] mb-1">Business addresses</h3>
+        <p className="text-[12px] text-[#7C7C7C] mb-4">Billing goes on invoices. Pickup is where orders are collected.</p>
+        <BusinessAddressForm
+          mode="billing+delivery"
+          value={addressValue}
+          onChange={handleAddressChange}
+          deliveryLabel="Pickup / warehouse address"
+          sameAsLabel="Pickup address is the same as billing"
+          required={false}
+        />
+        <div className="mt-4">
+          <label className="block text-[13px] font-bold text-[#181725] mb-1.5">GSTIN</label>
+          <input type="text" value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} maxLength={15} disabled={readOnly} className={cn(fieldClass, 'font-mono')} />
         </div>
       </div>
 

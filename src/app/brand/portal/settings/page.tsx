@@ -9,6 +9,13 @@ import { toast } from 'sonner';
 import { CategoryMultiPicker } from '@/components/features/brand/CategoryMultiPicker';
 import { ImagePreview } from '@/components/ui/ImagePreview';
 import { usePermissions } from '@/hooks/usePermissions';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+    EMPTY_BUSINESS_ADDRESS,
+    fromSingleAddress,
+    toBrandBillingPayload,
+    type BusinessAddressValue,
+} from '@/lib/businessAddress';
 import {
     HeroSlideManager,
     PAGE_HERO_CREATE_BODY,
@@ -28,6 +35,15 @@ interface BrandProfile {
     bgColor: string | null;
     showcaseImages: string[];
     approvalStatus: string;
+    addressLine?: string | null;
+    billingAddressLine?: string | null;
+    city?: string | null;
+    billingCity?: string | null;
+    state?: string | null;
+    billingState?: string | null;
+    pincode?: string | null;
+    billingPincode?: string | null;
+    outletName?: string | null;
 }
 
 export default function BrandSettingsPage() {
@@ -37,6 +53,7 @@ export default function BrandSettingsPage() {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [form, setForm] = useState({ name: '', tagline: '', description: '', logoUrl: '' as string | null, bannerUrl: '' as string | null, website: '', categories: [] as string[], bgColor: '#f0faf4', showcaseImages: [] as string[] });
+    const [address, setAddress] = useState<BusinessAddressValue>(EMPTY_BUSINESS_ADDRESS);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -44,18 +61,28 @@ export default function BrandSettingsPage() {
             .then(r => r.json())
             .then(json => {
                 if (json.success) {
-                    setProfile(json.data);
+                    const data = json.data as BrandProfile;
+                    setProfile(data);
                     setForm({
-                        name: json.data.name ?? '',
-                        tagline: json.data.tagline ?? '',
-                        description: json.data.description ?? '',
-                        logoUrl: json.data.logoUrl ?? null,
-                        bannerUrl: json.data.bannerUrl ?? null,
-                        website: json.data.website ?? '',
-                        categories: json.data.categories ?? [],
-                        bgColor: json.data.bgColor ?? '#f0faf4',
-                        showcaseImages: json.data.showcaseImages ?? [],
+                        name: data.name ?? '',
+                        tagline: data.tagline ?? '',
+                        description: data.description ?? '',
+                        logoUrl: data.logoUrl ?? null,
+                        bannerUrl: data.bannerUrl ?? null,
+                        website: data.website ?? '',
+                        categories: data.categories ?? [],
+                        bgColor: data.bgColor ?? '#f0faf4',
+                        showcaseImages: data.showcaseImages ?? [],
                     });
+                    setAddress(fromSingleAddress(
+                        {
+                            addressLine: data.addressLine ?? data.billingAddressLine ?? '',
+                            city: data.city ?? data.billingCity ?? '',
+                            state: data.state ?? data.billingState ?? '',
+                            pincode: data.pincode ?? data.billingPincode ?? '',
+                        },
+                        { locationName: data.outletName ?? '' },
+                    ));
                 }
             })
             .catch(() => {})
@@ -69,6 +96,7 @@ export default function BrandSettingsPage() {
             // which rejects both empty strings and `null`. Send only non-empty URLs so a blank
             // field doesn't fail validation. (NOTE: clearing an image therefore does not persist —
             // that needs the validator to accept null on logoUrl/bannerUrl. See report.)
+            const billing = toBrandBillingPayload(address);
             const res = await fetch('/api/v1/brand/profile', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -82,6 +110,15 @@ export default function BrandSettingsPage() {
                     categories: form.categories,
                     bgColor: form.bgColor,
                     showcaseImages: form.showcaseImages,
+                    addressLine: billing.addressLine,
+                    billingAddressLine: billing.billingAddressLine,
+                    city: billing.city,
+                    billingCity: billing.billingCity,
+                    state: billing.state,
+                    billingState: billing.billingState,
+                    pincode: billing.pincode,
+                    billingPincode: billing.billingPincode,
+                    outletName: address.locationName.trim() || undefined,
                 }),
             });
             const json = await res.json();
@@ -256,6 +293,24 @@ export default function BrandSettingsPage() {
                 createBody={PAGE_HERO_CREATE_BODY}
                 footer={<PageHeroIdentityNote kind="brand" name={form.name} logoUrl={form.logoUrl} />}
             />
+
+            {/* Registered address */}
+            <div className="bg-white rounded-[20px] border border-[#EEEEEE] p-6 space-y-4">
+                <div>
+                    <h2 className="text-[15px] font-bold text-[#181725]">Registered Address</h2>
+                    <p className="text-[12px] text-[#7C7C7C] mt-0.5">
+                        Single business location used on invoices and your brand profile.
+                    </p>
+                </div>
+                <BusinessAddressForm
+                    mode="single"
+                    value={address}
+                    onChange={setAddress}
+                    showLocationName
+                    locationNameLabel="Outlet name"
+                    required={false}
+                />
+            </div>
 
             {/* Categories */}
             <div className="bg-white rounded-[20px] border border-[#EEEEEE] p-6">

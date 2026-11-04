@@ -13,7 +13,7 @@
 // Backend contract: POST /api/v1/admin/vendors with the body shape
 // validated against src/lib/validators/vendor-kyc.ts schemas.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import {
   X, ChevronLeft, ChevronRight, Loader2, AlertCircle, Check,
   Info, UserPlus, Building2, IndianRupee, MapPin, Truck, Eye, EyeOff, Plus,
@@ -37,6 +37,13 @@ import {
 import { cn } from '@/lib/utils';
 import { FORM, FormField as Field, FormInput, SectionLabel, selectClass, textareaClass, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
 import { parseJsonResponse } from '@/lib/apiError';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+  EMPTY_BUSINESS_ADDRESS,
+  billingOf,
+  effectiveDelivery,
+  type BusinessAddressValue,
+} from '@/lib/businessAddress';
 
 interface Props {
   onClose: () => void;
@@ -45,9 +52,6 @@ interface Props {
 }
 
 const STEP_LABELS = ['Owner & Business', 'KYC & Bank', 'Address & Operations'];
-
-interface AddressInput { addressLine: string; city: string; state: string; pincode: string }
-const blankAddress = (): AddressInput => ({ addressLine: '', city: '', state: '', pincode: '' });
 
 const VENDOR_TYPE_LABEL: Partial<Record<VendorType, string>> = {
   distributor:  'Distributor',
@@ -107,12 +111,12 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
   const [bankIfsc, setBankIfsc] = useState('');
   const [bankName, setBankName] = useState('');
   const [bankAccountType, setBankAccountType] = useState<'savings' | 'current'>('current');
-  const [billingAddress, setBillingAddress] = useState<AddressInput>(blankAddress());
 
-  // Step 3 — Address & Operations
-  const [pickupSameAsBilling, setPickupSameAsBilling] = useState(true);
-  const [pickupAddress, setPickupAddress] = useState<AddressInput>(blankAddress());
-  const [outletName, setOutletName] = useState('');
+  // Step 3 — Address & Operations (shared form; Same as billing ON by default)
+  const [storeAddress, setStoreAddress] = useState<BusinessAddressValue>({
+    ...EMPTY_BUSINESS_ADDRESS,
+    sameAsBilling: true,
+  });
   const [pincodes, setPincodes] = useState<string[]>([]);
   const [pincodeInput, setPincodeInput] = useState('');
   const [deliveryCapability, setDeliveryCapability] = useState<DeliveryCapability | ''>('');
@@ -122,7 +126,9 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
   const [description, setDescription] = useState('');
   const [minOrderValue, setMinOrderValue] = useState('');
 
-  const effectivePickup = pickupSameAsBilling ? billingAddress : pickupAddress;
+  const billingAddress = billingOf(storeAddress);
+  const effectivePickup = effectiveDelivery(storeAddress);
+  const outletName = storeAddress.locationName;
 
   // ── Step validation.
   const validateStep = (s: number): Record<string, string> => {
@@ -151,12 +157,12 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
       if (bankAccountNumber.trim().length < 8) errors.bankAccountNumber = 'Account number must be at least 8 digits';
       if (!IFSC_RE.test(bankIfsc.trim())) errors.bankIfsc = 'IFSC must be 11 characters (e.g. HDFC0001234)';
       if (bankName.trim().length < 2) errors.bankName = 'Bank name is required';
+    } else if (s === 3) {
+      if (outletName.trim().length < 1) errors.outletName = 'Outlet name is required';
       if (billingAddress.addressLine.trim().length < 5) errors.billingAddressLine = 'Address line must be at least 5 characters';
       if (!billingAddress.city.trim()) errors.billingAddressCity = 'City is required';
       if (!billingAddress.state.trim()) errors.billingAddressState = 'State is required';
       if (!PINCODE_RE.test(billingAddress.pincode)) errors.billingAddressPincode = 'Pincode must be exactly 6 digits';
-    } else if (s === 3) {
-      if (outletName.trim().length < 1) errors.outletName = 'Outlet name is required';
       if (effectivePickup.addressLine.trim().length < 5) errors.pickupAddressLine = 'Pickup address line must be at least 5 characters';
       if (!effectivePickup.city.trim()) errors.pickupAddressCity = 'City is required';
       if (!effectivePickup.state.trim()) errors.pickupAddressState = 'State is required';
@@ -556,82 +562,49 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                 </div>
               </Field>
 
-              <div className="pt-2 border-t border-[#EEEEEE]" />
-              <SectionLabel><MapPin size={12} className="inline mr-1" />Billing Address (Bill From on invoices)</SectionLabel>
-              <AddressFields
-                value={billingAddress}
-                onChange={(v) => {
-                  setBillingAddress(v);
-                  setFieldErrors(prev => ({
-                    ...prev,
-                    billingAddressLine: '',
-                    billingAddressCity: '',
-                    billingAddressState: '',
-                    billingAddressPincode: '',
-                  }));
-                }}
-                errors={{
-                  addressLine: fieldErrors.billingAddressLine,
-                  city: fieldErrors.billingAddressCity,
-                  state: fieldErrors.billingAddressState,
-                  pincode: fieldErrors.billingAddressPincode,
-                }}
-                fieldPrefix="vendor-billing"
-              />
             </div>
           )}
 
           {/* Step 3 — Address & Operations */}
           {step === 3 && (
             <div className="space-y-4 min-h-[480px]">
-              <SectionLabel><MapPin size={12} className="inline mr-1" />Pickup / Warehouse Outlet</SectionLabel>
-              <Field label="Outlet name" required hint="e.g. 'Mumbai Warehouse', 'Main Store'" error={fieldErrors.outletName}>
-                <Input
-                  name="vendor-outlet-name" value={outletName}
-                  onChange={(v) => { setOutletName(v); setFieldErrors(prev => ({ ...prev, outletName: '' })); }}
-                  hasError={!!fieldErrors.outletName}
-                  placeholder="Main Warehouse"
-                />
-              </Field>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox" checked={pickupSameAsBilling}
-                  onChange={(e) => {
-                    setPickupSameAsBilling(e.target.checked);
-                    setFieldErrors(prev => ({
-                      ...prev,
-                      pickupAddressLine: '',
-                      pickupAddressCity: '',
-                      pickupAddressState: '',
-                      pickupAddressPincode: '',
-                    }));
-                  }}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-[12.5px] text-[#181725]">Pickup address is same as billing address</span>
-              </label>
-              {!pickupSameAsBilling && (
-                <AddressFields
-                  value={pickupAddress}
-                  onChange={(v) => {
-                    setPickupAddress(v);
-                    setFieldErrors(prev => ({
-                      ...prev,
-                      pickupAddressLine: '',
-                      pickupAddressCity: '',
-                      pickupAddressState: '',
-                      pickupAddressPincode: '',
-                    }));
-                  }}
-                  errors={{
-                    addressLine: fieldErrors.pickupAddressLine,
-                    city: fieldErrors.pickupAddressCity,
-                    state: fieldErrors.pickupAddressState,
-                    pincode: fieldErrors.pickupAddressPincode,
-                  }}
-                  fieldPrefix="vendor-pickup"
-                />
-              )}
+              <SectionLabel><MapPin size={12} className="inline mr-1" />Billing & Pickup Address</SectionLabel>
+              <BusinessAddressForm
+                mode="billing+delivery"
+                value={storeAddress}
+                onChange={(next) => {
+                  setStoreAddress(next);
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    outletName: '',
+                    billingAddressLine: '',
+                    billingAddressCity: '',
+                    billingAddressState: '',
+                    billingAddressPincode: '',
+                    pickupAddressLine: '',
+                    pickupAddressCity: '',
+                    pickupAddressState: '',
+                    pickupAddressPincode: '',
+                  }));
+                }}
+                errors={{
+                  outletName: fieldErrors.outletName,
+                  billingAddressLine: fieldErrors.billingAddressLine,
+                  billingCity: fieldErrors.billingAddressCity,
+                  billingState: fieldErrors.billingAddressState,
+                  billingPincode: fieldErrors.billingAddressPincode,
+                  addressLine: fieldErrors.pickupAddressLine,
+                  city: fieldErrors.pickupAddressCity,
+                  state: fieldErrors.pickupAddressState,
+                  pincode: fieldErrors.pickupAddressPincode,
+                }}
+                showLocationName
+                locationNameLabel="Outlet name"
+                locationNameRequired
+                deliveryLabel="Pickup / warehouse address"
+                sameAsLabel="Pickup address is the same as billing"
+                required
+              />
 
               <div className="pt-2 border-t border-[#EEEEEE]" />
               <SectionLabel><Truck size={12} className="inline mr-1" />Operations</SectionLabel>
@@ -801,77 +774,6 @@ function Step({ num, label, current, showConnector }: { num: 1 | 2 | 3; label: s
         </div>
       )}
     </>
-  );
-}
-
-// ── Address sub-block ───────────────────────────────────────────────────
-function AddressFields({
-  value, onChange, fieldPrefix, errors,
-}: {
-  value: AddressInput;
-  onChange: (v: AddressInput) => void;
-  fieldPrefix: string;
-  errors?: Record<string, string>;
-}) {
-  const lastFetchedPin = useRef('');
-
-  useEffect(() => {
-    const pin = value.pincode;
-    if (!/^\d{6}$/.test(pin)) return;
-    if (pin === lastFetchedPin.current) return;
-
-    lastFetchedPin.current = pin;
-    fetch(`https://api.postalpincode.in/pincode/${pin}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const po = data?.[0]?.PostOffice?.[0];
-        if (!po) return;
-        onChange({
-          ...value,
-          city: po.District || po.Division || value.city,
-          state: po.State || value.state,
-        });
-      })
-      .catch(() => {});
-  }, [value.pincode, value, onChange]);
-
-  return (
-    <div className="space-y-3">
-      <Field label="Address line" required error={errors?.addressLine}>
-        <Input
-          name={`${fieldPrefix}-line`} value={value.addressLine}
-          onChange={(v) => onChange({ ...value, addressLine: v })}
-          hasError={!!errors?.addressLine}
-          placeholder="Plot 22, MIDC Phase II"
-        />
-      </Field>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="City" required error={errors?.city}>
-          <Input
-            name={`${fieldPrefix}-city`} value={value.city}
-            onChange={(v) => onChange({ ...value, city: v })}
-            hasError={!!errors?.city}
-            placeholder="Mumbai"
-          />
-        </Field>
-        <Field label="State" required error={errors?.state}>
-          <Input
-            name={`${fieldPrefix}-state`} value={value.state}
-            onChange={(v) => onChange({ ...value, state: v })}
-            hasError={!!errors?.state}
-            placeholder="Maharashtra"
-          />
-        </Field>
-        <Field label="Pincode" required error={errors?.pincode}>
-          <Input
-            name={`${fieldPrefix}-pin`} value={value.pincode}
-            onChange={(v) => onChange({ ...value, pincode: v.replace(/\D/g, '').slice(0, 6) })}
-            hasError={!!errors?.pincode}
-            placeholder="400001" inputMode="numeric"
-          />
-        </Field>
-      </div>
-    </div>
   );
 }
 

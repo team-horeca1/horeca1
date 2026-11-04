@@ -18,6 +18,13 @@ import {
   type VendorProfileValues,
 } from '@/components/features/vendor/VendorProfileForm';
 import { EMPTY_VENDOR_PROFILE } from '@/components/features/vendor/vendorProfileDefaults';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+  EMPTY_BUSINESS_ADDRESS,
+  billingOf,
+  effectiveDelivery,
+  type BusinessAddressValue,
+} from '@/lib/businessAddress';
 import {
   validateVendorProfile,
   validateFieldBlur as validateVendorFieldBlur,
@@ -76,8 +83,6 @@ const V = {
 };
 
 type Address = { addressLine: string; city: string; state: string; pincode: string };
-
-const blankAddress = (): Address => ({ addressLine: '', city: '', state: '', pincode: '' });
 
 const RESEND_COOLDOWN = 60;
 
@@ -206,11 +211,11 @@ export default function VendorRegisterClient() {
   const [bankAccountType, setBankAccountType] = useState<'savings' | 'current'>('current');
   const [chequeFile, setChequeFile] = useState<File | null>(null);
 
-  // Step 6
-  const [billingAddress, setBillingAddress] = useState<Address>(blankAddress());
-  const [pickupAddress, setPickupAddress] = useState<Address>(blankAddress());
-  const [pickupSameAsBilling, setPickupSameAsBilling] = useState(false);
-
+  // Step 6 — shared address form (Same as billing ON by default)
+  const [storeAddress, setStoreAddress] = useState<BusinessAddressValue>(EMPTY_BUSINESS_ADDRESS);
+  const billingAddress: Address = billingOf(storeAddress);
+  const pickupAddress: Address = effectiveDelivery(storeAddress);
+  const pickupSameAsBilling = storeAddress.sameAsBilling;
   // Step 7
   const [pincodes, setPincodes] = useState<string[]>([]);
   const [pincodeInput, setPincodeInput] = useState('');
@@ -633,57 +638,6 @@ export default function VendorRegisterClient() {
     setError('');
   };
   const removePincode = (p: string) => setPincodes(pincodes.filter(x => x !== p));
-
-  // ─── Pickup same as billing ─────────────────────────────────────────────
-  useEffect(() => {
-    if (pickupSameAsBilling) setPickupAddress({ ...billingAddress });
-  }, [pickupSameAsBilling, billingAddress]);
-
-  const lastFetchedBillingPin = useRef('');
-  const lastFetchedPickupPin = useRef('');
-
-  // Auto-fill billing city & state when a valid 6-digit pincode is typed manually
-  useEffect(() => {
-    const pin = billingAddress.pincode;
-    if (!/^\d{6}$/.test(pin)) return;
-    if (pin === lastFetchedBillingPin.current) return;
-
-    lastFetchedBillingPin.current = pin;
-    fetch(`https://api.postalpincode.in/pincode/${pin}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const po = data?.[0]?.PostOffice?.[0];
-        if (!po) return;
-        setBillingAddress(prev => ({
-          ...prev,
-          city: po.District || po.Division || prev.city,
-          state: po.State || prev.state,
-        }));
-      })
-      .catch(() => {});
-  }, [billingAddress.pincode]);
-
-  // Auto-fill pickup city & state when a valid 6-digit pincode is typed manually
-  useEffect(() => {
-    if (pickupSameAsBilling) return;
-    const pin = pickupAddress.pincode;
-    if (!/^\d{6}$/.test(pin)) return;
-    if (pin === lastFetchedPickupPin.current) return;
-
-    lastFetchedPickupPin.current = pin;
-    fetch(`https://api.postalpincode.in/pincode/${pin}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const po = data?.[0]?.PostOffice?.[0];
-        if (!po) return;
-        setPickupAddress(prev => ({
-          ...prev,
-          city: po.District || po.Division || prev.city,
-          state: po.State || prev.state,
-        }));
-      })
-      .catch(() => {});
-  }, [pickupAddress.pincode, pickupSameAsBilling]);
 
   // ─── Validation per step ────────────────────────────────────────────────
   // Each input also runs validators on blur via setFE() so the user sees
@@ -1531,79 +1485,16 @@ export default function VendorRegisterClient() {
               <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store addresses</h2>
               <p className="text-[13px] text-gray-500 mb-6">Billing address goes on invoices. Pickup address is where our delivery partner collects orders.</p>
 
-              <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
-                <h3 className="font-bold text-[15px] text-gray-800 mb-3">Billing Address</h3>
-                <div className="space-y-3">
-                  <Field label="Address Line" required error={fieldErrors.billingAddressLine} dataField="billingAddressLine">
-                    <Input value={billingAddress.addressLine}
-                      onChange={v => { setBillingAddress({ ...billingAddress, addressLine: v }); if (fieldErrors.billingAddressLine) setFE('billingAddressLine', v.trim().length < 5 ? 'Enter the full address' : ''); }}
-                      onBlur={() => setFE('billingAddressLine', billingAddress.addressLine.trim().length < 5 ? 'Enter the full address' : '')}
-                      hasError={!!fieldErrors.billingAddressLine}
-                      placeholder="Building, street, area" />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="City" required error={fieldErrors.billingCity} dataField="billingCity">
-                      <Input value={billingAddress.city}
-                        onChange={v => { setBillingAddress({ ...billingAddress, city: v }); if (fieldErrors.billingCity) setFE('billingCity', v.trim() ? '' : 'City is required'); }}
-                        onBlur={() => setFE('billingCity', billingAddress.city.trim() ? '' : 'City is required')}
-                        hasError={!!fieldErrors.billingCity} />
-                    </Field>
-                    <Field label="State" required error={fieldErrors.billingState} dataField="billingState">
-                      <Input value={billingAddress.state}
-                        onChange={v => { setBillingAddress({ ...billingAddress, state: v }); if (fieldErrors.billingState) setFE('billingState', v.trim() ? '' : 'State is required'); }}
-                        onBlur={() => setFE('billingState', billingAddress.state.trim() ? '' : 'State is required')}
-                        hasError={!!fieldErrors.billingState} />
-                    </Field>
-                  </div>
-                  <Field label="Pincode" required error={fieldErrors.billingPincode} dataField="billingPincode">
-                    <Input value={billingAddress.pincode}
-                      onChange={v => { const n = v.replace(/\D/g, '').slice(0, 6); setBillingAddress({ ...billingAddress, pincode: n }); if (fieldErrors.billingPincode) setFE('billingPincode', V.pincode(n)); }}
-                      onBlur={() => setFE('billingPincode', V.pincode(billingAddress.pincode))}
-                      hasError={!!fieldErrors.billingPincode}
-                      placeholder="6-digit pincode" />
-                  </Field>
-                </div>
-              </div>
-
               <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-[15px] text-gray-800">Pickup / Warehouse Address</h3>
-                  <label className="flex items-center gap-2 text-[12px] text-gray-600 cursor-pointer">
-                    <input type="checkbox" checked={pickupSameAsBilling} onChange={e => setPickupSameAsBilling(e.target.checked)}
-                      className="accent-primary" />
-                    Same as billing
-                  </label>
-                </div>
-                <div className="space-y-3">
-                  <Field label="Address Line" required error={!pickupSameAsBilling ? fieldErrors.pickupAddressLine : undefined} dataField="pickupAddressLine">
-                    <Input value={pickupAddress.addressLine} disabled={pickupSameAsBilling}
-                      onChange={v => { setPickupAddress({ ...pickupAddress, addressLine: v }); if (fieldErrors.pickupAddressLine) setFE('pickupAddressLine', v.trim().length < 5 ? 'Enter the full address' : ''); }}
-                      onBlur={() => setFE('pickupAddressLine', pickupAddress.addressLine.trim().length < 5 ? 'Enter the full address' : '')}
-                      hasError={!pickupSameAsBilling && !!fieldErrors.pickupAddressLine}
-                      placeholder="Warehouse / godown address" />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="City" required error={!pickupSameAsBilling ? fieldErrors.pickupCity : undefined} dataField="pickupCity">
-                      <Input value={pickupAddress.city} disabled={pickupSameAsBilling}
-                        onChange={v => { setPickupAddress({ ...pickupAddress, city: v }); if (fieldErrors.pickupCity) setFE('pickupCity', v.trim() ? '' : 'City is required'); }}
-                        onBlur={() => setFE('pickupCity', pickupAddress.city.trim() ? '' : 'City is required')}
-                        hasError={!pickupSameAsBilling && !!fieldErrors.pickupCity} />
-                    </Field>
-                    <Field label="State" required error={!pickupSameAsBilling ? fieldErrors.pickupState : undefined} dataField="pickupState">
-                      <Input value={pickupAddress.state} disabled={pickupSameAsBilling}
-                        onChange={v => { setPickupAddress({ ...pickupAddress, state: v }); if (fieldErrors.pickupState) setFE('pickupState', v.trim() ? '' : 'State is required'); }}
-                        onBlur={() => setFE('pickupState', pickupAddress.state.trim() ? '' : 'State is required')}
-                        hasError={!pickupSameAsBilling && !!fieldErrors.pickupState} />
-                    </Field>
-                  </div>
-                  <Field label="Pincode" required error={!pickupSameAsBilling ? fieldErrors.pickupPincode : undefined} dataField="pickupPincode">
-                    <Input value={pickupAddress.pincode} disabled={pickupSameAsBilling}
-                      onChange={v => { const n = v.replace(/\D/g, '').slice(0, 6); setPickupAddress({ ...pickupAddress, pincode: n }); if (fieldErrors.pickupPincode) setFE('pickupPincode', V.pincode(n)); }}
-                      onBlur={() => setFE('pickupPincode', V.pincode(pickupAddress.pincode))}
-                      hasError={!pickupSameAsBilling && !!fieldErrors.pickupPincode}
-                      placeholder="6-digit pincode" />
-                  </Field>
-                </div>
+                <BusinessAddressForm
+                  mode="billing+delivery"
+                  value={storeAddress}
+                  onChange={setStoreAddress}
+                  errors={fieldErrors}
+                  deliveryLabel="Pickup / warehouse address"
+                  sameAsLabel="Pickup address is the same as billing"
+                  required
+                />
               </div>
             </section>
           )}

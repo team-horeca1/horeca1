@@ -48,6 +48,10 @@ function VendorSettingsContent() {
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
   const [addressPincode, setAddressPincode] = useState('');
+  const [pickupAddressLine, setPickupAddressLine] = useState('');
+  const [pickupCity, setPickupCity] = useState('');
+  const [pickupState, setPickupState] = useState('');
+  const [pickupPincode, setPickupPincode] = useState('');
   const [gstNumber, setGstNumber] = useState('');
   const [newPincode, setNewPincode] = useState('');
   const [addingArea, setAddingArea] = useState(false);
@@ -111,6 +115,10 @@ function VendorSettingsContent() {
             (!hasRegistered ? (data.pickupPincode || '') : '') ||
             '',
         );
+        setPickupAddressLine(data.pickupAddressLine || '');
+        setPickupCity(data.pickupCity || '');
+        setPickupState(data.pickupState || '');
+        setPickupPincode(data.pickupPincode || '');
         setGstNumber(data.gstNumber || '');
         setDefaultMOQ(data.defaultMOQ != null ? String(data.defaultMOQ) : '');
         setDeliveryFeeVal(data.deliveryFee != null ? String(data.deliveryFee) : '');
@@ -214,6 +222,10 @@ function VendorSettingsContent() {
           city: city || undefined,
           state: stateName || undefined,
           addressPincode: addressPincode || undefined,
+          pickupAddressLine: pickupAddressLine || undefined,
+          pickupCity: pickupCity || undefined,
+          pickupState: pickupState || undefined,
+          pickupPincode: pickupPincode || undefined,
           gstNumber: gstNumber || undefined,
           defaultMOQ: defaultMOQ ? parseInt(defaultMOQ, 10) : undefined,
           deliveryFee: deliveryFeeVal ? parseFloat(deliveryFeeVal) : undefined,
@@ -408,6 +420,10 @@ function VendorSettingsContent() {
               city={city} setCity={setCity}
               stateName={stateName} setStateName={setStateName}
               addressPincode={addressPincode} setAddressPincode={setAddressPincode}
+              pickupAddressLine={pickupAddressLine} setPickupAddressLine={setPickupAddressLine}
+              pickupCity={pickupCity} setPickupCity={setPickupCity}
+              pickupState={pickupState} setPickupState={setPickupState}
+              pickupPincode={pickupPincode} setPickupPincode={setPickupPincode}
               gstNumber={gstNumber} setGstNumber={setGstNumber}
               {...saveProps}
             />

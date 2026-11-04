@@ -28,6 +28,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CategoryMultiPicker } from '@/components/features/brand/CategoryMultiPicker';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+    EMPTY_BUSINESS_ADDRESS,
+    fromSingleAddress,
+    toBrandBillingPayload,
+    type BusinessAddressValue,
+} from '@/lib/businessAddress';
 import {
     HeroSlideManager,
     PAGE_HERO_CREATE_BODY,
@@ -150,6 +157,7 @@ export default function AdminBrandEditPage() {
         creditSupport: false,
         leadStatus: '',
     });
+    const [address, setAddress] = useState<BusinessAddressValue>(EMPTY_BUSINESS_ADDRESS);
 
     const loadBrand = useCallback(async () => {
         setLoading(true);
@@ -175,6 +183,13 @@ export default function AdminBrandEditPage() {
                 creditSupport: b.creditSupport ?? false,
                 leadStatus: b.leadStatus ?? '',
             });
+            const baAddr = b.businessAccount;
+            setAddress(fromSingleAddress({
+                addressLine: baAddr?.billingAddressLine ?? '',
+                city: baAddr?.billingCity ?? '',
+                state: baAddr?.billingState ?? '',
+                pincode: baAddr?.billingPincode ?? '',
+            }));
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Failed to load brand');
         } finally {
@@ -259,6 +274,7 @@ export default function AdminBrandEditPage() {
     const save = async () => {
         setSaving(true);
         try {
+            const billing = toBrandBillingPayload(address);
             const res = await fetch(`/api/v1/admin/brands/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -276,6 +292,14 @@ export default function AdminBrandEditPage() {
                     marketplaceVisibility: form.marketplaceVisibility || null,
                     creditSupport: form.creditSupport,
                     leadStatus: form.leadStatus || null,
+                    addressLine: billing.addressLine,
+                    billingAddressLine: billing.billingAddressLine,
+                    city: billing.city,
+                    billingCity: billing.billingCity,
+                    state: billing.state,
+                    billingState: billing.billingState,
+                    pincode: billing.pincode,
+                    billingPincode: billing.billingPincode,
                 }),
             });
             const json = await res.json();
@@ -499,8 +523,22 @@ export default function AdminBrandEditPage() {
                                             <InfoCardField label="GSTIN" value={gst} copyable />
                                             <InfoCardField label="Mobile Phone" value={phone} copyable />
                                             <InfoCardField label="Work Phone" value={ba?.workPhone} copyable />
-                                            <div className="sm:col-span-2">
-                                                <InfoCardField label="Registered Address" value={billingAddress} />
+                                            <div className="sm:col-span-3">
+                                                {canEditBrand ? (
+                                                    <div className="space-y-3 p-3.5 bg-[#F9FAFB] rounded-[10px] border border-[#F0F2F5]">
+                                                        <span className="text-[10px] font-extrabold text-[#9CA3AF] uppercase tracking-wider">
+                                                            Registered Address
+                                                        </span>
+                                                        <BusinessAddressForm
+                                                            mode="single"
+                                                            value={address}
+                                                            onChange={setAddress}
+                                                            required={false}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <InfoCardField label="Registered Address" value={billingAddress} />
+                                                )}
                                             </div>
                                             {ba?.remarks && (
                                                 <div className="sm:col-span-3">
@@ -552,6 +590,21 @@ export default function AdminBrandEditPage() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {canEditBrand && (
+                                        <div className="space-y-3">
+                                            <h2 className="text-[15px] font-black text-[#111827]">Registered Address</h2>
+                                            <p className="text-[12px] text-gray-500 -mt-1">
+                                                Single business location on the brand&apos;s business account.
+                                            </p>
+                                            <BusinessAddressForm
+                                                mode="single"
+                                                value={address}
+                                                onChange={setAddress}
+                                                required={false}
+                                            />
+                                        </div>
+                                    )}
 
                                     <div className="space-y-6">
                                         <h2 className="text-[15px] font-black text-[#111827]">Images</h2>

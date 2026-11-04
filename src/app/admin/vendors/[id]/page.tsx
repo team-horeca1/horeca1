@@ -48,6 +48,12 @@ import {
   normalizeVendorTypeSelections,
 } from '@/lib/constants/vendorProfile';
 import { resolveVendorCode, formatVendorSku } from '@/lib/sku';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+  fromBillingAndPickup,
+  toVendorFlatPayload,
+  type BusinessAddressValue,
+} from '@/lib/businessAddress';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -921,39 +927,35 @@ export default function VendorDetailsPage() {
                                                     </EditField>
                                                 </div>
                                                 <div className="md:col-span-2">
-                                                    <EditField label="Registered Office Address (Street)">
-                                                        <input
-                                                            type="text"
-                                                            value={address}
-                                                            onChange={(e) => setAddress(e.target.value)}
-                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    <EditField label="Business addresses">
+                                                        <BusinessAddressForm
+                                                            mode="billing+delivery"
+                                                            value={fromBillingAndPickup(
+                                                                { addressLine: address, city, state: stateVal, pincode },
+                                                                {
+                                                                    addressLine: pickupAddressLine,
+                                                                    city: pickupCity,
+                                                                    state: pickupState,
+                                                                    pincode: pickupPincode,
+                                                                },
+                                                            )}
+                                                            onChange={(next: BusinessAddressValue) => {
+                                                                const flat = toVendorFlatPayload(next);
+                                                                setAddress(flat.addressLine);
+                                                                setCity(flat.city);
+                                                                setStateVal(flat.state);
+                                                                setPincode(flat.pincode);
+                                                                setPickupAddressLine(flat.pickupAddressLine);
+                                                                setPickupCity(flat.pickupCity);
+                                                                setPickupState(flat.pickupState);
+                                                                setPickupPincode(flat.pickupPincode);
+                                                            }}
+                                                            deliveryLabel="Pickup / warehouse address"
+                                                            sameAsLabel="Pickup address is the same as billing"
+                                                            required={false}
                                                         />
                                                     </EditField>
                                                 </div>
-                                                <EditField label="Office City">
-                                                    <input
-                                                        type="text"
-                                                        value={city}
-                                                        onChange={(e) => setCity(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                    />
-                                                </EditField>
-                                                <EditField label="Office State">
-                                                    <input
-                                                        type="text"
-                                                        value={stateVal}
-                                                        onChange={(e) => setStateVal(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                    />
-                                                </EditField>
-                                                <EditField label="Office Pincode">
-                                                    <input
-                                                        type="text"
-                                                        value={pincode}
-                                                        onChange={(e) => setPincode(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                    />
-                                                </EditField>
                                             </div>
 
                                             <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Commercial Settings</h3>
@@ -1237,43 +1239,9 @@ export default function VendorDetailsPage() {
                                                 </EditField>
                                             </div>
 
-                                            <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Pickup warehouse address</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="md:col-span-2">
-                                                    <EditField label="Pickup warehouse address (Street)">
-                                                        <input
-                                                            type="text"
-                                                            value={pickupAddressLine}
-                                                            onChange={(e) => setPickupAddressLine(e.target.value)}
-                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                        />
-                                                    </EditField>
-                                                </div>
-                                                <EditField label="Pickup city">
-                                                    <input
-                                                        type="text"
-                                                        value={pickupCity}
-                                                        onChange={(e) => setPickupCity(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                    />
-                                                </EditField>
-                                                <EditField label="Pickup state">
-                                                    <input
-                                                        type="text"
-                                                        value={pickupState}
-                                                        onChange={(e) => setPickupState(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                    />
-                                                </EditField>
-                                                <EditField label="Pickup Pincode">
-                                                    <input
-                                                        type="text"
-                                                        value={pickupPincode}
-                                                        onChange={(e) => setPickupPincode(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
-                                                    />
-                                                </EditField>
-                                            </div>
+                                            <p className="mt-6 text-[12px] text-[#6B7280]">
+                                                Pickup / warehouse address is edited with Registered Office under Overview → Edit.
+                                            </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-6 animate-in fade-in duration-300">

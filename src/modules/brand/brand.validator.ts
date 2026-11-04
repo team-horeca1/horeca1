@@ -12,10 +12,26 @@ export const createBrandSchema = z.object({
   showcaseImages: z.array(z.string().url()).max(5).optional(),
 });
 
+const optionalPincode = z
+  .string()
+  .regex(/^\d{6}$/, 'Invalid pincode')
+  .optional()
+  .or(z.literal(''));
+
 /** PATCH may clear media by sending null (settings UI remove buttons). */
 export const updateBrandSchema = createBrandSchema.partial().extend({
   logoUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
   bannerUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  // Registered / billing address (BusinessAccount) — single location for brands.
+  addressLine: z.string().max(500).optional(),
+  billingAddressLine: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  billingCity: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+  billingState: z.string().max(100).optional(),
+  pincode: optionalPincode,
+  billingPincode: optionalPincode,
+  outletName: z.string().max(255).optional(),
 });
 
 export const createBrandProductSchema = z.object({

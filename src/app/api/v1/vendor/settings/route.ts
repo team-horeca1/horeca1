@@ -37,6 +37,11 @@ const updateSettingsSchema = z.object({
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   addressPincode: z.string().regex(/^\d{6}$/, 'Invalid pincode').optional().or(z.literal('')),
+  // Pickup / warehouse address (may differ from registered office).
+  pickupAddressLine: z.string().max(500).optional(),
+  pickupCity: z.string().max(100).optional(),
+  pickupState: z.string().max(100).optional(),
+  pickupPincode: z.string().regex(/^\d{6}$/, 'Invalid pincode').optional().or(z.literal('')),
   gstNumber: z.string().regex(GST_RE, 'Invalid GSTIN format').optional().or(z.literal('')),
   defaultMOQ: z.number().int().min(1).optional(),
   defaultTaxPercent: z.number().min(0).max(100).optional(),

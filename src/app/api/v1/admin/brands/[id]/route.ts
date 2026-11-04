@@ -14,6 +14,13 @@ import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
 import { hardDeleteBrandById } from '@/lib/userHardDelete';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
+const optionalPincode = z
+  .string()
+  .regex(/^\d{6}$/, 'Invalid pincode')
+  .nullable()
+  .optional()
+  .or(z.literal(''));
+
 // Lenient — admin should be able to save partial/legacy data.
 // Empty strings → null (frontend already does this). URLs not strictly validated
 // because some legacy records have bare domains like "amul.com".
@@ -39,6 +46,16 @@ const patchSchema = z.object({
   horecaFocused: z.boolean().nullable().optional(),
   retailFocused: z.boolean().nullable().optional(),
   isActive: z.boolean().optional(),
+  // Registered / billing address on linked BusinessAccount (single location).
+  addressLine: z.string().max(500).nullable().optional(),
+  billingAddressLine: z.string().max(500).nullable().optional(),
+  city: z.string().max(100).nullable().optional(),
+  billingCity: z.string().max(100).nullable().optional(),
+  state: z.string().max(100).nullable().optional(),
+  billingState: z.string().max(100).nullable().optional(),
+  pincode: optionalPincode,
+  billingPincode: optionalPincode,
+  outletName: z.string().max(255).nullable().optional(),
 });
 
 function slugify(name: string) {
@@ -95,6 +112,19 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     const body = await req.json();
     const input = patchSchema.parse(body);
 
+    const {
+      addressLine,
+      billingAddressLine,
+      city,
+      billingCity,
+      state,
+      billingState,
+      pincode,
+      billingPincode,
+      outletName,
+      ...brandFields
+    } = input;
+
     const existing = await prisma.brand.findUnique({
       where: { id },
       select: {
@@ -105,17 +135,55 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
         marketplaceVisibility: true,
         logoUrl: true,
         bannerUrl: true,
+        businessAccountId: true,
       },
     });
     if (!existing) throw Errors.notFound('Brand');
 
-    const updated = await prisma.brand.update({
-      where: { id },
-      data: {
-        ...input,
-        ...(input.name ? { slug: slugify(input.name) } : {}),
-      },
+    const line = billingAddressLine ?? addressLine;
+    const cityVal = billingCity ?? city;
+    const stateVal = billingState ?? state;
+    const pinVal = billingPincode ?? pincode;
+    const hasAddressPatch = [line, cityVal, stateVal, pinVal, outletName].some((v) => v !== undefined);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const brand = await tx.brand.update({
+        where: { id },
+        data: {
+          ...brandFields,
+          ...(input.name ? { slug: slugify(input.name) } : {}),
+        },
+      });
+
+      if (hasAddressPatch && existing.businessAccountId) {
+        const ba = await tx.businessAccount.update({
+          where: { id: existing.businessAccountId },
+          data: {
+            ...(line !== undefined ? { billingAddressLine: line || null } : {}),
+            ...(cityVal !== undefined ? { billingCity: cityVal || null } : {}),
+            ...(stateVal !== undefined ? { billingState: stateVal || null } : {}),
+            ...(pinVal !== undefined ? { billingPincode: pinVal || null } : {}),
+          },
+          select: { primaryOutletId: true },
+        });
+
+        if (ba.primaryOutletId && (line !== undefined || cityVal !== undefined || stateVal !== undefined || pinVal !== undefined || outletName !== undefined)) {
+          await tx.outlet.update({
+            where: { id: ba.primaryOutletId },
+            data: {
+              ...(outletName !== undefined && outletName?.trim() ? { name: outletName.trim() } : {}),
+              ...(line !== undefined ? { addressLine: line || 'Address pending' } : {}),
+              ...(cityVal !== undefined ? { city: cityVal || null } : {}),
+              ...(stateVal !== undefined ? { state: stateVal || null } : {}),
+              ...(pinVal !== undefined ? { pincode: pinVal || null } : {}),
+            },
+          });
+        }
+      }
+
+      return brand;
     });
+
     logAction(ctx, req, {
       action: AUDIT_ACTIONS.brandUpdate,
       entity: 'Brand',

@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils';
 import {
   FormField, FormInput, FormSelect, FormTextarea, TextField, PhoneInput, PasswordInput,
 } from '@/components/ui/form';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+  fromSingleAddress,
+  toBrandBillingPayload,
+  type BusinessAddressValue,
+} from '@/lib/businessAddress';
 import {
   BRAND_TYPES,
   BRAND_TIERS,
@@ -234,37 +240,51 @@ export function BrandProfileForm({
     set({ targetSegments: next });
   };
 
-  const locationFieldErrors = !!(errors.outletName || errors.addressLine || errors.pincode);
+  const locationFieldErrors = !!(
+    errors.outletName
+    || errors.locationName
+    || errors.addressLine
+    || errors.billingAddressLine
+    || errors.pincode
+    || errors.billingPincode
+  );
+
+  const addressValue: BusinessAddressValue = fromSingleAddress(
+    {
+      addressLine: value.addressLine ?? value.billingAddressLine ?? '',
+      city: value.city ?? value.billingCity ?? '',
+      state: value.state ?? value.billingState ?? '',
+      pincode: value.pincode ?? value.billingPincode ?? '',
+    },
+    { locationName: value.outletName ?? '' },
+  );
+
+  const handleAddressChange = (next: BusinessAddressValue) => {
+    const payload = toBrandBillingPayload(next);
+    set({
+      addressLine: payload.addressLine,
+      billingAddressLine: payload.billingAddressLine,
+      city: payload.city,
+      billingCity: payload.billingCity,
+      state: payload.state,
+      billingState: payload.billingState,
+      pincode: payload.pincode,
+      billingPincode: payload.billingPincode,
+      outletName: next.locationName,
+    });
+  };
 
   const addressContent = (
-    <div className="space-y-4">
-      <TextField label="Outlet name" required={requireLocationFields} value={value.outletName ?? ''}
-        dataField="outletName"
-        error={errors.outletName}
-        onChange={v => set({ outletName: v })}
-        onBlur={() => blur('outletName', value.outletName ?? '')}
-        placeholder="e.g. Mumbai HQ" />
-      <TextField label="Address Line" required={requireLocationFields} value={value.addressLine ?? value.billingAddressLine ?? ''}
-        dataField="addressLine"
-        error={errors.addressLine}
-        onChange={v => set({ addressLine: v, billingAddressLine: v })}
-        onBlur={() => blur('addressLine', value.addressLine ?? value.billingAddressLine ?? '')}
-        placeholder="Building, street, area" />
-      <div className={GRID}>
-        <TextField label="Pincode" required={requireLocationFields} value={value.pincode ?? value.billingPincode ?? ''} maxLength={6}
-          dataField="pincode"
-          error={errors.pincode} placeholder="6-digit PIN" inputMode="numeric"
-          onChange={v => {
-            const n = v.replace(/\D/g, '').slice(0, 6);
-            set({ pincode: n, billingPincode: n });
-          }}
-          onBlur={() => blur('pincode', value.pincode ?? value.billingPincode ?? '')} />
-        <TextField label="City" value={value.city ?? value.billingCity ?? ''}
-          onChange={v => set({ city: v, billingCity: v })} placeholder="City" />
-        <TextField label="State" value={value.state ?? value.billingState ?? ''}
-          onChange={v => set({ state: v, billingState: v })} placeholder="State" />
-      </div>
-    </div>
+    <BusinessAddressForm
+      mode="single"
+      value={addressValue}
+      onChange={handleAddressChange}
+      showLocationName
+      locationNameLabel="Outlet name"
+      locationNameRequired={requireLocationFields}
+      required={requireLocationFields}
+      errors={errors}
+    />
   );
 
   return (

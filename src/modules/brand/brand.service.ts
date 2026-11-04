@@ -123,6 +123,15 @@ interface UpdateBrandInput {
   categories?: string[];
   bgColor?: string;
   showcaseImages?: string[];
+  addressLine?: string;
+  billingAddressLine?: string;
+  city?: string;
+  billingCity?: string;
+  state?: string;
+  billingState?: string;
+  pincode?: string;
+  billingPincode?: string;
+  outletName?: string;
 }
 
 // ── Service ──────────────────────────────────────────────────
@@ -649,6 +658,15 @@ export class BrandService {
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
       include: {
+        businessAccount: {
+          select: {
+            billingAddressLine: true,
+            billingCity: true,
+            billingState: true,
+            billingPincode: true,
+            primaryOutletId: true,
+          },
+        },
         _count: {
           select: {
             masterProducts: { where: { isActive: true } },
@@ -658,7 +676,30 @@ export class BrandService {
       },
     });
     if (!brand) throw Errors.notFound('Brand profile not found for this user');
-    return brand;
+
+    const ba = brand.businessAccount;
+    let outletName: string | null = null;
+    if (ba?.primaryOutletId) {
+      const outlet = await prisma.outlet.findUnique({
+        where: { id: ba.primaryOutletId },
+        select: { name: true },
+      });
+      outletName = outlet?.name ?? null;
+    }
+
+    const { businessAccount: _ba, ...rest } = brand;
+    return {
+      ...rest,
+      addressLine: ba?.billingAddressLine ?? null,
+      billingAddressLine: ba?.billingAddressLine ?? null,
+      city: ba?.billingCity ?? null,
+      billingCity: ba?.billingCity ?? null,
+      state: ba?.billingState ?? null,
+      billingState: ba?.billingState ?? null,
+      pincode: ba?.billingPincode ?? null,
+      billingPincode: ba?.billingPincode ?? null,
+      outletName,
+    };
   }
 
   // ── Brand: update profile ──────────────────────────────────
@@ -666,19 +707,72 @@ export class BrandService {
     const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { id: true },
+      select: {
+        id: true,
+        businessAccountId: true,
+        businessAccount: { select: { primaryOutletId: true } },
+      },
     });
     if (!brand) throw Errors.notFound('Brand profile not found');
 
-    const data: Record<string, unknown> = { ...input };
+    const {
+      addressLine,
+      billingAddressLine,
+      city,
+      billingCity,
+      state,
+      billingState,
+      pincode,
+      billingPincode,
+      outletName,
+      ...brandFields
+    } = input;
+
+    const data: Record<string, unknown> = { ...brandFields };
     // Empty string from the settings URL field = clear media.
     if (input.logoUrl === '') data.logoUrl = null;
     if (input.bannerUrl === '') data.bannerUrl = null;
     if (input.name) data.slug = slugify(input.name);
 
-    return prisma.brand.update({
-      where: { id: brand.id },
-      data,
+    const line = billingAddressLine ?? addressLine;
+    const cityVal = billingCity ?? city;
+    const stateVal = billingState ?? state;
+    const pinVal = billingPincode ?? pincode;
+    const hasAddressPatch = [line, cityVal, stateVal, pinVal, outletName].some((v) => v !== undefined);
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.brand.update({
+        where: { id: brand.id },
+        data,
+      });
+
+      if (hasAddressPatch && brand.businessAccountId) {
+        await tx.businessAccount.update({
+          where: { id: brand.businessAccountId },
+          data: {
+            ...(line !== undefined ? { billingAddressLine: line || null } : {}),
+            ...(cityVal !== undefined ? { billingCity: cityVal || null } : {}),
+            ...(stateVal !== undefined ? { billingState: stateVal || null } : {}),
+            ...(pinVal !== undefined ? { billingPincode: pinVal || null } : {}),
+          },
+        });
+
+        const outletId = brand.businessAccount?.primaryOutletId;
+        if (outletId && (line !== undefined || cityVal !== undefined || stateVal !== undefined || pinVal !== undefined || outletName !== undefined)) {
+          await tx.outlet.update({
+            where: { id: outletId },
+            data: {
+              ...(outletName !== undefined && outletName.trim() ? { name: outletName.trim() } : {}),
+              ...(line !== undefined ? { addressLine: line || 'Address pending' } : {}),
+              ...(cityVal !== undefined ? { city: cityVal || null } : {}),
+              ...(stateVal !== undefined ? { state: stateVal || null } : {}),
+              ...(pinVal !== undefined ? { pincode: pinVal || null } : {}),
+            },
+          });
+        }
+      }
+
+      return updated;
     });
   }
 

@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { Building2, MapPin, Receipt, User, ShieldCheck, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  FormField, FormInput, FormSelect, FormTextarea, TextField, SectionLabel, inputClass, PasswordField,
+  FormField, FormInput, FormSelect, FormTextarea, TextField, inputClass, PasswordField,
 } from '@/components/ui/form';
 import {
   BUSINESS_SIZES, COVERAGE_OPTIONS, VENDOR_LEAD_STATUSES,
@@ -22,7 +22,13 @@ import {
   getEffectiveVendorTypeSelections,
 } from '@/lib/validators/vendor-profile';
 import { VendorTypeMatrix } from './VendorTypeMatrix';
-import { SALUTATIONS, INDIAN_STATES } from '@/lib/constants/customerProfile';
+import { SALUTATIONS } from '@/lib/constants/customerProfile';
+import { BusinessAddressForm } from '@/components/features/shared/BusinessAddressForm';
+import {
+  fromBillingAndPickup,
+  toVendorProfilePatch,
+  type BusinessAddressValue,
+} from '@/lib/businessAddress';
 
 export type VendorProfileValues = VendorProfileInput;
 
@@ -91,7 +97,7 @@ export function VendorProfileForm({
   showPasswordToggle,
   passwordVisible,
   onTogglePassword,
-  pickupSameAsBilling = false,
+  pickupSameAsBilling = true,
   onPickupSameAsBillingChange,
   className,
   layout = 'default',
@@ -130,10 +136,30 @@ export function VendorProfileForm({
     setCategoryDraft('');
   };
 
-  const billingLine = value.billingAddressLine ?? value.billingAddress?.addressLine ?? '';
-  const billingCity = value.billingCity ?? value.billingAddress?.city ?? '';
-  const billingState = value.billingState ?? value.billingAddress?.state ?? '';
-  const billingPincode = value.billingPincode ?? value.billingAddress?.pincode ?? '';
+  const addressValue: BusinessAddressValue = fromBillingAndPickup(
+    {
+      addressLine: value.billingAddressLine ?? value.billingAddress?.addressLine ?? value.addressLine ?? '',
+      city: value.billingCity ?? value.billingAddress?.city ?? value.city ?? '',
+      state: value.billingState ?? value.billingAddress?.state ?? value.state ?? '',
+      pincode: value.billingPincode ?? value.billingAddress?.pincode ?? value.pincode ?? '',
+    },
+    {
+      addressLine: value.pickupAddressLine ?? value.pickupAddress?.addressLine ?? '',
+      city: value.pickupCity ?? value.pickupAddress?.city ?? '',
+      state: value.pickupState ?? value.pickupAddress?.state ?? '',
+      pincode: value.pickupPincode ?? value.pickupAddress?.pincode ?? '',
+    },
+  );
+  // Parent may control the checkbox independently (wizard create defaults).
+  const addressFormValue: BusinessAddressValue = {
+    ...addressValue,
+    sameAsBilling: onPickupSameAsBillingChange ? pickupSameAsBilling : addressValue.sameAsBilling,
+  };
+
+  const handleAddressChange = (next: BusinessAddressValue) => {
+    onPickupSameAsBillingChange?.(next.sameAsBilling);
+    set(toVendorProfilePatch(next) as Partial<VendorProfileValues>);
+  };
 
   return (
     <div className={cn(isModal ? 'space-y-4 min-w-0' : isWide ? 'space-y-4' : 'space-y-5', className)}>
@@ -312,62 +338,22 @@ export function VendorProfileForm({
           </>
         )}
 
-        {visibleSections.billing && (
-          <>
-            <SectionHeader icon={MapPin} spanClass={SPAN_FULL}>Billing Address</SectionHeader>
-            <TextField label="Address Line" required value={billingLine}
-              error={errors.billingAddressLine}
-              onChange={v => set({
-                billingAddressLine: v,
-                billingAddress: { addressLine: v, city: billingCity, state: billingState, pincode: billingPincode },
-              })}
-              placeholder="Full billing address" className={SPAN_FULL} />
-            <TextField label="City" required value={billingCity} error={errors.billingCity}
-              onChange={v => set({ billingCity: v, billingAddress: { addressLine: billingLine, city: v, state: billingState, pincode: billingPincode } })}
-              placeholder="City" />
-            <FormField label="State" required>
-              <FormSelect value={billingState}
-                onChange={v => set({ billingState: v, billingAddress: { addressLine: billingLine, city: billingCity, state: v, pincode: billingPincode } })}
-                hasError={!!errors.billingState}>
-                <option value="">Select state</option>
-                {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-              </FormSelect>
-              {errors.billingState && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.billingState}</p>}
-            </FormField>
-            <TextField label="Pincode" required value={billingPincode} maxLength={6}
-              error={errors.billingPincode} placeholder="6-digit PIN" inputMode="numeric"
-              onChange={v => {
-                const n = v.replace(/\D/g, '').slice(0, 6);
-                set({ billingPincode: n, billingAddress: { addressLine: billingLine, city: billingCity, state: billingState, pincode: n } });
-              }}
-              onBlur={() => blur('billingPincode', billingPincode)} />
-          </>
-        )}
-
-        {visibleSections.pickup && onPickupSameAsBillingChange && (
-          <>
-            <SectionHeader icon={MapPin} spanClass={SPAN_FULL}>Pickup Address</SectionHeader>
-            <FormField label="Same as billing" className={SPAN_FULL}>
-              <label className="flex items-center gap-2 h-[44px] text-[14px] font-medium cursor-pointer">
-                <input type="checkbox" checked={pickupSameAsBilling}
-                  onChange={e => onPickupSameAsBillingChange(e.target.checked)}
-                  className="accent-primary w-4 h-4" />
-                Pickup address same as billing
-              </label>
-            </FormField>
-            {!pickupSameAsBilling && (
-              <>
-                <TextField label="Pickup Address" value={value.pickupAddressLine ?? ''}
-                  onChange={v => set({ pickupAddressLine: v })}
-                  placeholder="Warehouse / pickup location" className={SPAN_FULL} />
-                <TextField label="City" value={value.pickupCity ?? ''} onChange={v => set({ pickupCity: v })} />
-                <TextField label="State" value={value.pickupState ?? ''} onChange={v => set({ pickupState: v })} />
-                <TextField label="Pincode" value={value.pickupPincode ?? ''} maxLength={6}
-                  onChange={v => set({ pickupPincode: v.replace(/\D/g, '').slice(0, 6) })}
-                  onBlur={() => blur('pickupPincode', value.pickupPincode ?? '')} />
-              </>
-            )}
-          </>
+        {(visibleSections.billing || visibleSections.pickup) && (
+          <div className={SPAN_FULL}>
+            <SectionHeader icon={MapPin} spanClass={SPAN_FULL}>
+              {visibleSections.pickup ? 'Addresses' : 'Billing Address'}
+            </SectionHeader>
+            <BusinessAddressForm
+              mode="billing+delivery"
+              value={addressFormValue}
+              onChange={handleAddressChange}
+              errors={errors}
+              deliveryLabel="Pickup / warehouse address"
+              sameAsLabel="Pickup address is the same as billing"
+              showSameAsToggle={!!visibleSections.pickup}
+              required
+            />
+          </div>
         )}
 
         {visibleSections.ops && (
