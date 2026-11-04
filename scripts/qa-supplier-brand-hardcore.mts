@@ -91,9 +91,7 @@ async function main() {
   };
 
   const phoneA = `9${stamp}01`.slice(0, 10);
-  const phoneB = `9${stamp}02`.slice(0, 10);
   const emailA = `qa.supplier.${stamp}@example.com`;
-  const emailB = `qa.brand.${stamp}@example.com`;
 
   // ── Supplier create with distinct billing vs pickup ─────────────────────
   const vendorCreate = await api('/api/v1/admin/vendors', {
@@ -182,23 +180,13 @@ async function main() {
   }
 
   // ── Brand create + city-only edit ───────────────────────────────────────
+  // Full adminCreate needs firstName/subType/etc. Use quickCreate then PATCH address
+  // (same path brand portal settings / admin detail now use).
   const brandCreate = await api('/api/v1/admin/brands', {
     method: 'POST',
     body: JSON.stringify({
+      quickCreate: true,
       name: `${tag} Brand`,
-      legalName: `${tag} Brand Pvt Ltd`,
-      displayName: `${tag} Brand`,
-      email: emailB,
-      phone: phoneB,
-      password: 'TestPass123!',
-      brandType: 'FMCG',
-      billingAddressLine: 'Brand HQ Street 1',
-      billingCity: 'Delhi',
-      billingState: 'Delhi',
-      billingPincode: '110001',
-      city: 'Delhi',
-      state: 'Delhi',
-      pincode: '110001',
     }),
   });
 
@@ -207,13 +195,32 @@ async function main() {
   assert(!!brandCreate.json.success && !!brandId, 'create brand', JSON.stringify(brandCreate.json.error || brandCreate.json.data));
 
   if (brandId) {
+    const setAddr = await api(`/api/v1/admin/brands/${brandId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        billingAddressLine: 'Brand HQ Street 1',
+        billingCity: 'Delhi',
+        billingState: 'Delhi',
+        billingPincode: '110001',
+        outletName: `${tag} HQ`,
+      }),
+    });
+    const setErr = typeof setAddr.json.error === 'string'
+      ? setAddr.json.error
+      : setAddr.json.error?.message || '';
+    assert(
+      !!setAddr.json.success && !/no valid fields/i.test(setErr),
+      'brand address-only PATCH',
+      setErr || `status=${setAddr.res.status}`,
+    );
+
     const brandGet = await api(`/api/v1/admin/brands/${brandId}`);
     const b = brandGet.json.data as Record<string, unknown> | undefined;
     const ba = (b?.businessAccount || b) as Record<string, unknown> | undefined;
     assert(!!brandGet.json.success && !!b, 'get brand');
     if (ba) {
       const line = String(ba.billingAddressLine || b?.billingAddressLine || '');
-      assert(line.includes('Brand HQ') || line.length > 0, 'brand address persisted', line);
+      assert(line.includes('Brand HQ'), 'brand address persisted', line);
 
       const cityOnly = await api(`/api/v1/admin/brands/${brandId}`, {
         method: 'PATCH',
@@ -230,7 +237,7 @@ async function main() {
         : cityOnly.json.error?.message || '';
       assert(
         !!cityOnly.json.success && !/no valid fields/i.test(errMsg),
-        'brand address PATCH',
+        'brand city-only PATCH',
         errMsg || `status=${cityOnly.res.status}`,
       );
 
