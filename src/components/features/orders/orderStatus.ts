@@ -78,10 +78,10 @@ export const ORDER_STATUS_TABS = [
   'dispatched',
   'delivered',
   'cancelled',
-  'abandoned',
 ] as const;
 
-export type OrderStatusTab = (typeof ORDER_STATUS_TABS)[number];
+export const VENDOR_ORDER_STATUS_TABS = [...ORDER_STATUS_TABS, 'abandoned'] as const;
+export type OrderStatusTab = (typeof VENDOR_ORDER_STATUS_TABS)[number];
 
 export function orderStatusLabel(status: string): string {
   return ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, ' ');

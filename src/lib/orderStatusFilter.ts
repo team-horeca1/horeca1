@@ -1,11 +1,21 @@
+const abandonedCartWhere = {
+  AND: [
+    { status: 'pending' },
+    { abandonedAt: { not: null } },
+    { paymentStatus: { not: 'paid' } },
+  ],
+};
+
 /**
  * Shared status-tab → Prisma where fragment for vendor + admin order lists.
  * Mirrors the brief filter aliases used on /vendor/orders.
  */
-export function buildOrderStatusWhere(statusParam?: string | null): Record<string, unknown> {
+export function buildOrderStatusWhere(statusParam?: string | null, excludeAbandoned = false): Record<string, unknown> {
+  if (statusParam === 'abandoned') return abandonedCartWhere;
+  const scope = excludeAbandoned ? { NOT: abandonedCartWhere } : {};
   let statusWhere: Record<string, unknown> = { status: { not: 'draft' } };
   if (!statusParam || statusParam === 'all' || statusParam === 'draft') {
-    return statusWhere;
+    return { ...scope, ...statusWhere };
   }
 
   switch (statusParam) {
@@ -32,13 +42,6 @@ export function buildOrderStatusWhere(statusParam?: string | null): Record<strin
     case 'completed':
       statusWhere = { status: 'delivered' };
       break;
-    case 'abandoned':
-      statusWhere = {
-        status: 'pending',
-        abandonedAt: { not: null },
-        paymentStatus: { not: 'paid' },
-      };
-      break;
     case 'pending':
       statusWhere = { status: 'pending', abandonedAt: null };
       break;
@@ -47,7 +50,7 @@ export function buildOrderStatusWhere(statusParam?: string | null): Record<strin
       break;
   }
 
-  return statusWhere;
+  return { ...scope, ...statusWhere };
 }
 
 export function buildCreatedAtFilter(

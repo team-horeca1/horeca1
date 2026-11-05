@@ -31,7 +31,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     const paymentStatus = params.get('paymentStatus') || undefined;
     const paymentMethod = params.get('paymentMethod') || undefined;
 
-    let statusWhere = buildOrderStatusWhere(statusParam);
+    let statusWhere = buildOrderStatusWhere(statusParam, params.get('excludeAbandoned') === 'true');
     const createdAtFilter = buildCreatedAtFilter(dateFrom, dateTo);
     if (createdAtFilter) {
       statusWhere = { ...statusWhere, createdAt: createdAtFilter };

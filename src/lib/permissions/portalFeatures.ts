@@ -142,7 +142,7 @@ const BRAND_FEATURES: PortalFeatureMap = {
 
 const ADMIN_FEATURES: PortalFeatureMap = {
   dashboard:  { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/admin/dashboard'] },
-  orders:     { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/admin/orders', '/admin/returns'] },
+  orders:     { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/admin/orders', '/admin/abandoned', '/admin/returns'] },
   customers:  { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/admin/customers'] },
   vendors:    { label: 'Suppliers', actions: MODULE_ACTIONS.vendors, routes: ['/admin/vendors', '/admin/approvals'] },
   brands:     { label: 'Brands', actions: MODULE_ACTIONS.brands, routes: ['/admin/brands', '/admin/approvals'] },

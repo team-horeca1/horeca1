@@ -6,6 +6,7 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorOutletContext, buildFulfillmentOutletWhere } from '@/lib/resolveVendorOutletContext';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
+import { buildCreatedAtFilter, buildOrderStatusWhere, buildPaymentMethodWhere } from '@/lib/orderStatusFilter';
 
 function csvEscape(v: string | number | null | undefined): string {
   const s = v == null ? '' : String(v);
@@ -28,50 +29,14 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const paymentStatus = params.get('paymentStatus') || undefined;
     const paymentMethod = params.get('paymentMethod') || undefined;
 
-    const createdAtFilter: { gte?: Date; lte?: Date } = {};
-    if (dateFrom) createdAtFilter.gte = new Date(dateFrom);
-    if (dateTo) createdAtFilter.lte = new Date(dateTo + 'T23:59:59Z');
-
-    let statusWhere: Record<string, unknown> = { status: { not: 'draft' } };
-    if (statusParam && statusParam !== 'all' && statusParam !== 'draft') {
-      switch (statusParam) {
-        case 'new':
-          statusWhere = { status: 'confirmed' };
-          break;
-        case 'processing':
-          statusWhere = {
-            status: { in: ['processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'] },
-          };
-          break;
-        case 'accepted':
-          statusWhere = { status: 'confirmed' };
-          break;
-        case 'partially_accepted':
-          statusWhere = { isPartial: true, status: { not: 'draft' } };
-          break;
-        case 'packed':
-          statusWhere = { status: 'processing' };
-          break;
-        case 'dispatched':
-          statusWhere = { status: 'shipped' };
-          break;
-        case 'completed':
-          statusWhere = { status: 'delivered' };
-          break;
-        default:
-          statusWhere = { status: statusParam };
-          break;
-      }
-    }
-
-    if (dateFrom || dateTo) {
-      statusWhere = { ...statusWhere, createdAt: { ...(statusWhere.createdAt as object || {}), ...createdAtFilter } };
-    }
+    const statusWhere = buildOrderStatusWhere(statusParam);
+    const createdAtFilter = buildCreatedAtFilter(dateFrom, dateTo);
 
     const where: Record<string, unknown> = {
       vendorId,
       ...orderScope,
       ...statusWhere,
+      ...(createdAtFilter && { createdAt: createdAtFilter }),
       ...(search && {
         OR: [
           { orderNumber: { contains: search, mode: 'insensitive' } },
@@ -80,13 +45,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         ],
       }),
       ...(paymentStatus && { paymentStatus }),
-      ...(paymentMethod === 'credit'
-        ? { paymentMethod: { in: ['credit', 'vendor_credit', 'discco'] } }
-        : paymentMethod === 'cash' || paymentMethod === 'cod'
-          ? { paymentMethod: { in: ['cod', 'cash'] } }
-          : paymentMethod
-            ? { paymentMethod }
-            : {}),
+      ...buildPaymentMethodWhere(paymentMethod),
     };
 
     const orders = await prisma.order.findMany({

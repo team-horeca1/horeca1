@@ -5,6 +5,7 @@ import type { ComponentType } from 'react';
 import {
   LayoutDashboard,
   ShoppingBag,
+  ShoppingCart,
   Users,
   Store,
   CheckSquare,
@@ -54,6 +55,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     links: [
       { name: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard', feature: 'dashboard', requiredPerm: 'dashboard.view' },
       { name: 'Orders', icon: ShoppingBag, href: '/admin/orders', feature: 'orders', requiredPerm: 'orders.view' },
+      { name: 'Abandoned', icon: ShoppingCart, href: '/admin/abandoned', feature: 'orders', requiredPerm: 'orders.view', matrixExclude: true },
       { name: 'Returns', icon: RotateCcw, href: '/admin/returns', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Approvals', icon: CheckSquare, href: '/admin/approvals', feature: 'vendors', requiredPerm: ['vendors.approve', 'brands.approve', 'products.approve'] },
     ],

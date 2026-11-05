@@ -74,6 +74,7 @@ function AdminNavLinks({
                                 <Link
                                     key={link.name}
                                     href={link.href}
+                                    aria-current={isActive ? 'page' : undefined}
                                     onClick={onNavigate}
                                     title={collapsed ? (badge > 0 ? `${link.name} (${badgeLabel} pending)` : link.name) : undefined}
                                     className={cn(

@@ -12,7 +12,8 @@ export type VendorOption = { id: string; name: string };
 
 type Props = {
   activeTab: string;
-  onTabChange: (tab: string) => void;
+  tabs?: readonly OrderStatusTab[];
+  onTabChange?: (tab: string) => void;
   dateFrom: string;
   dateTo: string;
   onDateFromChange: (v: string) => void;
@@ -33,6 +34,7 @@ type Props = {
 
 export function OrderListFilters({
   activeTab,
+  tabs = ORDER_STATUS_TABS,
   onTabChange,
   dateFrom,
   dateTo,
@@ -54,11 +56,12 @@ export function OrderListFilters({
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex items-center gap-2 flex-wrap">
-        {ORDER_STATUS_TABS.map((tab: OrderStatusTab) => (
+      {onTabChange && <div className="flex items-center gap-2 flex-wrap">
+        {tabs.map((tab) => (
           <button
             key={tab}
             type="button"
+            aria-pressed={activeTab === tab}
             onClick={() => onTabChange(tab)}
             className={cn(
               'px-4 py-2 rounded-[10px] text-[13px] font-bold transition-all',
@@ -70,7 +73,7 @@ export function OrderListFilters({
             {ORDER_TAB_LABELS[tab] || tab.replace(/_/g, ' ')}
           </button>
         ))}
-      </div>
+      </div>}
 
       <div className="flex items-center gap-3 flex-wrap">
         <input
