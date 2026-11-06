@@ -1,4 +1,4 @@
-import { brandPublicPath, productPublicPath, vendorPublicPath } from '@/lib/publicSlug';
+import { brandProductPublicPath, brandPublicPath, productPublicPath, vendorPublicPath } from '@/lib/publicSlug';
 
 const OG_CARD_VERSION = '7';
 
@@ -122,6 +122,33 @@ export function brandShareContent(opts: {
     ogPath: `/api/og/brand/${encodeURIComponent(opts.slug)}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
     downloadName: `horeca1-brand-${opts.slug}.png`,
     subtitle: 'Brand store',
+  };
+}
+
+export function brandProductShareContent(opts: {
+  brandSlug: string;
+  productId: string;
+  name: string;
+  brandName?: string | null;
+  image?: string | null;
+  pack?: string | null;
+  updatedAt?: string | number | Date | null;
+}): ShareableContent {
+  const v = opts.updatedAt ? `&v=${encodeURIComponent(String(opts.updatedAt))}` : '';
+  const brand = opts.brandName?.trim();
+  const pack = opts.pack?.trim();
+  return {
+    kind: 'product',
+    id: opts.productId,
+    title: opts.name,
+    text: brand
+      ? `${opts.name} · ${brand} on Horeca1`
+      : `${opts.name} on Horeca1`,
+    path: brandProductPublicPath(opts.brandSlug, opts.productId),
+    image: opts.image,
+    ogPath: `/api/og/brand/${encodeURIComponent(opts.brandSlug)}/sku/${encodeURIComponent(opts.productId)}?format=portrait&cv=${OG_CARD_VERSION}${v}`,
+    downloadName: `horeca1-product-${opts.productId}.png`,
+    subtitle: [brand, pack].filter(Boolean).join(' · ') || null,
   };
 }
 
