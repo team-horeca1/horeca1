@@ -65,14 +65,6 @@ export function brandPublicPath(slug: string): string {
   return isPublicSlug(slug) ? `/${slug}` : `/brand/${encodeURIComponent(slug)}`;
 }
 
-/** Brand store URL that opens one master SKU's supplier picker. */
-export function brandProductPublicPath(slug: string, productId: string): string {
-  const base = brandPublicPath(slug);
-  const id = productId.trim();
-  if (!id) return base;
-  return `${base}?sku=${encodeURIComponent(id)}`;
-}
-
 export function productPublicPath(opts: {
   id: string;
   slug?: string | null;

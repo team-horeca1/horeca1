@@ -1,7 +1,7 @@
 'use client';
 
 import { ShareButton } from '@/components/features/share/ShareButton';
-import { brandProductShareContent } from '@/lib/share-cards/types';
+import { brandShareContent } from '@/lib/share-cards/types';
 import { cn } from '@/lib/utils';
 import { Chip } from '@/components/ui/Chip';
 import {
@@ -60,15 +60,17 @@ export function BrandProductCard({
   const highlight = brandHighlightTag(product);
   const nearby = nearbySupplierCount(product.distributors);
 
-  const pack = [product.packSize, product.unit].filter(Boolean).join(' ');
-  const shareContent = brandProductShareContent({
-    brandSlug,
-    productId: product.id,
-    name: product.name,
-    brandName,
-    image: image && image !== PRODUCT_IMAGE_FALLBACK ? image : null,
-    pack: pack || null,
-  });
+  // Brand SKU deep-links to brand store; share uses brand OG card (not raw CDN photo).
+  const shareContent = {
+    ...brandShareContent({
+      slug: brandSlug,
+      name: product.name,
+      image: image && image !== PRODUCT_IMAGE_FALLBACK ? image : null,
+    }),
+    path: `/brand/${brandSlug}?sku=${product.id}`,
+    text: `${product.name} · ${brandName} on Horeca1`,
+    subtitle: brandName,
+  };
 
   return (
     <div

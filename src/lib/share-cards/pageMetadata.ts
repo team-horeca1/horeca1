@@ -2,7 +2,7 @@ import 'server-only';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { shareSiteOrigin } from '@/lib/share-cards/ogHelpers';
-import { productPublicPath, vendorPublicPath, brandPublicPath, brandProductPublicPath } from '@/lib/publicSlug';
+import { productPublicPath, vendorPublicPath, brandPublicPath } from '@/lib/publicSlug';
 
 export function catalogShareMetadata(opts: {
   title: string;
@@ -124,46 +124,6 @@ export async function brandShareMetadata(slug: string): Promise<Metadata> {
     description: clip(brand?.description, `Find ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
     path: brandPublicPath(slug),
     ogPath: `/api/og/brand/${encodeURIComponent(slug)}?format=square&cv=5`,
-  });
-}
-
-const PRODUCT_UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Open Graph for one brand-store SKU. Falls back to the store card when the SKU is missing. */
-export async function brandProductShareMetadata(slug: string, productId: string): Promise<Metadata> {
-  if (!PRODUCT_UUID_RE.test(productId)) return brandShareMetadata(slug);
-
-  const product = await prisma.brandMasterProduct.findFirst({
-    where: {
-      id: productId,
-      isActive: true,
-      brand: { slug, isActive: true, approvalStatus: 'approved' },
-    },
-    select: {
-      name: true,
-      description: true,
-      packSize: true,
-      unit: true,
-      brand: { select: { name: true, slug: true } },
-    },
-  });
-
-  const brandSlug = product?.brand?.slug;
-  const brandName = product?.brand?.name;
-  if (!product || !brandSlug || !brandName) return brandShareMetadata(slug);
-
-  const title = product.name || 'Horeca1';
-  const pack = [product.packSize, product.unit].filter(Boolean).join(' ');
-  const fallback = pack
-    ? `${title} (${pack}) from ${brandName} on Horeca1`
-    : `Shop ${title} from ${brandName} on Horeca1`;
-
-  return catalogShareMetadata({
-    title,
-    description: clip(product.description, fallback),
-    path: brandProductPublicPath(brandSlug, productId),
-    ogPath: `/api/og/brand/${encodeURIComponent(brandSlug)}/sku/${encodeURIComponent(productId)}?format=square&cv=7`,
   });
 }
 
