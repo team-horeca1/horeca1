@@ -153,10 +153,11 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
     // Single transaction so the upsert is all-or-nothing per request.
     let upsertedCount = 0;
+    let skippedLocked = 0;
     const productIds = [...byProduct.keys()];
     const existingItems = await prisma.priceListItem.findMany({
       where: { priceListId: listId, productId: { in: productIds } },
-      select: { productId: true, customPrice: true, discountPercent: true },
+      select: { productId: true, customPrice: true, discountPercent: true, isLocked: true },
     });
     const existingByProduct = new Map(existingItems.map((e) => [e.productId, e]));
     const priceHistoryEntries: PriceHistoryEntry[] = [];
@@ -164,6 +165,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     await prisma.$transaction(async (tx) => {
       for (const r of byProduct.values()) {
         const prev = existingByProduct.get(r.productId);
+        // Brief: locked prices are never overwritten by bulk updates.
+        if (prev?.isLocked) { skippedLocked++; continue; }
         const oldCustom = prev?.customPrice != null ? Number(prev.customPrice) : null;
         const oldDiscount = prev?.discountPercent != null ? Number(prev.discountPercent) : null;
         if (oldCustom !== r.customPrice) {
@@ -223,6 +226,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       data: {
         matched: resolved.length,
         upserted: upsertedCount,
+        skippedLocked,
         errors,
       },
     });
