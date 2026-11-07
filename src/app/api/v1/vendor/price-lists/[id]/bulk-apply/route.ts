@@ -59,10 +59,11 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
     const { type, value } = body.action;
     let upserted = 0;
+    let skippedLocked = 0;
 
     const existingItems = await prisma.priceListItem.findMany({
       where: { priceListId: listId, productId: { in: products.map((p) => p.id) } },
-      select: { productId: true, customPrice: true, discountPercent: true },
+      select: { productId: true, customPrice: true, discountPercent: true, isLocked: true },
     });
     const existingByProduct = new Map(existingItems.map((e) => [e.productId, e]));
     const priceHistoryEntries: PriceHistoryEntry[] = [];
@@ -79,6 +80,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
         }
 
         const prev = existingByProduct.get(p.id);
+        // Brief: locked prices are never overwritten by bulk updates.
+        if (prev?.isLocked) { skippedLocked++; continue; }
         const oldCustom = prev?.customPrice != null ? Number(prev.customPrice) : null;
         const oldDiscount = prev?.discountPercent != null ? Number(prev.discountPercent) : null;
         if (oldCustom !== data.customPrice) {
@@ -123,10 +126,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       action: AUDIT_ACTIONS.priceListBulkApply,
       entity: 'price_list',
       entityId: listId,
-      metadata: { vendorId, type, value, matched: products.length, upserted },
+      metadata: { vendorId, type, value, matched: products.length, upserted, skippedLocked },
     });
 
-    return NextResponse.json({ success: true, data: { matched: products.length, upserted } });
+    return NextResponse.json({ success: true, data: { matched: products.length, upserted, skippedLocked } });
   } catch (error) {
     return errorResponse(error instanceof z.ZodError ? Errors.badRequest(error.issues[0]?.message ?? 'Invalid input') : error);
   }

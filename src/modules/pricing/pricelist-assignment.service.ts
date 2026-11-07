@@ -12,7 +12,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { Errors, ApiError } from '@/middleware/errorHandler';
-import { normalizeCreditStatus } from '@/modules/pricing/pricing.service';
+import { normalizeCreditStatus, compareListOrder } from '@/modules/pricing/pricing.service';
 import { marketplaceCustomerFilter } from '@/lib/marketplaceCustomers';
 import type { PriceListAssignmentType } from '@prisma/client';
 
@@ -214,11 +214,7 @@ function computeEffectiveLists(c: UniverseCustomer, assignments: AssignmentRow[]
   for (const type of LADDER_ORDER) {
     const matches = assignments
       .filter((a) => a.type === type && a.priceList.id !== excludeListId && assignmentMatchesCustomer(a, c))
-      .sort((x, y) => {
-        const dp = (x.priceList.priority ?? 0) - (y.priceList.priority ?? 0);
-        if (dp !== 0) return dp;
-        return new Date(x.priceList.createdAt ?? 0).getTime() - new Date(y.priceList.createdAt ?? 0).getTime();
-      });
+      .sort((x, y) => compareListOrder(x.priceList, y.priceList));
     for (const m of matches) {
       if (lists.some((l) => l.priceListId === m.priceList.id)) continue;
       lists.push({
