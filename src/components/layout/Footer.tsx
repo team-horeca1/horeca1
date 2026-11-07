@@ -7,7 +7,6 @@ import {
     Phone,
     Mail,
     Facebook,
-    Twitter,
     Instagram,
     Linkedin,
     PhoneCall,
@@ -48,11 +47,11 @@ const FOOTER_LINKS: Record<string, Array<{ label: string; href: string }>> = {
     ],
 };
 
+/** Only networks with a live Horeca1 profile belong here. To add X/Twitter later, import its icon and add one line. */
 const SOCIAL_LINKS = [
-    { icon: Facebook, href: '#' },
-    { icon: Twitter, href: '#' },
-    { icon: Instagram, href: '#' },
-    { icon: Linkedin, href: '#' }
+    { icon: Facebook, href: 'https://www.facebook.com/profile.php?id=100071476420362', label: 'Horeca1 on Facebook' },
+    { icon: Instagram, href: 'https://www.instagram.com/horeca__1/', label: 'Horeca1 on Instagram' },
+    { icon: Linkedin, href: 'https://www.linkedin.com/company/horeca1/', label: 'Horeca1 on LinkedIn' },
 ];
 
 export function Footer() {
@@ -189,14 +188,17 @@ export function Footer() {
                         Horeca1 eCommerce © 2026. All Rights Reserved
                     </p>
                     <div className="flex items-center gap-4">
-                        {SOCIAL_LINKS.map((social, idx) => (
-                            <Link
-                                key={idx}
+                        {SOCIAL_LINKS.map((social) => (
+                            <a
+                                key={social.label}
                                 href={social.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={social.label}
                                 className="size-11 rounded-full bg-primary-light text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all"
                             >
-                                <social.icon size={18} />
-                            </Link>
+                                <social.icon size={18} aria-hidden="true" />
+                            </a>
                         ))}
                     </div>
                 </div>
