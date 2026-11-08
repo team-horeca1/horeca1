@@ -129,20 +129,35 @@ interface ListShape {
   name?: string;
   discountPercent: Prisma.Decimal | number;
   /**
-   * Kept for shape compatibility only. Overlapping same-level prices are a
-   * supplier conflict (blocked at assignment), never silently ordered —
-   * same-level lists here are ordered oldest-first purely for determinism
-   * on legacy data.
+   * Tie-break for lists at the same level (see compareListOrder). Overlaps
+   * are meant to be blocked at assignment; this only keeps legacy data
+   * deterministic and identical to what the assignment screens show.
    */
   priority?: number;
   createdAt?: Date | string;
   items: ItemShape[];
 }
 
+/**
+ * ONE tie-break rule for lists that sit at the same level for a customer.
+ * Used by checkout, the cart, the catalog AND the assignment screens, so the
+ * list a supplier sees winning is always the list the buyer is charged from.
+ * Order: lower `priority` number first, then oldest list, then id (stable).
+ */
+export function compareListOrder(
+  a: { id: string; priority?: number | null; createdAt?: Date | string | null },
+  b: { id: string; priority?: number | null; createdAt?: Date | string | null },
+): number {
+  const dp = (a.priority ?? 0) - (b.priority ?? 0);
+  if (dp !== 0) return dp;
+  const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  if (ta !== tb) return ta - tb;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 function byListPriority(a: AssignmentShape, b: AssignmentShape): number {
-  const ta = a.priceList.createdAt ? new Date(a.priceList.createdAt).getTime() : 0;
-  const tb = b.priceList.createdAt ? new Date(b.priceList.createdAt).getTime() : 0;
-  return ta - tb;
+  return compareListOrder(a.priceList, b.priceList);
 }
 
 function sortedByPriority(assignments: AssignmentShape[]): AssignmentShape[] {

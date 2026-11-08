@@ -19,6 +19,12 @@ export type CellState = {
   scheduledPrice: number | null;
   scheduledFrom: string | null;
   scheduledTo: string | null;
+  // Item type fields. Older stored snapshots do not have them (undefined),
+  // in which case publish/rollback leave the item's type untouched.
+  pricingType?: 'fixed' | 'discount' | 'special' | 'scheme';
+  discountPercent?: number | null;
+  schemeMinQty?: number | null;
+  schemeFreeQty?: number | null;
 };
 
 export type DraftCell = {
@@ -61,9 +67,19 @@ function toCellState(row: {
   scheduledPrice: Prisma.Decimal | number | null;
   scheduledFrom: Date | null;
   scheduledTo: Date | null;
+  pricingType?: 'fixed' | 'discount' | 'special' | 'scheme';
+  discountPercent?: Prisma.Decimal | number | null;
+  schemeMinQty?: number | null;
+  schemeFreeQty?: number | null;
 } | null): CellState | null {
   if (!row) return null;
   return {
+    ...(row.pricingType !== undefined && {
+      pricingType: row.pricingType,
+      discountPercent: row.discountPercent != null ? Number(row.discountPercent) : null,
+      schemeMinQty: row.schemeMinQty ?? null,
+      schemeFreeQty: row.schemeFreeQty ?? null,
+    }),
     customPrice: row.customPrice != null ? Number(row.customPrice) : null,
     isExcluded: row.isExcluded,
     isLocked: row.isLocked,
@@ -96,6 +112,26 @@ function classifyKind(before: CellState | null, after: CellState | null): DiffRo
   if (after?.customPrice != null) return 'priced';
   if (after?.isLocked !== before?.isLocked || after?.note !== before?.note) return 'meta';
   return 'priced';
+}
+
+/** Compare the editable fields of two cells (null and missing are equal). */
+function sameCell(a: CellState | null, b: CellState | null): boolean {
+  if (a === null || b === null) return a === b;
+  const n = <T,>(v: T | null | undefined) => (v === undefined ? null : v);
+  // The publish snapshot keeps dates as the client typed them ("2026-12-01"),
+  // the database hands back full ISO strings. Compare the instant, not the text.
+  const d = (v: string | null | undefined) => (v ? new Date(v).getTime() : null);
+  return (
+    n(a.customPrice) === n(b.customPrice) &&
+    a.isExcluded === b.isExcluded &&
+    a.isLocked === b.isLocked &&
+    d(a.validFrom) === d(b.validFrom) &&
+    d(a.validTo) === d(b.validTo) &&
+    n(a.note) === n(b.note) &&
+    n(a.scheduledPrice) === n(b.scheduledPrice) &&
+    d(a.scheduledFrom) === d(b.scheduledFrom) &&
+    d(a.scheduledTo) === d(b.scheduledTo)
+  );
 }
 
 export async function getLatestPublishId(vendorId: string): Promise<string | null> {
@@ -413,6 +449,18 @@ export async function publishWorkspace(args: {
         scheduledFrom: c.scheduledFrom !== undefined ? c.scheduledFrom : before?.scheduledFrom ?? null,
         scheduledTo: c.scheduledTo !== undefined ? c.scheduledTo : before?.scheduledTo ?? null,
       };
+      // Keep the item's type. Only an explicit new price turns a discount or
+      // scheme item into a plain fixed price (that is what the supplier typed).
+      const explicitPrice = c.customPrice !== undefined && c.customPrice !== null;
+      const priorType = before?.pricingType ?? 'fixed';
+      // Scheme items keep their scheme (the price is the post-threshold price).
+      after.pricingType =
+        !explicitPrice || priorType === 'scheme' || priorType === 'special'
+          ? priorType
+          : 'fixed';
+      after.discountPercent = explicitPrice ? null : before?.discountPercent ?? null;
+      after.schemeMinQty = before?.schemeMinQty ?? null;
+      after.schemeFreeQty = before?.schemeFreeQty ?? null;
 
       let history = existing?.history && Array.isArray(existing.history) ? [...(existing.history as unknown[])] : [];
       if (before?.customPrice !== after.customPrice || before?.isExcluded !== after.isExcluded) {
@@ -432,7 +480,10 @@ export async function publishWorkspace(args: {
           priceListId: c.priceListId,
           productId: c.productId,
           customPrice: after.customPrice,
-          pricingType: 'fixed',
+          pricingType: after.pricingType ?? 'fixed',
+          discountPercent: after.discountPercent ?? null,
+          schemeMinQty: after.schemeMinQty ?? null,
+          schemeFreeQty: after.schemeFreeQty ?? null,
           isLocked: after.isLocked,
           isExcluded: after.isExcluded,
           validFrom: after.validFrom ? new Date(after.validFrom) : null,
@@ -445,7 +496,10 @@ export async function publishWorkspace(args: {
         },
         update: {
           customPrice: after.customPrice,
-          pricingType: 'fixed',
+          pricingType: after.pricingType ?? 'fixed',
+          discountPercent: after.discountPercent ?? null,
+          schemeMinQty: after.schemeMinQty ?? null,
+          schemeFreeQty: after.schemeFreeQty ?? null,
           isLocked: after.isLocked,
           isExcluded: after.isExcluded,
           validFrom: after.validFrom ? new Date(after.validFrom) : null,
@@ -592,13 +646,44 @@ export async function rollbackPublish(args: {
   const newId = await prisma.$transaction(async (tx) => {
     const rollbackChanges: typeof changes = [];
 
+    // A publish can be undone once.
+    const alreadyUndone = await tx.priceListPublish.findFirst({
+      where: { vendorId: args.vendorId, kind: 'rollback', rollbackOfId: source.id },
+      select: { id: true },
+    });
+    if (alreadyUndone) {
+      throw new ApiError('ALREADY_ROLLED_BACK', 'This publish has already been undone.', 409, {});
+    }
+
+    // Undo must never silently wipe a later edit: every cell has to still be
+    // exactly as that publish left it. Otherwise list the cells and stop.
+    const clashes: Array<{ priceListId: string; productId: string }> = [];
+    const currentByKey = new Map<string, ReturnType<typeof toCellState>>();
+    for (const ch of changes) {
+      if (!existingListIds.has(ch.priceListId)) continue;
+      const row = await tx.priceListItem.findUnique({
+        where: { priceListId_productId: { priceListId: ch.priceListId, productId: ch.productId } },
+      });
+      const state = toCellState(row);
+      currentByKey.set(`${ch.priceListId}:${ch.productId}`, state);
+      if (!sameCell(state, ch.after)) clashes.push({ priceListId: ch.priceListId, productId: ch.productId });
+    }
+    if (clashes.length > 0) {
+      throw new ApiError(
+        'ROLLBACK_CONFLICT',
+        `${clashes.length} price(s) changed after this publish. Undo would overwrite those newer edits, so nothing was changed.`,
+        409,
+        { cells: clashes.slice(0, 50) },
+      );
+    }
+
     for (const ch of changes) {
       if (!existingListIds.has(ch.priceListId)) continue;
 
       const current = await tx.priceListItem.findUnique({
         where: { priceListId_productId: { priceListId: ch.priceListId, productId: ch.productId } },
       });
-      const currentState = toCellState(current);
+      const currentState = currentByKey.get(`${ch.priceListId}:${ch.productId}`) ?? toCellState(current);
       const target = ch.before;
 
       if (target === null) {
@@ -629,7 +714,10 @@ export async function rollbackPublish(args: {
             priceListId: ch.priceListId,
             productId: ch.productId,
             customPrice: target.customPrice,
-            pricingType: 'fixed',
+            pricingType: target.pricingType ?? 'fixed',
+            discountPercent: target.discountPercent ?? null,
+            schemeMinQty: target.schemeMinQty ?? null,
+            schemeFreeQty: target.schemeFreeQty ?? null,
             isLocked: target.isLocked,
             isExcluded: target.isExcluded,
             validFrom: target.validFrom ? new Date(target.validFrom) : null,
@@ -641,6 +729,12 @@ export async function rollbackPublish(args: {
           },
           update: {
             customPrice: target.customPrice,
+            ...(target.pricingType !== undefined && {
+              pricingType: target.pricingType,
+              discountPercent: target.discountPercent ?? null,
+              schemeMinQty: target.schemeMinQty ?? null,
+              schemeFreeQty: target.schemeFreeQty ?? null,
+            }),
             isLocked: target.isLocked,
             isExcluded: target.isExcluded,
             validFrom: target.validFrom ? new Date(target.validFrom) : null,

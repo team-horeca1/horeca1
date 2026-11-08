@@ -87,6 +87,9 @@ export const PriceGrid = forwardRef<PriceGridHandle, Props>(function PriceGrid({
   const [editing, setEditing] = useState<{ r: number; c: number } | null>(null);
   const [editVal, setEditVal] = useState('');
   const editRef = useRef<HTMLInputElement>(null);
+  // True when the edit began by typing a digit (spreadsheet style). Then the caret
+  // goes to the end; selecting all would make the next digit overwrite the first.
+  const typedStartRef = useRef(false);
   const [colMenu, setColMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [rowMenu, setRowMenu] = useState<{ r: number; x: number; y: number } | null>(null);
   const [rename, setRename] = useState<{ id: string; name: string } | null>(null);
@@ -137,7 +140,17 @@ export const PriceGrid = forwardRef<PriceGridHandle, Props>(function PriceGrid({
   }, [colMenu, rowMenu, formulaCol, rename, floorEdit]);
 
   useEffect(() => {
-    if (editing) setTimeout(() => editRef.current?.select(), 0);
+    if (!editing) return;
+    setTimeout(() => {
+      const el = editRef.current;
+      if (!el) return;
+      if (typedStartRef.current) {
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      } else {
+        el.select();
+      }
+    }, 0);
   }, [editing]);
 
   const openBulkAdjustForCol = useCallback((colId: string) => {
@@ -279,6 +292,7 @@ export const PriceGrid = forwardRef<PriceGridHandle, Props>(function PriceGrid({
       return;
     }
     const val = effective(row, col, dirty);
+    typedStartRef.current = false;
     setEditVal(String(val));
     setEditing({ r, c });
   };
@@ -526,6 +540,7 @@ export const PriceGrid = forwardRef<PriceGridHandle, Props>(function PriceGrid({
       if (e.key.length === 1 && /[\d.]/.test(e.key)) {
         startEdit(active.r, active.c);
         setEditVal(e.key);
+        typedStartRef.current = true;
       }
     };
     window.addEventListener('keydown', onKey);
