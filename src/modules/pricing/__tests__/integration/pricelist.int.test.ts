@@ -186,4 +186,20 @@ describe.skipIf(!run)('pricelist integration', () => {
     await rollbackPublish({ vendorId: s.vendorId, actorId: s.actorId, publishId: p1.publishId });
     expect(await price(s)).toBe(90);
   });
+
+  it('rollback works after a publish that set validity and schedule dates', async () => {
+    const s = await seedBase(100, true);
+    const list = await prisma.priceList.create({ data: { vendorId: s.vendorId, name: `Dates-${rid()}` } });
+    await prisma.priceListAssignment.create({ data: { priceListId: list.id, type: 'customer', userId: s.customerId } });
+    const p1 = await publishWorkspace({
+      vendorId: s.vendorId, actorId: s.actorId, baseVersion: null, acknowledgeWarnings: true,
+      cells: [{
+        priceListId: list.id, productId: s.productId, customPrice: 90,
+        validFrom: '2026-01-01', validTo: '2026-12-31',
+        scheduledPrice: 95, scheduledFrom: '2026-12-01', scheduledTo: '2027-03-31',
+      }],
+    });
+    await rollbackPublish({ vendorId: s.vendorId, actorId: s.actorId, publishId: p1.publishId });
+    expect(await price(s)).toBe(100);
+  });
 });

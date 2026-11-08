@@ -118,16 +118,19 @@ function classifyKind(before: CellState | null, after: CellState | null): DiffRo
 function sameCell(a: CellState | null, b: CellState | null): boolean {
   if (a === null || b === null) return a === b;
   const n = <T,>(v: T | null | undefined) => (v === undefined ? null : v);
+  // The publish snapshot keeps dates as the client typed them ("2026-12-01"),
+  // the database hands back full ISO strings. Compare the instant, not the text.
+  const d = (v: string | null | undefined) => (v ? new Date(v).getTime() : null);
   return (
     n(a.customPrice) === n(b.customPrice) &&
     a.isExcluded === b.isExcluded &&
     a.isLocked === b.isLocked &&
-    n(a.validFrom) === n(b.validFrom) &&
-    n(a.validTo) === n(b.validTo) &&
+    d(a.validFrom) === d(b.validFrom) &&
+    d(a.validTo) === d(b.validTo) &&
     n(a.note) === n(b.note) &&
     n(a.scheduledPrice) === n(b.scheduledPrice) &&
-    n(a.scheduledFrom) === n(b.scheduledFrom) &&
-    n(a.scheduledTo) === n(b.scheduledTo)
+    d(a.scheduledFrom) === d(b.scheduledFrom) &&
+    d(a.scheduledTo) === d(b.scheduledTo)
   );
 }
 
