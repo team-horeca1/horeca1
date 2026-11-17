@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
 type Kpis = {
   outstanding: string;
@@ -24,6 +25,7 @@ type Row = {
   eligible: string;
   onHold: string;
   settled: string;
+  eligibleSale: string;
   commission: string;
   unconfigured: boolean;
 };
@@ -43,7 +45,7 @@ function inr(value: string | number): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number.isFinite(n) ? n : 0);
 }
 
-function money(value: string): number {
+function money(value: string | undefined): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
@@ -72,7 +74,7 @@ export function PayablesDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    const params = new URLSearchParams({ page: String(page), sort: 'outstanding' });
+    const params = new URLSearchParams({ page: String(page), sort: '-outstanding' });
     if (q) params.set('q', q);
     if (status) params.set('status', status);
     try {
@@ -134,89 +136,112 @@ export function PayablesDashboard() {
     }
   }
 
+  const featured = rows.find((row) => money(row.eligible) > 0) ?? null;
   const openPayments = batches.filter((batch) => batch.status !== 'settled' && batch.status !== 'cancelled');
+  const split = kpis
+    ? [{
+      name: 'Money',
+      ready: money(kpis.eligible),
+      unpaid: money(kpis.pendingCapture),
+      delivering: money(kpis.awaitingCompletion),
+      paused: money(kpis.onHold),
+      missing: money(kpis.blockedSale),
+    }]
+    : [];
+  const splitTotal = split[0]
+    ? split[0].ready + split[0].unpaid + split[0].delivering + split[0].paused + split[0].missing
+    : 0;
 
   return (
-    <div className="mx-auto max-w-[1100px] space-y-8 pb-16 text-[#1C1C1C]">
-      <header className="space-y-3">
-        <p className="text-[13px] font-semibold uppercase tracking-wide text-[#6B1D2E]">Finance</p>
-        <h1 className="text-[clamp(1.75rem,2vw+1rem,2.25rem)] font-semibold tracking-tight">Pay suppliers</h1>
-        <p className="max-w-2xl text-[16px] leading-7 text-[#3F3F46]">
-          A supplier sells through Horeca1. The customer pays. When the order is delivered, we keep our commission and pay the supplier the rest.
+    <div className="mx-auto max-w-[1080px] space-y-8 pb-16 text-[#1C1C1C]">
+      <header className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#6B1D2E]">Finance</p>
+        <h1 className="mt-2 text-[clamp(2rem,3vw+1rem,2.75rem)] font-semibold tracking-[-0.03em]">Pay suppliers</h1>
+        <p className="mt-2 max-w-xl text-[16px] leading-7 text-[#3F3F46]">
+          The customer pays. The order is delivered. We keep our commission. What is left is what you pay the supplier.
         </p>
       </header>
 
-      <ol className="grid gap-3 sm:grid-cols-3">
-        {[
-          ['1', 'See what we owe', 'The big number is the money still unpaid to suppliers.'],
-          ['2', 'Pay only what is ready', 'Ready means the customer paid and the order was delivered.'],
-          ['3', 'Record the bank payment', 'Someone else checks the list. Then you type the bank reference. We do not call the bank.'],
-        ].map(([step, title, body]) => (
-          <li key={step} className="rounded-2xl border border-[#E9E3DD] bg-white p-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F8E8EC] text-[14px] font-semibold text-[#6B1D2E]">{step}</span>
-            <p className="mt-3 font-semibold">{title}</p>
-            <p className="mt-1 text-[14px] leading-6 text-[#667085]">{body}</p>
-          </li>
-        ))}
-      </ol>
-
       {loading && !kpis ? (
-        <div className="flex items-center gap-2 py-10 text-[#6B1D2E]"><Loader2 className="animate-spin" size={18} /> Loading</div>
+        <div className="flex items-center gap-2 py-16 text-[#6B1D2E]"><Loader2 className="animate-spin" size={18} /> Loading the ledger</div>
       ) : null}
-      {error ? <p role="alert" className="rounded-xl border border-[#DC2626]/30 bg-white px-4 py-3 text-[14px] text-[#DC2626]">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-2xl border border-[#DC2626]/30 bg-white px-4 py-3 text-[14px] text-[#DC2626]">{error}</p> : null}
 
       {kpis ? (
-        <section className="rounded-2xl border border-[#E9E3DD] bg-white p-5 sm:p-6">
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <section className="animate-in fade-in slide-in-from-bottom-2 duration-700 overflow-hidden rounded-[28px] bg-[#2A1218] text-[#FAF7F2] shadow-[0_24px_60px_-32px_rgba(42,18,24,0.7)]">
+          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
             <div>
-              <p className="text-[14px] text-[#667085]">We still owe suppliers</p>
-              <p className="mt-1 text-[clamp(2rem,4vw,3rem)] font-semibold tabular-nums leading-none">{inr(kpis.outstanding)}</p>
-              <p className="mt-3 max-w-md text-[14px] leading-6 text-[#667085]">
-                This stays here until the bank reference is saved. Preparing a payment does not make it disappear.
+              <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#E7C5CE]">We still owe suppliers</p>
+              <p className="mt-3 font-semibold tabular-nums tracking-[-0.04em] text-[clamp(2.8rem,6vw,4.5rem)] leading-none">{inr(kpis.outstanding)}</p>
+              <p className="mt-4 max-w-sm text-[14px] leading-6 text-[#E7C5CE]">
+                This number stays until you save a bank reference. Preparing a payment does not clear it.
               </p>
             </div>
-            <div className="rounded-xl bg-[#F8E8EC] p-4">
-              <p className="text-[14px] font-medium text-[#6B1D2E]">Ready to pay now</p>
-              <p className="mt-1 text-[clamp(1.5rem,3vw,2rem)] font-semibold tabular-nums text-[#6B1D2E]">{inr(kpis.eligible)}</p>
-              <p className="mt-2 text-[14px] leading-6 text-[#6B1D2E]">Only this amount can go into a new payment.</p>
+            <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
+              <p className="text-[12px] uppercase tracking-[0.16em] text-[#E7C5CE]">Ready to pay now</p>
+              <p className="mt-2 text-[clamp(1.8rem,3vw,2.4rem)] font-semibold tabular-nums">{inr(kpis.eligible)}</p>
+              <p className="mt-2 text-[13px] leading-5 text-[#E7C5CE]">Customer paid. Order delivered. Commission already taken out.</p>
             </div>
           </div>
-          <ul className="mt-6 divide-y divide-[#E9E3DD] border-t border-[#E9E3DD] text-[14px]">
-            <li className="flex items-start justify-between gap-4 py-3">
-              <span>Customer has not paid yet</span>
-              <span className="shrink-0 tabular-nums font-medium">{inr(kpis.pendingCapture)}</span>
-            </li>
-            <li className="flex items-start justify-between gap-4 py-3">
-              <span>Customer paid, order not delivered yet</span>
-              <span className="shrink-0 tabular-nums font-medium">{inr(kpis.awaitingCompletion)}</span>
-            </li>
-            <li className="flex items-start justify-between gap-4 py-3">
-              <span>Paused on purpose</span>
-              <span className="shrink-0 tabular-nums font-medium">{inr(kpis.onHold)}</span>
-            </li>
-            <li className="flex items-start justify-between gap-4 py-3">
-              <span>Commission rate missing, so we will not guess</span>
-              <span className="shrink-0 tabular-nums font-medium">{inr(kpis.blockedSale)}</span>
-            </li>
-            <li className="flex items-start justify-between gap-4 py-3">
-              <span>Our commission kept on delivered orders</span>
-              <span className="shrink-0 tabular-nums font-medium">{inr(kpis.commission)}</span>
-            </li>
-          </ul>
+
+          {featured ? (
+            <div className="mx-6 mb-6 grid gap-2 rounded-2xl bg-[#FAF7F2] p-4 text-[#1C1C1C] sm:mx-8 sm:grid-cols-[1.2fr_auto_auto_auto] sm:items-end">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">Worked example</p>
+                <p className="mt-1 text-[18px] font-semibold">{featured.supplier}</p>
+                <p className="text-[13px] text-[#667085]">{featured.ratePct == null ? 'No commission set' : `${featured.ratePct}% commission`}</p>
+              </div>
+              <Figure label="Customer paid" value={inr(featured.eligibleSale)} />
+              <Figure label="We keep" value={inr(featured.commission)} />
+              <Figure label="Pay them" value={inr(featured.eligible)} strong />
+            </div>
+          ) : null}
+
+          {splitTotal > 0 ? (
+            <div className="border-t border-white/10 px-6 py-5 sm:px-8">
+              <p className="mb-3 text-[12px] uppercase tracking-[0.14em] text-[#E7C5CE]">Where the money is</p>
+              <div className="h-3 w-full">
+                <ResponsiveContainer width="100%" height={12}>
+                  <BarChart data={split} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                    <XAxis type="number" hide domain={[0, splitTotal]} />
+                    <Tooltip
+                      cursor={false}
+                      formatter={(value, name) => [inr(Number(value ?? 0)), SPLIT_LABEL[String(name)] ?? String(name)]}
+                      contentStyle={{ borderRadius: 12, border: '1px solid #E9E3DD', fontSize: 13 }}
+                    />
+                    <Bar dataKey="ready" stackId="m" fill="#F8E8EC" radius={[6, 0, 0, 6]} />
+                    <Bar dataKey="unpaid" stackId="m" fill="#8D6E76" />
+                    <Bar dataKey="delivering" stackId="m" fill="#C4A4AE" />
+                    <Bar dataKey="paused" stackId="m" fill="#F59E0B" />
+                    <Bar dataKey="missing" stackId="m" fill="#6B1D2E" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#E7C5CE]">
+                <Legend dot="bg-[#F8E8EC]" label="Ready" value={kpis.eligible} />
+                <Legend dot="bg-[#8D6E76]" label="Customer has not paid" value={kpis.pendingCapture} />
+                <Legend dot="bg-[#C4A4AE]" label="Not delivered" value={kpis.awaitingCompletion} />
+                <Legend dot="bg-[#F59E0B]" label="Paused" value={kpis.onHold} />
+                <Legend dot="bg-[#6B1D2E]" label="No commission rate" value={kpis.blockedSale} />
+              </ul>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
       <section className="space-y-3">
-        <div>
-          <h2 className="text-[20px] font-semibold">Suppliers</h2>
-          <p className="mt-1 text-[14px] text-[#667085]">Open a name to see which orders make up the amount.</p>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-[20px] font-semibold tracking-tight">Suppliers</h2>
+            <p className="text-[14px] text-[#667085]">Open a name to see the orders. Pay only the ones marked ready.</p>
+          </div>
         </div>
         <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); setPage(1); void load(); }}>
           <label className="flex-1 text-[13px] text-[#667085]">Find a supplier
-            <input aria-label="Search supplier" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or code" className="mt-1 h-12 w-full rounded-xl border border-[#E9E3DD] bg-white px-3 text-[15px] text-[#1C1C1C]" />
+            <input aria-label="Search supplier" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or code" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] bg-white px-4 text-[15px] text-[#1C1C1C] outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-[#6B1D2E] focus:shadow-[0_0_0_4px_rgba(107,29,46,0.12)]" />
           </label>
           <label className="text-[13px] text-[#667085]">Show
-            <select aria-label="Show" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="mt-1 block h-12 rounded-xl border border-[#E9E3DD] bg-white px-3">
+            <select aria-label="Show" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="mt-1 block h-12 rounded-2xl border border-[#E9E3DD] bg-white px-3">
               <option value="">Everyone</option>
               <option value="outstanding">We still owe them</option>
               <option value="eligible">Ready to pay</option>
@@ -224,39 +249,32 @@ export function PayablesDashboard() {
               <option value="settled">Already paid</option>
             </select>
           </label>
-          <button type="submit" className="h-12 self-end rounded-xl bg-[#6B1D2E] px-5 text-[15px] font-semibold text-white">Apply</button>
+          <button type="submit" className="h-12 self-end rounded-2xl bg-[#6B1D2E] px-5 text-[15px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98]">Apply</button>
         </form>
 
         {rows.length === 0 && !loading ? (
-          <p className="rounded-2xl border border-[#E9E3DD] bg-white px-4 py-10 text-[15px] text-[#667085]">No suppliers match these filters.</p>
+          <p className="rounded-[24px] border border-dashed border-[#E9E3DD] bg-white px-4 py-12 text-center text-[15px] text-[#667085]">No supplier matches. Clear the search to see everyone.</p>
         ) : (
-          <ul className="divide-y divide-[#E9E3DD] overflow-hidden rounded-2xl border border-[#E9E3DD] bg-white">
+          <ul className="space-y-2">
             {rows.map((row) => {
               const ready = money(row.eligible) > 0;
-              const owes = money(row.outstanding) > 0;
               return (
-                <li key={row.vendorId} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <li key={row.vendorId} className="group flex flex-col gap-4 rounded-[22px] border border-[#E9E3DD] bg-white p-4 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-28px_rgba(42,18,24,0.45)] sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <Link href={`/admin/finance/payables/${row.vendorId}`} className="text-[16px] font-semibold text-[#6B1D2E]">{row.supplier}</Link>
+                    <Link href={`/admin/finance/payables/${row.vendorId}`} className="text-[17px] font-semibold tracking-tight text-[#1C1C1C] underline-offset-4 hover:text-[#6B1D2E] hover:underline">{row.supplier}</Link>
                     <p className="mt-1 text-[13px] text-[#667085]">
-                      {row.ratePct == null ? 'Commission not set' : `Our commission is ${row.ratePct}%`}
+                      {row.ratePct == null ? 'Commission not set — we will not guess a rate' : `We keep ${row.ratePct}%`}
                       {row.supplierCode ? ` · ${row.supplierCode}` : ''}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-end gap-x-6 gap-y-2 sm:justify-end">
-                    <div>
-                      <p className="text-[12px] text-[#667085]">We owe</p>
-                      <p className="text-[16px] font-semibold tabular-nums">{owes ? inr(row.outstanding) : 'Nothing'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[12px] text-[#667085]">Ready to pay</p>
-                      <p className="text-[16px] font-semibold tabular-nums text-[#166534]">{ready ? inr(row.eligible) : 'Not yet'}</p>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <Stat label="We owe" value={money(row.outstanding) > 0 ? inr(row.outstanding) : 'Nothing'} />
+                    <Stat label="Ready" value={ready ? inr(row.eligible) : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
                     <button
                       type="button"
                       disabled={!ready || busy === row.vendorId}
                       onClick={() => void preparePayment(row.vendorId)}
-                      className="h-11 rounded-xl bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white disabled:bg-[#E9E3DD] disabled:text-[#667085]"
+                      className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98] disabled:bg-[#EFEAE4] disabled:text-[#8A8178]"
                     >
                       {busy === row.vendorId ? 'Preparing…' : 'Prepare payment'}
                     </button>
@@ -269,47 +287,41 @@ export function PayablesDashboard() {
         <div className="flex items-center justify-between text-[14px] text-[#667085]">
           <span>{total} suppliers</span>
           <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)} className="h-10 rounded-xl border border-[#E9E3DD] bg-white px-3 disabled:opacity-40">Previous</button>
-            <button type="button" disabled={page * 20 >= total} onClick={() => setPage((n) => n + 1)} className="h-10 rounded-xl border border-[#E9E3DD] bg-white px-3 disabled:opacity-40">Next</button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)} className="h-10 rounded-full border border-[#E9E3DD] bg-white px-4 disabled:opacity-40">Previous</button>
+            <button type="button" disabled={page * 20 >= total} onClick={() => setPage((n) => n + 1)} className="h-10 rounded-full border border-[#E9E3DD] bg-white px-4 disabled:opacity-40">Next</button>
           </div>
         </div>
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h2 className="text-[20px] font-semibold">Payments being prepared</h2>
-          <p className="mt-1 max-w-2xl text-[14px] leading-6 text-[#667085]">
-            A prepared list is not a bank payment. Another person checks it. After the money is sent, type the reference from your bank. We do not verify it with a bank.
-          </p>
-        </div>
+        <h2 className="text-[20px] font-semibold tracking-tight">Payments being prepared</h2>
+        <p className="max-w-2xl text-[14px] leading-6 text-[#667085]">
+          A list is not a bank transfer. Another person checks it. After you send the money, type the reference from your bank. We do not call the bank.
+        </p>
         {openPayments.length === 0 && !loading ? (
-          <p className="rounded-2xl border border-[#E9E3DD] bg-white px-4 py-8 text-[15px] text-[#667085]">Nothing is waiting. Prepare a payment from a supplier who is ready.</p>
+          <p className="rounded-[22px] border border-[#E9E3DD] bg-white px-4 py-8 text-[15px] text-[#667085]">Nothing is waiting. Prepare a payment from a supplier marked ready.</p>
         ) : (
           <ul className="space-y-3">
             {openPayments.map((batch) => {
               const label = BATCH_LABEL[batch.status] ?? { title: batch.status, next: '' };
               return (
-                <li key={batch.id} className="rounded-2xl border border-[#E9E3DD] bg-white p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{label.title}</p>
-                      <p className="mt-1 text-[13px] text-[#667085]">{batch.batchNumber} · {batch.orderCount} orders · {inr(batch.net)}</p>
-                      <p className="mt-2 text-[14px] leading-6">{label.next}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <li key={batch.id} className="rounded-[22px] border border-[#E9E3DD] bg-white p-4">
+                  <p className="font-semibold">{label.title}</p>
+                  <p className="mt-1 text-[13px] text-[#667085]">{batch.batchNumber} · {batch.orderCount} orders · {inr(batch.net)}</p>
+                  <p className="mt-2 text-[14px] leading-6">{label.next}</p>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
                     {batch.status === 'draft' ? (
                       <>
-                        <button type="button" onClick={() => void batchAction(batch.id, 'finalise')} className="h-11 rounded-xl bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white">Send for a check</button>
-                        <button type="button" onClick={() => void batchAction(batch.id, 'cancel')} className="h-11 rounded-xl border border-[#E9E3DD] px-4 text-[14px]">Cancel this list</button>
+                        <button type="button" onClick={() => void batchAction(batch.id, 'finalise')} className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white active:scale-[0.98]">Send for a check</button>
+                        <button type="button" onClick={() => void batchAction(batch.id, 'cancel')} className="h-11 rounded-full border border-[#E9E3DD] px-4 text-[14px]">Cancel this list</button>
                       </>
                     ) : null}
                     {batch.status === 'finalised' ? (
                       <>
                         <label className="text-[13px] text-[#667085]">Bank reference
-                          <input aria-label={`Bank reference for ${batch.batchNumber}`} value={utr[batch.id] ?? ''} onChange={(e) => setUtr((current) => ({ ...current, [batch.id]: e.target.value }))} placeholder="From your bank" className="mt-1 h-11 w-full rounded-xl border border-[#E9E3DD] px-3 text-[15px] text-[#1C1C1C] sm:w-56" />
+                          <input aria-label={`Bank reference for ${batch.batchNumber}`} value={utr[batch.id] ?? ''} onChange={(e) => setUtr((current) => ({ ...current, [batch.id]: e.target.value }))} placeholder="From your bank" className="mt-1 h-11 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[15px] text-[#1C1C1C] sm:w-56" />
                         </label>
-                        <button type="button" onClick={() => void batchAction(batch.id, 'settle')} className="h-11 rounded-xl bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white sm:mt-5">I have sent the money</button>
+                        <button type="button" onClick={() => void batchAction(batch.id, 'settle')} className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white">I have sent the money</button>
                       </>
                     ) : null}
                   </div>
@@ -320,14 +332,52 @@ export function PayablesDashboard() {
         )}
       </section>
 
-      <footer className="border-t border-[#E9E3DD] pt-4 text-[14px] leading-6 text-[#667085]">
-        Other records, not this payment list:{' '}
+      <footer className="border-t border-[#E9E3DD] pt-4 text-[14px] text-[#667085]">
+        Other records:{' '}
         <Link href="/admin/finance/payments" className="font-semibold text-[#6B1D2E]">customer payments</Link>
         {' · '}
         <Link href="/admin/ledger" className="font-semibold text-[#6B1D2E]">older supplier wallet</Link>
         {' · '}
         <Link href="/admin/reports" className="font-semibold text-[#6B1D2E]">sales reports</Link>
       </footer>
+
+    </div>
+  );
+}
+
+const SPLIT_LABEL: Record<string, string> = {
+  ready: 'Ready to pay',
+  unpaid: 'Customer has not paid',
+  delivering: 'Not delivered yet',
+  paused: 'Paused',
+  missing: 'No commission rate',
+};
+
+function Figure({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div>
+      <p className="text-[12px] text-[#667085]">{label}</p>
+      <p className={`tabular-nums ${strong ? 'text-[20px] font-semibold text-[#6B1D2E]' : 'text-[16px] font-medium'}`}>{value}</p>
+    </div>
+  );
+}
+
+function Legend({ dot, label, value }: { dot: string; label: string; value: string }) {
+  if (money(value) <= 0) return null;
+  return (
+    <li className="inline-flex items-center gap-1.5">
+      <span className={`inline-block h-2 w-2 rounded-full ${dot}`} />
+      {label} {inr(value)}
+    </li>
+  );
+}
+
+function Stat({ label, value, tone = 'ink' }: { label: string; value: string; tone?: 'ink' | 'ready' | 'muted' }) {
+  const color = tone === 'ready' ? 'text-[#166534]' : tone === 'muted' ? 'text-[#8A8178]' : 'text-[#1C1C1C]';
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-[0.12em] text-[#8A8178]">{label}</p>
+      <p className={`text-[16px] font-semibold tabular-nums ${color}`}>{value}</p>
     </div>
   );
 }
