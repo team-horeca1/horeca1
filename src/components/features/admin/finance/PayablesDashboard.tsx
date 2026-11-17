@@ -258,6 +258,7 @@ export function PayablesDashboard() {
           <ul className="space-y-2">
             {rows.map((row) => {
               const ready = money(row.eligible) > 0;
+              const queued = !ready && money(row.outstanding) > 0 && batches.some((batch) => batch.vendorId === row.vendorId && (batch.status === 'draft' || batch.status === 'in_review' || batch.status === 'finalised'));
               return (
                 <li key={row.vendorId} className="group flex flex-col gap-4 rounded-[22px] border border-[#E9E3DD] bg-white p-4 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-28px_rgba(42,18,24,0.45)] sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -269,14 +270,14 @@ export function PayablesDashboard() {
                   </div>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                     <Stat label="We owe" value={money(row.outstanding) > 0 ? inr(row.outstanding) : 'Nothing'} />
-                    <Stat label="Ready" value={ready ? inr(row.eligible) : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
+                    <Stat label="Ready" value={ready ? inr(row.eligible) : queued ? 'In the list below' : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
                     <button
                       type="button"
                       disabled={!ready || busy === row.vendorId}
                       onClick={() => void preparePayment(row.vendorId)}
                       className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98] disabled:bg-[#EFEAE4] disabled:text-[#8A8178]"
                     >
-                      {busy === row.vendorId ? 'Preparing…' : 'Prepare payment'}
+                      {busy === row.vendorId ? 'Preparing…' : queued ? 'Already added' : 'Prepare payment'}
                     </button>
                   </div>
                 </li>
