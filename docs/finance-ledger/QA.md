@@ -33,7 +33,14 @@ The local Postgres test rolled back a failed claim, let only one of two concurre
 ## Not executed
 
 - A second browser user finalising a batch in Playwright. The transition is covered by the unit test: the creator cannot finalise.
-- The live demo site, until a later demo workflow run completes.
+- A signed-in pass on `https://demo.horeca1.com` itself. The route is deployed and redirects to login.
 
-Push `5cafce2f` started [CI / Deploy Demo run 44084643167](https://github.com/team-horeca1/horeca1/actions/runs/44084643167). Type check and the image build passed. **Migrations & drift failed**, and the deploy job was skipped, so `demo.horeca1.com` did not change. The drift was seven `id` columns that had a database default Prisma does not expect. Follow-up migration `20261117123000_supplier_payables_uuid_client` removes those defaults. A fresh local database `horeca1_drift` then reproduced the CI check with no remaining drift. This note does not claim the follow-up deploy has succeeded.
+## Demo deployment
+
+The first push, `5cafce2f`, started [run 44084643167](https://github.com/team-horeca1/horeca1/actions/runs/44084643167). Type check and the image build passed. Migrations and drift failed, and deploy was skipped. The drift was seven `id` columns with a database default Prisma does not expect.
+
+Follow-up `cbd63962` is [run 44086013194](https://github.com/team-horeca1/horeca1/actions/runs/44086013194). Type check, migrations and drift, image build, and Deploy to demo.horeca1.com all succeeded.
+
+`https://demo.horeca1.com/admin/finance/payables` responds 307 to the login page and keeps that path as the redirect. A signed-in walkthrough on the demo site was not run from this session.
+
 
