@@ -33,4 +33,7 @@ The local Postgres test rolled back a failed claim, let only one of two concurre
 ## Not executed
 
 - A second browser user finalising a batch in Playwright. The transition is covered by the unit test: the creator cannot finalise.
-- Demo site `https://demo.horeca1.com` until the demo workflow finishes. This file must not be updated to say that deploy succeeded unless that run is actually green.
+- The live demo site, until a later demo workflow run completes.
+
+Push `5cafce2f` started [CI / Deploy Demo run 44084643167](https://github.com/team-horeca1/horeca1/actions/runs/44084643167). Type check and the image build passed. **Migrations & drift failed**, and the deploy job was skipped, so `demo.horeca1.com` did not change. The drift was seven `id` columns that had a database default Prisma does not expect. Follow-up migration `20261117123000_supplier_payables_uuid_client` removes those defaults. A fresh local database `horeca1_drift` then reproduced the CI check with no remaining drift. This note does not claim the follow-up deploy has succeeded.
+
