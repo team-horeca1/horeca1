@@ -70,6 +70,15 @@ export function PayablesDashboard() {
   const [error, setError] = useState('');
   const [utr, setUtr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
+  const [guide, setGuide] = useState<{
+    supplier: string;
+    vendorId: string;
+    batchId: string;
+    batchNumber: string;
+    status: string;
+    net: string;
+    notice: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,9 +119,15 @@ export function PayablesDashboard() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? 'That step did not save');
+      const nextStatus = action === 'cancel' ? 'cancelled' : action === 'finalise' ? 'finalised' : 'settled';
+      setGuide((current) => current && current.batchId === id
+        ? { ...current, status: nextStatus, notice: action === 'settle' ? 'Saved. This supplier is paid.' : action === 'finalise' ? 'Checked. Type the bank reference from your transfer.' : 'Cancelled.' }
+        : current);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'That step did not save');
+      const message = err instanceof Error ? err.message : 'That step did not save';
+      setError(message);
+      setGuide((current) => current ? { ...current, notice: message } : current);
     } finally {
       setBusy('');
     }
@@ -128,6 +143,17 @@ export function PayablesDashboard() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? 'Could not prepare the payment');
+      const batch = json.data;
+      const supplier = rows.find((row) => row.vendorId === vendorId)?.supplier ?? 'Supplier';
+      setGuide({
+        supplier,
+        vendorId,
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        status: batch.status ?? 'draft',
+        net: String(batch.netAmount ?? batch.net ?? '0'),
+        notice: 'List made. Check it, then type the bank reference.',
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not prepare the payment');
@@ -236,9 +262,9 @@ export function PayablesDashboard() {
             <p className="text-[14px] text-[#667085]">Open a name to see the orders. Pay only the ones marked ready.</p>
           </div>
         </div>
-        <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); setPage(1); void load(); }}>
+        <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const next = String(new FormData(event.currentTarget).get('supplier') ?? ''); setQ(next); setPage(1); }}>
           <label className="flex-1 text-[13px] text-[#667085]">Find a supplier
-            <input aria-label="Search supplier" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or code" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] bg-white px-4 text-[15px] text-[#1C1C1C] outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-[#6B1D2E] focus:shadow-[0_0_0_4px_rgba(107,29,46,0.12)]" />
+            <input name="supplier" aria-label="Search supplier" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or code" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] bg-white px-4 text-[15px] text-[#1C1C1C] outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-[#6B1D2E] focus:shadow-[0_0_0_4px_rgba(107,29,46,0.12)]" />
           </label>
           <label className="text-[13px] text-[#667085]">Show
             <select aria-label="Show" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="mt-1 block h-12 rounded-2xl border border-[#E9E3DD] bg-white px-3">
@@ -273,11 +299,27 @@ export function PayablesDashboard() {
                     <Stat label="Ready" value={ready ? inr(row.eligible) : queued ? 'In the list below' : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
                     <button
                       type="button"
-                      disabled={!ready || busy === row.vendorId}
-                      onClick={() => void preparePayment(row.vendorId)}
+                      disabled={(!ready && !queued) || busy === row.vendorId}
+                      onClick={() => {
+                        if (queued) {
+                          const batch = batches.find((item) => item.vendorId === row.vendorId && (item.status === 'draft' || item.status === 'finalised' || item.status === 'in_review'));
+                          if (!batch) return;
+                          setGuide({
+                            supplier: row.supplier,
+                            vendorId: row.vendorId,
+                            batchId: batch.id,
+                            batchNumber: batch.batchNumber,
+                            status: batch.status,
+                            net: batch.net,
+                            notice: batch.status === 'finalised' ? 'Checked. Type the bank reference from your transfer.' : 'This list is already made. Check it next.',
+                          });
+                          return;
+                        }
+                        void preparePayment(row.vendorId);
+                      }}
                       className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98] disabled:bg-[#EFEAE4] disabled:text-[#8A8178]"
                     >
-                      {busy === row.vendorId ? 'Preparing…' : queued ? 'Already added' : 'Prepare payment'}
+                      {busy === row.vendorId ? 'Opening…' : queued ? 'Continue' : `Pay ${inr(row.eligible)}`}
                     </button>
                   </div>
                 </li>
@@ -332,6 +374,48 @@ export function PayablesDashboard() {
           </ul>
         )}
       </section>
+
+      {guide ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1C1C1C]/50 p-4 sm:items-center" role="presentation" onClick={() => setGuide(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pay-dialog-title"
+            className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">Payment</p>
+            <h2 id="pay-dialog-title" className="mt-1 text-[24px] font-semibold tracking-tight">Pay {guide.supplier}</h2>
+            <p className="mt-2 text-[28px] font-semibold tabular-nums">{inr(guide.net)}</p>
+            <p className="mt-2 text-[15px] leading-6 text-[#3F3F46]">{guide.notice}</p>
+            <ol className="mt-5 space-y-3 text-[15px]">
+              <li className="flex gap-3"><span className="font-semibold text-[#166534]">1</span><span>List made. No money has moved.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-[#6B1D2E]">2</span><span>Check the list.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-[#6B1D2E]">3</span><span>Type the bank reference after you send the money. We do not call the bank.</span></li>
+            </ol>
+            <div className="mt-6 flex flex-col gap-3">
+              {guide.status === 'draft' || guide.status === 'in_review' ? (
+                <button type="button" onClick={() => void batchAction(guide.batchId, 'finalise')} className="h-12 rounded-full bg-[#6B1D2E] text-[15px] font-semibold text-white active:scale-[0.98]">Check this list</button>
+              ) : null}
+              {guide.status === 'finalised' ? (
+                <>
+                  <label className="text-[13px] text-[#667085]">Bank reference
+                    <input aria-label={`Bank reference for ${guide.batchNumber}`} value={utr[guide.batchId] ?? ''} onChange={(event) => setUtr((current) => ({ ...current, [guide.batchId]: event.target.value }))} placeholder="From your bank, at least 6 characters" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
+                  </label>
+                  <button type="button" onClick={() => void batchAction(guide.batchId, 'settle')} className="h-12 rounded-full bg-[#6B1D2E] text-[15px] font-semibold text-white active:scale-[0.98]">I have sent the money</button>
+                </>
+              ) : null}
+              {guide.status === 'settled' ? (
+                <p className="rounded-2xl bg-[#F0FDF4] px-4 py-3 text-[15px] font-medium text-[#166534]">Paid. The reference is saved.</p>
+              ) : null}
+              {guide.status === 'draft' ? (
+                <button type="button" onClick={() => void batchAction(guide.batchId, 'cancel')} className="h-11 text-[14px] text-[#667085]">Cancel this list</button>
+              ) : null}
+              <button type="button" onClick={() => setGuide(null)} className="h-11 text-[14px] font-semibold text-[#6B1D2E]">Close</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <footer className="border-t border-[#E9E3DD] pt-4 text-[14px] text-[#667085]">
         Other records:{' '}

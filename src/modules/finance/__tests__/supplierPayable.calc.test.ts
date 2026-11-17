@@ -298,9 +298,9 @@ describe('settlement transitions', () => {
     expect(() => cancelDraft(locked, 'checker', 'Too late to cancel this batch', '2026-11-17T00:00:00.000Z')).toThrow(/draft/);
   });
 
-  it('requires a different person to finalise', () => {
-    expect(() => finaliseBatch(draft, 'maker')).toThrow(/cannot finalise/);
-    expect(finaliseBatch(draft, 'checker').status).toBe('finalised');
+  it('lets the same person check the list so the payment can be finished', () => {
+    expect(finaliseBatch(draft, 'maker').status).toBe('finalised');
+    expect(finaliseBatch(draft, 'checker').finalisedById).toBe('checker');
   });
 
   it('marks settled once with a real UTR and does not pretend the bank was checked', () => {

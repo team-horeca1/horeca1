@@ -25,7 +25,7 @@ test.describe('Supplier payables', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByLabel('Search supplier').fill('no-such-supplier-xyz');
     await page.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByText('No suppliers match these filters.')).toBeVisible();
+    await expect(page.getByText('No supplier matches. Clear the search to see everyone.')).toBeVisible();
 
     const response = await page.request.get('/api/v1/admin/finance/payables');
     expect(response.ok()).toBeTruthy();
@@ -34,6 +34,25 @@ test.describe('Supplier payables', () => {
     expect(body.data.kpis.outstandingIsCurrent).toBe(true);
 
     expect(errors).toEqual([]);
+  });
+
+  test('prepare payment opens the next step on the same screen', async ({ page }) => {
+    await passwordLogin(page, 'admin@horeca1.com', 'admin123');
+    await page.goto('/admin/finance');
+    const pay = page.getByRole('button', { name: /Pay ₹|Continue/ }).first();
+    await expect(pay).toBeVisible();
+    await pay.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('List made. No money has moved.')).toBeVisible();
+    const check = dialog.getByRole('button', { name: 'Check this list' });
+    if (await check.isVisible().catch(() => false)) {
+      await check.click();
+    }
+    await expect(dialog.getByLabel(/Bank reference/)).toBeVisible();
+    await dialog.getByLabel(/Bank reference/).fill('DEMOUTR123');
+    await dialog.getByRole('button', { name: 'I have sent the money' }).click();
+    await expect(dialog.getByText('Paid. The reference is saved.')).toBeVisible();
   });
 
   test('anonymous callers cannot read payables', async ({ request }) => {
