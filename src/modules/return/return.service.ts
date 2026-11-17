@@ -10,6 +10,7 @@ import { Errors } from '@/middleware/errorHandler';
 import { getRazorpay } from '@/lib/razorpay';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { debitVendorOnRefund } from '@/modules/vendor/vendorSettlement.service';
+import { refreshSupplierPayable } from '@/modules/finance/supplierPayable.service';
 import { promotionService } from '@/modules/promotion/promotion.service';
 import { orderService } from '@/modules/order/order.service';
 import type { OrderService } from '@/modules/order/order.service';
@@ -790,6 +791,7 @@ export async function adminProcessReturnRefund(
       refundAmount,
       `Return ${returnId} refunded to customer`,
     );
+    await refreshSupplierPayable(order.id);
   }
 
   if (order.status !== 'returned') {

@@ -1,5 +1,7 @@
 # Horeca1 — B2B HoReCa Marketplace
 
+Supplier payables (Phase 1) are documented in [docs/finance-ledger/README.md](docs/finance-ledger/README.md).
+
 [![CI / Deploy](https://github.com/AneeVerse/horeca1/actions/workflows/ci-deploy.yml/badge.svg)](https://github.com/AneeVerse/horeca1/actions/workflows/ci-deploy.yml)
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).

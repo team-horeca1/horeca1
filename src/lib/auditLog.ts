@@ -77,6 +77,14 @@ export const AUDIT_ACTIONS = {
   nominationDelete: 'voice_nomination.delete',
   orderMarkPaid: 'order.mark_paid',
   paymentRefunded: 'payment.refunded',
+  supplierCommissionUpdate: 'supplier_commission.update',
+  supplierPayableHold: 'supplier_payable.hold',
+  supplierPayableRelease: 'supplier_payable.release',
+  supplierPayableAdjust: 'supplier_payable.adjust',
+  supplierSettlementDraft: 'supplier_settlement.draft',
+  supplierSettlementCancel: 'supplier_settlement.cancel',
+  supplierSettlementFinalise: 'supplier_settlement.finalise',
+  supplierSettlementSettle: 'supplier_settlement.settle',
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];

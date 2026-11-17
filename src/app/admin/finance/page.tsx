@@ -90,6 +90,12 @@ export default function FinancePage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Link
+                        href="/admin/finance/payables"
+                        className="min-h-12 w-full md:w-auto justify-center px-6 bg-white text-[#6B1D2E] border border-[#6B1D2E] rounded-[12px] text-[14px] font-semibold hover:bg-[#F8E8EC] transition-all flex items-center gap-2"
+                    >
+                        Supplier Payables
+                    </Link>
+                    <Link
                         href="/admin/ledger"
                         className="min-h-12 w-full md:w-auto justify-center px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-semibold hover:bg-[#5A1926] transition-all flex items-center gap-2 shadow-sm shadow-[#6B1D2E]/20"
                     >

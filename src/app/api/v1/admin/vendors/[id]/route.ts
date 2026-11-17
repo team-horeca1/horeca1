@@ -180,15 +180,25 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       allowedFields.freeDeliveryAbove = body.freeDeliveryAbove !== null ? Number(body.freeDeliveryAbove) : null;
     }
     if (body.platformFeePct !== undefined) {
-      if (body.platformFeePct === null || body.platformFeePct === '') {
-        allowedFields.platformFeePct = null;
-      } else {
-        const pct = Number(body.platformFeePct);
-        if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-          throw Errors.badRequest('Platform fee must be between 0% and 100%');
-        }
-        allowedFields.platformFeePct = pct;
-      }
+      const { setSupplierCommission } = await import('@/modules/finance/supplierPayable.service');
+      const rate = body.platformFeePct === null || body.platformFeePct === ''
+        ? null
+        : Number(body.platformFeePct);
+      const reason = typeof body.commissionReason === 'string' ? body.commissionReason : '';
+      const changed = await setSupplierCommission({
+        vendorId: id,
+        ratePct: rate,
+        reason,
+        actorId: ctx.userId,
+      });
+      void logAction(ctx, req, {
+        action: AUDIT_ACTIONS.supplierCommissionUpdate,
+        entity: 'Vendor',
+        entityId: id,
+        before: { platformFeePct: changed.previous },
+        after: { platformFeePct: changed.next },
+        metadata: { reason },
+      });
     }
 
     const userUpdate: Record<string, string> = {};

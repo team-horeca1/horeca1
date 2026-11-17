@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import { claimOrders } from '@/modules/finance/claims';
 
 export const GATEWAY_FEE_PCT = 2;
 const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet'];
@@ -253,8 +254,11 @@ export async function createSettlementBatch(
     const unsettledOrderIds = orderIds.filter((id) => !settledSet.has(id));
     if (unsettledOrderIds.length === 0) return null;
 
+    const { claimed } = await claimOrders(tx, unsettledOrderIds, 'legacy_wallet');
+    if (claimed.length === 0) return null;
+
     const orders = await tx.order.findMany({
-      where: { id: { in: unsettledOrderIds } },
+      where: { id: { in: claimed } },
       select: {
         id: true,
         totalAmount: true,
@@ -365,6 +369,11 @@ export async function createSettlementBatch(
         balance: newBalance,
         pendingAmount: { decrement: settleAmount },
       },
+    });
+
+    await tx.supplierSettlementClaim.updateMany({
+      where: { orderId: { in: claimed }, owner: 'legacy_wallet', releasedAt: null },
+      data: { legacySettlementId: settlement.id },
     });
 
     return {

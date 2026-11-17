@@ -18,6 +18,7 @@ import { getDeliveryGeo } from '@/lib/deliveryLocation';
 import { CartService, type CartContext } from '@/modules/cart/cart.service';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.service';
+import { refreshSupplierPayable } from '@/modules/finance/supplierPayable.service';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
@@ -2473,6 +2474,7 @@ export class OrderService {
       if (status === 'returned') {
         await promotionService.cancelCashbackForOrder(tx, orderId);
       }
+      await refreshSupplierPayable(orderId, tx);
 
       // V2.2 Phase 1 — Commission accrual hook.
       //
@@ -2972,6 +2974,7 @@ export class OrderService {
       console.error('[Order] Program issuance after admin mark-paid failed:', err);
     }
 
+    await refreshSupplierPayable(updated.order.id);
     return updated.order;
   }
 }

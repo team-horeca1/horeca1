@@ -259,6 +259,9 @@ model Vendor {
   priceHistory            PriceHistory[]
   priceListPublishes      PriceListPublish[]
   settlements             VendorSettlement[]
+  commissionAgreements    SupplierCommissionAgreement[]
+  payableLines            SupplierPayableLine[]
+  financeBatches          FinanceSettlementBatch[]
   promotions              Promotion[]
   customerTasks           VendorCustomerTask[]
   customerPrices          VendorCustomerPrice[]
@@ -288,6 +291,10 @@ model Vendor {
   freeDeliveryAbove  Decimal? @map("free_delivery_above") @db.Decimal(10, 2)
   returnPolicy       String?  @map("return_policy") @db.Text
   cancellationPolicy String?  @map("cancellation_policy") @db.Text
+
+  // Supplier payables settlement cadence. Manual until finance sets weekly.
+  // Weekly only prepares finance drafts. It does not move money.
+  settlementCycle VendorSettlementCycle @default(manual) @map("settlement_cycle")
 
   // Bank account details for settlements
   bankAccountName   String? @map("bank_account_name") @db.VarChar(100)
@@ -955,6 +962,8 @@ model Order {
   shipments            OrderShipment[]
   fulfilment           Fulfilment?
   deliveryAccessTokens DeliveryAccessToken[]
+  payableLine          SupplierPayableLine?
+  settlementClaims     SupplierSettlementClaim[]
 
   @@index([userId])
   @@index([vendorId])
@@ -2476,6 +2485,205 @@ model VendorSettlementOrder {
   @@unique([settlementId, orderId])
   @@index([settlementId])
   @@map("vendor_settlement_orders")
+}
+
+// ═══ SUPPLIER PAYABLES (Phase 1) ═════════════════════
+// One line per purchase order. Finance batches are separate from VendorSettlement,
+// which already means "the vendor wallet was debited".
+
+enum VendorSettlementCycle {
+  manual
+  weekly
+
+  @@map("vendor_settlement_cycle")
+}
+
+enum SupplierPayableStatus {
+  pending_capture
+  awaiting_completion
+  commission_unconfigured
+  eligible
+  on_hold
+  in_batch
+  settled
+  closed
+
+  @@map("supplier_payable_status")
+}
+
+enum FinanceBatchStatus {
+  draft
+  in_review
+  finalised
+  settled
+  cancelled
+
+  @@map("finance_batch_status")
+}
+
+enum SettlementClaimOwner {
+  finance
+  legacy_wallet
+
+  @@map("settlement_claim_owner")
+}
+
+model SupplierCommissionAgreement {
+  id            String    @id @default(uuid()) @db.Uuid
+  vendorId      String    @map("vendor_id") @db.Uuid
+  ratePct       Decimal   @map("rate_pct") @db.Decimal(5, 2)
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz
+  reason        String    @db.Text
+  actorId       String?   @map("actor_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, effectiveFrom])
+  @@map("supplier_commission_agreements")
+}
+
+model SupplierPayableLine {
+  id                  String                @id @default(uuid()) @db.Uuid
+  orderId             String                @unique @map("order_id") @db.Uuid
+  vendorId            String                @map("vendor_id") @db.Uuid
+  status              SupplierPayableStatus @default(pending_capture)
+  commercialBase      Decimal               @default(0) @map("commercial_base") @db.Decimal(12, 2)
+  collectedAmount     Decimal               @default(0) @map("collected_amount") @db.Decimal(12, 2)
+  refundedAmount      Decimal               @default(0) @map("refunded_amount") @db.Decimal(12, 2)
+  recognisedBase      Decimal               @default(0) @map("recognised_base") @db.Decimal(12, 2)
+  commissionRatePct   Decimal?              @map("commission_rate_pct") @db.Decimal(5, 2)
+  commissionAmount    Decimal               @default(0) @map("commission_amount") @db.Decimal(12, 2)
+  netPayable          Decimal               @default(0) @map("net_payable") @db.Decimal(12, 2)
+  provisionalBase     Decimal               @default(0) @map("provisional_base") @db.Decimal(12, 2)
+  blockedSale         Decimal               @default(0) @map("blocked_sale") @db.Decimal(12, 2)
+  aboveCash           Decimal               @default(0) @map("above_cash") @db.Decimal(12, 2)
+  rateSnapshottedAt   DateTime?             @map("rate_snapshotted_at") @db.Timestamptz
+  financeBatchId      String?               @map("finance_batch_id") @db.Uuid
+  breakdown           Json                  @default("{}")
+  calculatedAt        DateTime              @default(now()) @map("calculated_at") @db.Timestamptz
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order  Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  batch  FinanceSettlementBatch? @relation(fields: [financeBatchId], references: [id], onDelete: SetNull)
+  events SupplierPayableEvent[]
+  holds  SupplierPayableHold[]
+
+  @@index([vendorId, status])
+  @@index([financeBatchId])
+  @@map("supplier_payable_lines")
+}
+
+model SupplierPayableEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  lineId          String?   @map("line_id") @db.Uuid
+  orderId         String    @map("order_id") @db.Uuid
+  vendorId        String    @map("vendor_id") @db.Uuid
+  eventType       String    @map("event_type") @db.VarChar(40)
+  sourceType      String    @map("source_type") @db.VarChar(40)
+  sourceId        String    @map("source_id") @db.VarChar(80)
+  amount          Decimal   @default(0) @db.Decimal(12, 2)
+  reason          String?   @db.Text
+  actorId         String?   @map("actor_id") @db.Uuid
+  approvalStatus  String?   @map("approval_status") @db.VarChar(20)
+  appliedBatchId  String?   @map("applied_batch_id") @db.Uuid
+  payload         Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  line          SupplierPayableLine?    @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  appliedBatch  FinanceSettlementBatch? @relation(fields: [appliedBatchId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceType, sourceId])
+  @@index([orderId])
+  @@index([vendorId, eventType])
+  @@index([appliedBatchId])
+  @@map("supplier_payable_events")
+}
+
+model SupplierPayableHold {
+  id           String    @id @default(uuid()) @db.Uuid
+  lineId       String    @map("line_id") @db.Uuid
+  reason       String    @db.Text
+  openedById   String    @map("opened_by_id") @db.Uuid
+  releasedById String?   @map("released_by_id") @db.Uuid
+  releasedAt   DateTime? @map("released_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  line SupplierPayableLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  @@index([lineId])
+  @@map("supplier_payable_holds")
+}
+
+model FinanceSettlementBatch {
+  id               String             @id @default(uuid()) @db.Uuid
+  batchNumber      String             @unique @map("batch_number") @db.VarChar(40)
+  vendorId         String             @map("vendor_id") @db.Uuid
+  status           FinanceBatchStatus @default(draft)
+  periodStart      DateTime           @map("period_start") @db.Date
+  periodEnd        DateTime           @map("period_end") @db.Date
+  commercialBase   Decimal            @default(0) @map("commercial_base") @db.Decimal(12, 2)
+  commissionAmount Decimal            @default(0) @map("commission_amount") @db.Decimal(12, 2)
+  adjustmentAmount Decimal            @default(0) @map("adjustment_amount") @db.Decimal(12, 2)
+  netAmount        Decimal            @default(0) @map("net_amount") @db.Decimal(12, 2)
+  heldAmount       Decimal            @default(0) @map("held_amount") @db.Decimal(12, 2)
+  orderCount       Int                @default(0) @map("order_count")
+  createdById      String             @map("created_by_id") @db.Uuid
+  finalisedById    String?            @map("finalised_by_id") @db.Uuid
+  settledById      String?            @map("settled_by_id") @db.Uuid
+  settledAt        DateTime?          @map("settled_at") @db.Timestamptz
+  bankReference    String?            @map("bank_reference") @db.VarChar(100)
+  cancelledById    String?            @map("cancelled_by_id") @db.Uuid
+  cancelledAt      DateTime?          @map("cancelled_at") @db.Timestamptz
+  cancelReason     String?            @map("cancel_reason") @db.Text
+  idempotencyKey   String?            @unique @map("idempotency_key") @db.VarChar(80)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vendor   Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  lines    SupplierPayableLine[]
+  events   FinanceSettlementEvent[]
+  claims   SupplierSettlementClaim[]
+  recoveries SupplierPayableEvent[]
+
+  @@index([vendorId, status])
+  @@index([settledAt])
+  @@map("finance_settlement_batches")
+}
+
+model FinanceSettlementEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  batchId   String   @map("batch_id") @db.Uuid
+  action    String   @db.VarChar(40)
+  actorId   String?  @map("actor_id") @db.Uuid
+  reason    String?  @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  batch FinanceSettlementBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId, createdAt])
+  @@map("finance_settlement_events")
+}
+
+model SupplierSettlementClaim {
+  id                   String               @id @default(uuid()) @db.Uuid
+  orderId              String               @map("order_id") @db.Uuid
+  owner                SettlementClaimOwner
+  financeBatchId       String?              @map("finance_batch_id") @db.Uuid
+  legacySettlementId   String?              @map("legacy_settlement_id") @db.Uuid
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  releasedAt           DateTime?            @map("released_at") @db.Timestamptz
+
+  order        Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  financeBatch FinanceSettlementBatch? @relation(fields: [financeBatchId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([financeBatchId])
+  @@map("supplier_settlement_claims")
 }
 
 // ═══ VENDOR CUSTOMER MAPPING ═════════════════════════
