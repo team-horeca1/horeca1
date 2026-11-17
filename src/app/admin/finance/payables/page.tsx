@@ -1,5 +1,5 @@
-import { PayablesDashboard } from '@/components/features/admin/finance/PayablesDashboard';
+import { redirect } from 'next/navigation';
 
-export default function SupplierPayablesPage() {
-  return <PayablesDashboard />;
+export default function SupplierPayablesRedirect() {
+  redirect('/admin/finance');
 }

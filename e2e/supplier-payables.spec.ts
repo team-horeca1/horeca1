@@ -6,16 +6,16 @@ test.describe('Supplier payables', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await passwordLogin(page, 'admin@horeca1.com', 'admin123');
-    await page.goto('/admin/finance/payables');
-    await expect(page.getByRole('heading', { name: 'Supplier Payables' })).toBeVisible();
-    await expect(page.getByText('does not verify it with a bank')).toBeVisible();
-    await expect(page.getByText('Total supplier outstanding')).toBeVisible();
-    await expect(page.getByText('Eligible for settlement')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Settlement batches' })).toBeVisible();
+    await page.goto('/admin/finance');
+    await expect(page.getByRole('heading', { name: 'Pay suppliers' })).toBeVisible();
+    await expect(page.getByText('We do not call the bank.')).toBeVisible();
+    await expect(page.getByText('We still owe suppliers')).toBeVisible();
+    await expect(page.getByText('Ready to pay now')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Payments being prepared' })).toBeVisible();
 
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      await expect(page.getByRole('heading', { name: 'Supplier Payables' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Pay suppliers' })).toBeVisible();
       await page.screenshot({
         path: `docs/finance-ledger/screenshots/payables-${width}.png`,
         fullPage: true,

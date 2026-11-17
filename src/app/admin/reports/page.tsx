@@ -46,8 +46,8 @@ export default function AdminReportsPage() {
     <div className="space-y-6 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[clamp(1.25rem,2vw+0.75rem,1.75rem)] font-bold text-[#181725]">Platform Reports</h1>
-          <p className="text-[12px] text-[#7C7C7C]">GMV, platform revenue, settlements, and returns — downloadable</p>
+          <h1 className="text-[clamp(1.25rem,2vw+0.75rem,1.75rem)] font-bold text-[#181725]">Sales reports</h1>
+          <p className="text-[12px] text-[#7C7C7C]">How much was sold. This is not the page for paying suppliers.</p>
         </div>
         <div className="flex gap-2">
           {(['7d', '30d', '90d'] as const).map((p) => (

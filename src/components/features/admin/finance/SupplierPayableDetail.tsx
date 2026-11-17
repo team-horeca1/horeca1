@@ -88,10 +88,10 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-16 text-[#1C1C1C]">
-      <Link href="/admin/finance/payables" className="text-[13px] font-semibold text-[#6B1D2E]">Back to supplier payables</Link>
+      <Link href="/admin/finance" className="text-[14px] font-semibold text-[#6B1D2E]">Back to Pay suppliers</Link>
       <header>
-        <h1 className="text-[clamp(1.5rem,2vw+1rem,2rem)] font-semibold text-[#6B1D2E]">{name}</h1>
-        <p className="mt-1 text-[14px] text-[#667085]">{data.vendor.vendorCode ?? 'No supplier code'} · {data.vendor.platformFeePct == null ? 'Commission not configured' : `Commission ${data.vendor.platformFeePct}%`}</p>
+        <h1 className="text-[clamp(1.5rem,2vw+1rem,2rem)] font-semibold text-[#6B1D2E]">What we owe {name}</h1>
+        <p className="mt-1 text-[15px] leading-6 text-[#667085]">{data.vendor.platformFeePct == null ? 'Set a commission before this supplier can be paid. Blank is not zero.' : `We keep ${data.vendor.platformFeePct}% and pay the rest.`}</p>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2">

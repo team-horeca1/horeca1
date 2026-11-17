@@ -78,10 +78,8 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Finance',
     links: [
-      { name: 'Overview', icon: Wallet, href: '/admin/finance', feature: 'payments', requiredPerm: 'payments.view' },
-      { name: 'Supplier Payables', icon: Receipt, href: '/admin/finance/payables', feature: 'payments', requiredPerm: 'payments.view' },
-      { name: 'Platform Ledger', icon: BookOpen, href: '/admin/ledger', feature: 'payments', requiredPerm: 'payments.view' },
-      { name: 'Reports', icon: BarChart3, href: '/admin/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
+      { name: 'Pay suppliers', icon: Receipt, href: '/admin/finance', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Sales reports', icon: BarChart3, href: '/admin/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
     ],
   },
   {
