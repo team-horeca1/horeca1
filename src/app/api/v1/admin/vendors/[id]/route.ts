@@ -179,7 +179,9 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (body.freeDeliveryAbove !== undefined) {
       allowedFields.freeDeliveryAbove = body.freeDeliveryAbove !== null ? Number(body.freeDeliveryAbove) : null;
     }
+    let commissionUpdated = false;
     if (body.platformFeePct !== undefined) {
+      commissionUpdated = true;
       const { setSupplierCommission } = await import('@/modules/finance/supplierPayable.service');
       const rate = body.platformFeePct === null || body.platformFeePct === ''
         ? null
@@ -276,7 +278,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     const hasServiceAreas = body.serviceAreas !== undefined;
     const hasDeliverySlots = body.deliverySlots !== undefined;
 
-    if (Object.keys(allowedFields).length === 0 && Object.keys(userUpdate).length === 0 && !hasServiceAreas && !hasDeliverySlots && !hasBusinessAccountUpdate) {
+    if (!commissionUpdated && Object.keys(allowedFields).length === 0 && Object.keys(userUpdate).length === 0 && !hasServiceAreas && !hasDeliverySlots && !hasBusinessAccountUpdate) {
       throw Errors.notFound('No valid fields to update');
     }
 

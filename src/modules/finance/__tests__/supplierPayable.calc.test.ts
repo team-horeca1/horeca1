@@ -22,7 +22,7 @@ function input(overrides: Partial<PayableAssessmentInput> = {}): PayableAssessme
     promoDiscount: '0.00',
     couponDiscount: '0.00',
     couponVendorId: null,
-    payments: [{ amount: '10000.00', status: 'captured', method: 'online' }],
+    payments: [{ amount: '10000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     processedRefunds: [],
     ratePct: '10.00',
     onHold: false,
@@ -42,6 +42,37 @@ describe('paise conversion', () => {
 });
 
 describe('supplier payable calculation', () => {
+  it('uses the stored Razorpay fee in paise, not a percentage', () => {
+    const result = assessPayable(input({
+      subtotal: '100.00',
+      payments: [{ amount: '100.00', status: 'captured', method: 'online', razorpayFeePaise: 118 }],
+      ratePct: '10.00',
+    }));
+    expect(result.razorpayFeePaise).toBe(118);
+    expect(result.commissionPaise).toBe(1000);
+    expect(result.netPayablePaise).toBe(10000 - 118 - 1000);
+    expect(result.razorpayFeeUnknown).toBe(false);
+  });
+
+  it('does not invent a Razorpay fee when the payment has none', () => {
+    const result = assessPayable(input({
+      payments: [{ amount: '100.00', status: 'captured', method: 'online', razorpayFeePaise: null }],
+    }));
+    expect(result.status).toBe('fee_unknown');
+    expect(result.razorpayFeeUnknown).toBe(true);
+    expect(result.netPayablePaise).toBe(0);
+  });
+
+  it('charges no Razorpay fee on cash that never went through Razorpay', () => {
+    const result = assessPayable(input({
+      paymentMethod: 'cod',
+      payments: [{ amount: '10000.00', status: 'captured', method: 'cod' }],
+    }));
+    expect(result.razorpayFeePaise).toBe(0);
+    expect(result.razorpayFeeUnknown).toBe(false);
+    expect(result.netPayablePaise).toBe(900_000);
+  });
+
   it('charges a configured positive commission on the tax-inclusive subtotal', () => {
     const result = assessPayable(input());
     expect(result.taxTreatment).toBe('tax_inclusive_subtotal_pending_client_confirmation');
@@ -79,7 +110,7 @@ describe('supplier payable calculation', () => {
 
   it('does not count an authorised payment as cash', () => {
     const result = assessPayable(input({
-      payments: [{ amount: '10000.00', status: 'authorized', method: 'online' }],
+      payments: [{ amount: '10000.00', status: 'authorized', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.status).toBe('pending_capture');
     expect(result.netCollectedPaise).toBe(0);
@@ -88,7 +119,7 @@ describe('supplier payable calculation', () => {
 
   it('does not count a failed payment', () => {
     const result = assessPayable(input({
-      payments: [{ amount: '10000.00', status: 'failed', method: 'online' }],
+      payments: [{ amount: '10000.00', status: 'failed', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.netCollectedPaise).toBe(0);
   });
@@ -107,7 +138,7 @@ describe('supplier payable calculation', () => {
   it('sums multiple cash rows and caps a partial collection', () => {
     const result = assessPayable(input({
       payments: [
-        { amount: '4000.00', status: 'captured', method: 'online' },
+        { amount: '4000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 },
         { amount: '2500.50', status: 'captured', method: 'bank_transfer' },
         { amount: '1000.00', status: 'captured', method: 'wallet' },
       ],
@@ -121,8 +152,8 @@ describe('supplier payable calculation', () => {
   it('applies several processed refunds once and refuses the excess', () => {
     const result = assessPayable(input({
       payments: [
-        { amount: '6000.00', status: 'captured', method: 'online' },
-        { amount: '4000.00', status: 'refunded', method: 'online' },
+        { amount: '6000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 },
+        { amount: '4000.00', status: 'refunded', method: 'online', razorpayFeePaise: 0 },
       ],
       processedRefunds: [
         { id: 'r1', amount: '3000.00' },
@@ -143,7 +174,7 @@ describe('supplier payable calculation', () => {
       promoDiscount: '500.00',
       couponDiscount: '250.00',
       couponVendorId: vendor,
-      payments: [{ amount: '9250.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '9250.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.supplierPromoPaise).toBe(50_000);
     expect(result.supplierCouponPaise).toBe(25_000);
@@ -156,7 +187,7 @@ describe('supplier payable calculation', () => {
       promoDiscount: '0.00',
       couponDiscount: '1000.00',
       couponVendorId: null,
-      payments: [{ amount: '9000.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '9000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.platformCouponPaise).toBe(100_000);
     expect(result.supplierCouponPaise).toBe(0);
@@ -170,7 +201,7 @@ describe('supplier payable calculation', () => {
       promoDiscount: '0.00',
       couponDiscount: '400.00',
       couponVendorId: vendor,
-      payments: [{ amount: '9600.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '9600.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.supplierPromoPaise).toBe(0);
     expect(result.commercialBasePaise).toBe(960_000);
@@ -178,7 +209,7 @@ describe('supplier payable calculation', () => {
 
   it('does not treat rewards-wallet redemption as a supplier discount', () => {
     const result = assessPayable(input({
-      payments: [{ amount: '9000.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '9000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.commercialBasePaise).toBe(1_000_000);
     expect(result.recognisedBasePaise).toBe(900_000);
@@ -188,7 +219,7 @@ describe('supplier payable calculation', () => {
     const result = assessPayable(input({
       subtotal: '8000.00',
       payments: [
-        { amount: '10000.00', status: 'captured', method: 'online' },
+        { amount: '10000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 },
       ],
       processedRefunds: [{ id: 'r1', amount: '2000.00' }],
     }));
@@ -206,7 +237,7 @@ describe('supplier payable calculation', () => {
   it('does not create a supplier liability for a cancellation before delivery', () => {
     const result = assessPayable(input({
       orderStatus: 'cancelled',
-      payments: [{ amount: '10000.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '10000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(result.status).toBe('closed');
     expect(result.netPayablePaise).toBe(0);
@@ -218,14 +249,14 @@ describe('supplier payable calculation', () => {
       vendorId: 'vendor-a',
       subtotal: '6000.00',
       ratePct: '10.00',
-      payments: [{ amount: '6000.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '6000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     const second = assessPayable(input({
       vendorId: 'vendor-b',
       subtotal: '4000.00',
       ratePct: '0.00',
       couponDiscount: '0.00',
-      payments: [{ amount: '4000.00', status: 'captured', method: 'online' }],
+      payments: [{ amount: '4000.00', status: 'captured', method: 'online', razorpayFeePaise: 0 }],
     }));
     expect(first.netPayablePaise + second.netCollectedPaise).toBeGreaterThan(0);
     expect(first.netCollectedPaise + second.netCollectedPaise).toBe(1_000_000);
@@ -331,7 +362,7 @@ describe('legacy wallet formula', () => {
 describe('cash gross helper', () => {
   it('includes refunded cash rows and skips non-cash captured rows', () => {
     expect(grossCashPaise([
-      { amount: '10.00', status: 'captured', method: 'online' },
+      { amount: '10.00', status: 'captured', method: 'online', razorpayFeePaise: 0 },
       { amount: '5.00', status: 'refunded', method: 'cheque' },
       { amount: '99.00', status: 'captured', method: 'credit' },
     ])).toBe(1500);

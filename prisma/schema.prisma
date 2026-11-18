@@ -1188,6 +1188,9 @@ model Payment {
   razorpaySignature String?       @map("razorpay_signature") @db.VarChar(255)
   amount            Decimal       @db.Decimal(12, 2)
   currency          String        @default("INR") @db.VarChar(10)
+  // Razorpay payment.fee / payment.tax in paise. Null means Razorpay did not return a fee.
+  razorpayFeePaise  Int?          @map("razorpay_fee_paise")
+  razorpayTaxPaise  Int?          @map("razorpay_tax_paise")
   status            PaymentStatus @default(created)
   method            String?       @db.VarChar(30)
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -2502,6 +2505,7 @@ enum SupplierPayableStatus {
   pending_capture
   awaiting_completion
   commission_unconfigured
+  fee_unknown
   eligible
   on_hold
   in_batch
@@ -2555,6 +2559,8 @@ model SupplierPayableLine {
   recognisedBase      Decimal               @default(0) @map("recognised_base") @db.Decimal(12, 2)
   commissionRatePct   Decimal?              @map("commission_rate_pct") @db.Decimal(5, 2)
   commissionAmount    Decimal               @default(0) @map("commission_amount") @db.Decimal(12, 2)
+  razorpayFee         Decimal?              @map("razorpay_fee") @db.Decimal(12, 2)
+  razorpayFeeUnknown  Boolean               @default(false) @map("razorpay_fee_unknown")
   netPayable          Decimal               @default(0) @map("net_payable") @db.Decimal(12, 2)
   provisionalBase     Decimal               @default(0) @map("provisional_base") @db.Decimal(12, 2)
   blockedSale         Decimal               @default(0) @map("blocked_sale") @db.Decimal(12, 2)

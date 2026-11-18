@@ -271,7 +271,7 @@ async function clearProvisionalWalletCredit(
   return { posted: true, amountPaise: remaining };
 }
 
-export async function markFinanceBatchSettled(batchId: string, actorId: string, utr: string) {
+export async function markFinanceBatchSettled(batchId: string, actorId: string, utr: string, note?: string) {
   try {
     return await prisma.$transaction(async (tx) => {
       const batch = await tx.financeSettlementBatch.findUnique({
@@ -313,7 +313,7 @@ export async function markFinanceBatchSettled(batchId: string, actorId: string, 
             bankVerified: false,
             walletReleases,
           },
-          reason: 'Operator recorded a UTR. The bank was not contacted.',
+          reason: note?.trim() || 'Operator recorded a UTR. The bank was not contacted.',
         },
       });
       return { batch: updated, replayed: false, walletReleases };
@@ -349,4 +349,29 @@ export async function runWeeklyFinanceDrafts() {
     }
   }
   return { vendors: vendors.length, drafts };
+}
+
+export async function paySupplierNow(input: {
+  vendorId: string;
+  actorId: string;
+  utr: string;
+  note: string;
+}) {
+  const note = input.note.trim();
+  if (note.length < 3) throw Errors.badRequest('Add a short note');
+  const open = await prisma.financeSettlementBatch.findFirst({
+    where: { vendorId: input.vendorId, status: { in: ['draft', 'in_review', 'finalised'] } },
+    orderBy: { createdAt: 'desc' },
+  });
+  let batchId = open?.id;
+  let status = open?.status;
+  if (!batchId) {
+    const draft = await createFinanceDraft({ vendorId: input.vendorId, actorId: input.actorId });
+    batchId = draft.batch.id;
+    status = 'draft';
+  }
+  if (status === 'draft' || status === 'in_review') {
+    await finaliseFinanceBatch(batchId, input.actorId);
+  }
+  return markFinanceBatchSettled(batchId, input.actorId, input.utr, note);
 }

@@ -25,6 +25,26 @@ export function paiseToRupees(paise: number): string {
   return `${negative ? '-' : ''}${whole}.${frac}`;
 }
 
+/** Split an integer paise total across weights. The last share takes the remainder so the parts sum exactly. */
+export function allocatePaise(total: number, weights: number[]): number[] {
+  if (weights.length === 0) return [];
+  const safeTotal = Math.max(0, Math.round(total));
+  const sum = weights.reduce((acc, weight) => acc + Math.max(0, weight), 0);
+  if (sum <= 0 || safeTotal === 0) return weights.map(() => 0);
+  const shares: number[] = [];
+  let used = 0;
+  for (let i = 0; i < weights.length; i += 1) {
+    if (i === weights.length - 1) {
+      shares.push(safeTotal - used);
+    } else {
+      const share = Math.floor((safeTotal * Math.max(0, weights[i])) / sum);
+      shares.push(share);
+      used += share;
+    }
+  }
+  return shares;
+}
+
 /** Commission in paise. ratePct is a percentage with at most two decimal places, e.g. "10.50". */
 export function commissionPaise(basePaise: number, ratePct: string | null): number {
   if (ratePct == null || basePaise <= 0) return 0;

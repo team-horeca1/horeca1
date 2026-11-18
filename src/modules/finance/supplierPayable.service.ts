@@ -19,6 +19,16 @@ function money(paise: number): string {
   return paiseToRupees(paise);
 }
 
+function paymentInputs(payments: Array<{ amount: { toString(): string }; status: string; method: string | null; razorpayFeePaise: number | null; razorpayPaymentId: string | null }>) {
+  return payments.map((payment) => ({
+    amount: payment.amount.toString(),
+    status: payment.status,
+    method: payment.method,
+    razorpayFeePaise: payment.razorpayFeePaise,
+    hasRazorpayPayment: Boolean(payment.razorpayPaymentId),
+  }));
+}
+
 async function agreementRate(
   db: Db,
   vendorId: string,
@@ -81,7 +91,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: {
-      payments: { select: { id: true, amount: true, status: true, method: true } },
+      payments: { select: { id: true, amount: true, status: true, method: true, razorpayFeePaise: true, razorpayPaymentId: true } },
       coupon: { select: { vendorId: true } },
       returnRequests: { select: { id: true, status: true, resolutionType: true, refundAmount: true } },
       payableLine: { include: { batch: { select: { id: true, status: true } }, holds: { where: { releasedAt: null }, take: 1 } } },
@@ -109,11 +119,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
       promoDiscount: order.promoDiscount.toString(),
       couponDiscount: order.couponDiscount.toString(),
       couponVendorId: order.coupon?.vendorId ?? null,
-      payments: order.payments.map((payment) => ({
-        amount: payment.amount.toString(),
-        status: payment.status,
-        method: payment.method,
-      })),
+      payments: paymentInputs(order.payments),
       processedRefunds: refunds,
       ratePct: liveRate,
       onHold: false,
@@ -132,11 +138,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
     promoDiscount: order.promoDiscount.toString(),
     couponDiscount: order.couponDiscount.toString(),
     couponVendorId: order.coupon?.vendorId ?? null,
-    payments: order.payments.map((payment) => ({
-      amount: payment.amount.toString(),
-      status: payment.status,
-      method: payment.method,
-    })),
+    payments: paymentInputs(order.payments),
     processedRefunds: refunds,
     ratePct: liveRate,
     onHold: openHold,
@@ -154,11 +156,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
       promoDiscount: order.promoDiscount.toString(),
       couponDiscount: order.couponDiscount.toString(),
       couponVendorId: order.coupon?.vendorId ?? null,
-      payments: order.payments.map((payment) => ({
-        amount: payment.amount.toString(),
-        status: payment.status,
-        method: payment.method,
-      })),
+      payments: paymentInputs(order.payments),
       processedRefunds: refunds,
       ratePct: liveRate,
       onHold: openHold,
@@ -210,6 +208,8 @@ function lineData(assessed: PayableAssessment, vendorId: string, financeBatchId:
     refundedAmount: money(assessed.refundedPaise),
     recognisedBase: money(assessed.recognisedBasePaise),
     commissionAmount: money(assessed.commissionPaise),
+    razorpayFee: assessed.razorpayFeeUnknown ? null : money(assessed.razorpayFeePaise),
+    razorpayFeeUnknown: assessed.razorpayFeeUnknown,
     netPayable: money(assessed.netPayablePaise),
     provisionalBase: money(assessed.provisionalBasePaise),
     blockedSale: money(assessed.blockedSalePaise),
@@ -417,7 +417,7 @@ export async function listSupplierPayables(query: PayableListQuery) {
     ? []
     : await prisma.supplierPayableLine.findMany({
       where: { vendorId: { in: vendorIds } },
-      include: { order: { select: { deliveredAt: true } } },
+      include: { order: { select: { deliveredAt: true, orderNumber: true } } },
     });
   const batches = vendorIds.length === 0
     ? []
@@ -459,7 +459,9 @@ export async function listSupplierPayables(query: PayableListQuery) {
       ratePct: vendor.platformFeePct == null ? null : vendor.platformFeePct.toString(),
       commissionConfigured: vendor.platformFeePct != null,
       settlementCycle: vendor.settlementCycle,
-      eligibleSalePaise: own.reduce((sum, line) => sum + rupeesToPaise(line.recognisedBase.toString()), 0),
+      eligibleSalePaise: own.reduce((sum, line) => sum + rupeesToPaise(line.collectedAmount.toString()), 0),
+      razorpayFeePaise: own.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())), 0),
+      razorpayFeeUnknown: own.some((line) => line.razorpayFeeUnknown),
       commissionPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.commissionAmount.toString()), 0),
       adjustmentPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.aboveCash.toString()), 0),
       outstandingPaise: outstandingPaise(parts, recovery),
@@ -468,6 +470,7 @@ export async function listSupplierPayables(query: PayableListQuery) {
       settledPaise,
       latestSettlement: latestSettled?.settledAt?.toISOString() ?? null,
       unconfigured: own.some((line) => line.status === 'commission_unconfigured') || vendor.platformFeePct == null,
+      orders: own.map((line) => ({ orderId: line.orderId, orderNumber: line.order.orderNumber })),
     };
   });
 
@@ -522,6 +525,9 @@ export async function listSupplierPayables(query: PayableListQuery) {
     kpis: {
       outstandingPaise: outstanding,
       eligiblePaise: eligible,
+      customerPaidPaise: lines.reduce((sum, line) => sum + rupeesToPaise(line.collectedAmount.toString()), 0),
+      razorpayFeePaise: lines.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())), 0),
+      razorpayFeeUnknown: lines.some((line) => line.razorpayFeeUnknown),
       pendingCapturePaise: pendingCapture,
       awaitingCompletionPaise: awaiting,
       commissionPaise: commission,

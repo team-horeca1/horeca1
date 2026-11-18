@@ -11,6 +11,9 @@ type Kpis = {
   pendingCapture: string;
   awaitingCompletion: string;
   commission: string;
+  customerPaid: string;
+  razorpayFee: string;
+  razorpayFeeUnknown: boolean;
   settledPeriod: string;
   onHold: string;
   blockedSale: string;
@@ -26,18 +29,11 @@ type Row = {
   onHold: string;
   settled: string;
   eligibleSale: string;
+  razorpayFee: string | null;
+  razorpayFeeUnknown: boolean;
   commission: string;
   unconfigured: boolean;
-};
-
-type Batch = {
-  id: string;
-  batchNumber: string;
-  vendorId: string;
-  status: string;
-  net: string;
-  orderCount: number;
-  bankReference: string | null;
+  orders: Array<{ orderId: string; orderNumber: string }>;
 };
 
 function inr(value: string | number): string {
@@ -50,34 +46,24 @@ function money(value: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const BATCH_LABEL: Record<string, { title: string; next: string }> = {
-  draft: { title: 'Not checked yet', next: 'Someone else must check this before you pay.' },
-  in_review: { title: 'Being checked', next: 'Wait for the check to finish.' },
-  finalised: { title: 'Checked. Ready to record the payment.', next: 'Type the bank reference after you send the money.' },
-  settled: { title: 'Paid', next: 'The bank reference is saved. We do not call the bank to check it.' },
-  cancelled: { title: 'Cancelled', next: 'These orders can be paid in a new list.' },
-};
-
 export function PayablesDashboard() {
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [utr, setUtr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState('');
   const [guide, setGuide] = useState<{
     supplier: string;
     vendorId: string;
-    batchId: string;
-    batchNumber: string;
-    status: string;
     net: string;
+    utr: string;
+    note: string;
     notice: string;
+    paid: boolean;
   } | null>(null);
 
   const load = useCallback(async () => {
@@ -92,7 +78,6 @@ export function PayablesDashboard() {
       if (!res.ok) throw new Error(json?.error?.message ?? 'Could not load this page');
       setKpis(json.data.kpis);
       setRows(json.data.rows);
-      setBatches(json.data.batches ?? []);
       setTotal(json.data.pagination.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this page');
@@ -105,65 +90,28 @@ export function PayablesDashboard() {
     void load();
   }, [load]);
 
-  async function batchAction(id: string, action: 'cancel' | 'finalise' | 'settle') {
-    setBusy(id + action);
+  async function markPaid() {
+    if (!guide) return;
+    setBusy(guide.vendorId);
     try {
-      const res = await fetch(`/api/v1/admin/finance/payables/batches/${id}`, {
+      const res = await fetch('/api/v1/admin/finance/payables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          reason: action === 'cancel' ? 'Payment list cancelled before it was checked' : undefined,
-          utr: utr[id],
-        }),
+        body: JSON.stringify({ vendorId: guide.vendorId, utr: guide.utr, note: guide.note }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error?.message ?? 'That step did not save');
-      const nextStatus = action === 'cancel' ? 'cancelled' : action === 'finalise' ? 'finalised' : 'settled';
-      setGuide((current) => current && current.batchId === id
-        ? { ...current, status: nextStatus, notice: action === 'settle' ? 'Saved. This supplier is paid.' : action === 'finalise' ? 'Checked. Type the bank reference from your transfer.' : 'Cancelled.' }
-        : current);
+      if (!res.ok) throw new Error(json?.error?.message ?? 'Could not mark this paid');
+      setGuide({ ...guide, paid: true, notice: 'Paid. The reference is saved.' });
       await load();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'That step did not save';
-      setError(message);
+      const message = err instanceof Error ? err.message : 'Could not mark this paid';
       setGuide((current) => current ? { ...current, notice: message } : current);
     } finally {
       setBusy('');
     }
   }
 
-  async function preparePayment(vendorId: string) {
-    setBusy(vendorId);
-    try {
-      const res = await fetch('/api/v1/admin/finance/payables', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId, idempotencyKey: `manual:${vendorId}:${Date.now()}` }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error?.message ?? 'Could not prepare the payment');
-      const batch = json.data;
-      const supplier = rows.find((row) => row.vendorId === vendorId)?.supplier ?? 'Supplier';
-      setGuide({
-        supplier,
-        vendorId,
-        batchId: batch.id,
-        batchNumber: batch.batchNumber,
-        status: batch.status ?? 'draft',
-        net: String(batch.netAmount ?? batch.net ?? '0'),
-        notice: 'List made. Check it, then type the bank reference.',
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not prepare the payment');
-    } finally {
-      setBusy('');
-    }
-  }
-
   const featured = rows.find((row) => money(row.eligible) > 0) ?? null;
-  const openPayments = batches.filter((batch) => batch.status !== 'settled' && batch.status !== 'cancelled');
   const split = kpis
     ? [{
       name: 'Money',
@@ -184,7 +132,7 @@ export function PayablesDashboard() {
         <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#6B1D2E]">Finance</p>
         <h1 className="mt-2 text-[clamp(2rem,3vw+1rem,2.75rem)] font-semibold tracking-[-0.03em]">Pay suppliers</h1>
         <p className="mt-2 max-w-xl text-[16px] leading-7 text-[#3F3F46]">
-          The customer pays. The order is delivered. We keep our commission. What is left is what you pay the supplier.
+          The customer pays. Razorpay takes its fee. Horeca1 keeps the commission. What is left is what you pay the supplier. We do not call the bank.
         </p>
       </header>
 
@@ -197,16 +145,17 @@ export function PayablesDashboard() {
         <section className="animate-in fade-in slide-in-from-bottom-2 duration-700 overflow-hidden rounded-[28px] bg-[#2A1218] text-[#FAF7F2] shadow-[0_24px_60px_-32px_rgba(42,18,24,0.7)]">
           <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
             <div>
-              <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#E7C5CE]">We still owe suppliers</p>
-              <p className="mt-3 font-semibold tabular-nums tracking-[-0.04em] text-[clamp(2.8rem,6vw,4.5rem)] leading-none">{inr(kpis.outstanding)}</p>
+              <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#E7C5CE]">To pay</p>
+              <p className="mt-3 font-semibold tabular-nums tracking-[-0.04em] text-[clamp(2.8rem,6vw,4.5rem)] leading-none">{inr(kpis.eligible)}</p>
               <p className="mt-4 max-w-sm text-[14px] leading-6 text-[#E7C5CE]">
-                This number stays until you save a bank reference. Preparing a payment does not clear it.
+                Customer paid, minus the Razorpay fee, minus commission.
               </p>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
-              <p className="text-[12px] uppercase tracking-[0.16em] text-[#E7C5CE]">Ready to pay now</p>
-              <p className="mt-2 text-[clamp(1.8rem,3vw,2.4rem)] font-semibold tabular-nums">{inr(kpis.eligible)}</p>
-              <p className="mt-2 text-[13px] leading-5 text-[#E7C5CE]">Customer paid. Order delivered. Commission already taken out.</p>
+              <p className="text-[12px] uppercase tracking-[0.16em] text-[#E7C5CE]">Razorpay cut</p>
+              <p className="mt-2 text-[clamp(1.8rem,3vw,2.4rem)] font-semibold tabular-nums">{inr(kpis.razorpayFee)}</p>
+              {kpis.razorpayFeeUnknown ? <p className="mt-2 text-[13px] leading-5 text-[#E7C5CE]">Some Razorpay fees have not been received. Those suppliers stay unpaid.</p> : null}
+              <p className="mt-2 text-[13px] leading-5 text-[#E7C5CE]">Commission kept {inr(kpis.commission)}. Customer paid {inr(kpis.customerPaid)}.</p>
             </div>
           </div>
 
@@ -218,8 +167,9 @@ export function PayablesDashboard() {
                 <p className="text-[13px] text-[#667085]">{featured.ratePct == null ? 'No commission set' : `${featured.ratePct}% commission`}</p>
               </div>
               <Figure label="Customer paid" value={inr(featured.eligibleSale)} />
-              <Figure label="We keep" value={inr(featured.commission)} />
-              <Figure label="Pay them" value={inr(featured.eligible)} strong />
+              <Figure label="Razorpay cut" value={featured.razorpayFeeUnknown ? 'Not received' : inr(featured.razorpayFee ?? 0)} />
+              <Figure label="Commission" value={inr(featured.commission)} />
+              <Figure label="To pay" value={inr(featured.eligible)} strong />
             </div>
           ) : null}
 
@@ -283,8 +233,7 @@ export function PayablesDashboard() {
         ) : (
           <ul className="space-y-2">
             {rows.map((row) => {
-              const ready = money(row.eligible) > 0;
-              const queued = !ready && money(row.outstanding) > 0 && batches.some((batch) => batch.vendorId === row.vendorId && (batch.status === 'draft' || batch.status === 'in_review' || batch.status === 'finalised'));
+              const ready = money(row.eligible) > 0 && !row.razorpayFeeUnknown;
               return (
                 <li key={row.vendorId} className="group flex flex-col gap-4 rounded-[22px] border border-[#E9E3DD] bg-white p-4 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-28px_rgba(42,18,24,0.45)] sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -293,34 +242,38 @@ export function PayablesDashboard() {
                       {row.ratePct == null ? 'Commission not set — we will not guess a rate' : `We keep ${row.ratePct}%`}
                       {row.supplierCode ? ` · ${row.supplierCode}` : ''}
                     </p>
+                    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[13px]">
+                      {(row.orders ?? []).map((order) => (
+                        <span key={order.orderId} className="inline-flex items-center gap-2">
+                          <span className="text-[#667085]">{order.orderNumber}</span>
+                          <a className="font-semibold text-[#6B1D2E]" href={`/api/v1/admin/orders/${order.orderId}/invoice`}>Invoice</a>
+                        </span>
+                      ))}
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <Stat label="We owe" value={money(row.outstanding) > 0 ? inr(row.outstanding) : 'Nothing'} />
-                    <Stat label="Ready" value={ready ? inr(row.eligible) : queued ? 'In the list below' : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
-                    <button
-                      type="button"
-                      disabled={(!ready && !queued) || busy === row.vendorId}
-                      onClick={() => {
-                        if (queued) {
-                          const batch = batches.find((item) => item.vendorId === row.vendorId && (item.status === 'draft' || item.status === 'finalised' || item.status === 'in_review'));
-                          if (!batch) return;
-                          setGuide({
-                            supplier: row.supplier,
-                            vendorId: row.vendorId,
-                            batchId: batch.id,
-                            batchNumber: batch.batchNumber,
-                            status: batch.status,
-                            net: batch.net,
-                            notice: batch.status === 'finalised' ? 'Checked. Type the bank reference from your transfer.' : 'This list is already made. Check it next.',
-                          });
-                          return;
-                        }
-                        void preparePayment(row.vendorId);
-                      }}
-                      className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98] disabled:bg-[#EFEAE4] disabled:text-[#8A8178]"
-                    >
-                      {busy === row.vendorId ? 'Opening…' : queued ? 'Continue' : `Pay ${inr(row.eligible)}`}
-                    </button>
+                    <Stat label="Customer paid" value={inr(row.eligibleSale)} />
+                    <Stat label="Razorpay cut" value={row.razorpayFeeUnknown ? 'Razorpay fee not received' : inr(row.razorpayFee ?? 0)} />
+                    <Stat label="Commission" value={row.ratePct == null ? 'Not set' : inr(row.commission)} />
+                    <Stat label="To pay" value={ready ? inr(row.eligible) : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
+                    {ready ? (
+                      <button
+                        type="button"
+                        disabled={busy === row.vendorId}
+                        onClick={() => setGuide({
+                          supplier: row.supplier,
+                          vendorId: row.vendorId,
+                          net: row.eligible,
+                          utr: '',
+                          note: '',
+                          notice: 'Add the bank reference and a note. We do not call the bank.',
+                          paid: false,
+                        })}
+                        className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98] disabled:bg-[#EFEAE4] disabled:text-[#8A8178]"
+                      >
+                        {busy === row.vendorId ? 'Saving…' : 'Pay'}
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -336,45 +289,6 @@ export function PayablesDashboard() {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-[20px] font-semibold tracking-tight">Payments being prepared</h2>
-        <p className="max-w-2xl text-[14px] leading-6 text-[#667085]">
-          A list is not a bank transfer. Another person checks it. After you send the money, type the reference from your bank. We do not call the bank.
-        </p>
-        {openPayments.length === 0 && !loading ? (
-          <p className="rounded-[22px] border border-[#E9E3DD] bg-white px-4 py-8 text-[15px] text-[#667085]">Nothing is waiting. Prepare a payment from a supplier marked ready.</p>
-        ) : (
-          <ul className="space-y-3">
-            {openPayments.map((batch) => {
-              const label = BATCH_LABEL[batch.status] ?? { title: batch.status, next: '' };
-              return (
-                <li key={batch.id} className="rounded-[22px] border border-[#E9E3DD] bg-white p-4">
-                  <p className="font-semibold">{label.title}</p>
-                  <p className="mt-1 text-[13px] text-[#667085]">{batch.batchNumber} · {batch.orderCount} orders · {inr(batch.net)}</p>
-                  <p className="mt-2 text-[14px] leading-6">{label.next}</p>
-                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-                    {batch.status === 'draft' ? (
-                      <>
-                        <button type="button" onClick={() => void batchAction(batch.id, 'finalise')} className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white active:scale-[0.98]">Send for a check</button>
-                        <button type="button" onClick={() => void batchAction(batch.id, 'cancel')} className="h-11 rounded-full border border-[#E9E3DD] px-4 text-[14px]">Cancel this list</button>
-                      </>
-                    ) : null}
-                    {batch.status === 'finalised' ? (
-                      <>
-                        <label className="text-[13px] text-[#667085]">Bank reference
-                          <input aria-label={`Bank reference for ${batch.batchNumber}`} value={utr[batch.id] ?? ''} onChange={(e) => setUtr((current) => ({ ...current, [batch.id]: e.target.value }))} placeholder="From your bank" className="mt-1 h-11 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[15px] text-[#1C1C1C] sm:w-56" />
-                        </label>
-                        <button type="button" onClick={() => void batchAction(batch.id, 'settle')} className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white">I have sent the money</button>
-                      </>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
       {guide ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1C1C1C]/50 p-4 sm:items-center" role="presentation" onClick={() => setGuide(null)}>
           <div
@@ -387,32 +301,21 @@ export function PayablesDashboard() {
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">Payment</p>
             <h2 id="pay-dialog-title" className="mt-1 text-[24px] font-semibold tracking-tight">Pay {guide.supplier}</h2>
             <p className="mt-2 text-[28px] font-semibold tabular-nums">{inr(guide.net)}</p>
-            <p className="mt-2 text-[15px] leading-6 text-[#3F3F46]">{guide.notice}</p>
-            <ol className="mt-5 space-y-3 text-[15px]">
-              <li className="flex gap-3"><span className="font-semibold text-[#166534]">1</span><span>List made. No money has moved.</span></li>
-              <li className="flex gap-3"><span className="font-semibold text-[#6B1D2E]">2</span><span>Check the list.</span></li>
-              <li className="flex gap-3"><span className="font-semibold text-[#6B1D2E]">3</span><span>Type the bank reference after you send the money. We do not call the bank.</span></li>
-            </ol>
-            <div className="mt-6 flex flex-col gap-3">
-              {guide.status === 'draft' || guide.status === 'in_review' ? (
-                <button type="button" onClick={() => void batchAction(guide.batchId, 'finalise')} className="h-12 rounded-full bg-[#6B1D2E] text-[15px] font-semibold text-white active:scale-[0.98]">Check this list</button>
-              ) : null}
-              {guide.status === 'finalised' ? (
-                <>
-                  <label className="text-[13px] text-[#667085]">Bank reference
-                    <input aria-label={`Bank reference for ${guide.batchNumber}`} value={utr[guide.batchId] ?? ''} onChange={(event) => setUtr((current) => ({ ...current, [guide.batchId]: event.target.value }))} placeholder="From your bank, at least 6 characters" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
-                  </label>
-                  <button type="button" onClick={() => void batchAction(guide.batchId, 'settle')} className="h-12 rounded-full bg-[#6B1D2E] text-[15px] font-semibold text-white active:scale-[0.98]">I have sent the money</button>
-                </>
-              ) : null}
-              {guide.status === 'settled' ? (
-                <p className="rounded-2xl bg-[#F0FDF4] px-4 py-3 text-[15px] font-medium text-[#166534]">Paid. The reference is saved.</p>
-              ) : null}
-              {guide.status === 'draft' ? (
-                <button type="button" onClick={() => void batchAction(guide.batchId, 'cancel')} className="h-11 text-[14px] text-[#667085]">Cancel this list</button>
-              ) : null}
-              <button type="button" onClick={() => setGuide(null)} className="h-11 text-[14px] font-semibold text-[#6B1D2E]">Close</button>
-            </div>
+            {guide.paid ? null : <p className="mt-2 text-[15px] leading-6 text-[#3F3F46]">{guide.notice}</p>}
+            {guide.paid ? (
+              <p className="mt-5 rounded-2xl bg-[#F0FDF4] px-4 py-3 text-[15px] font-medium text-[#166534]">Paid. The reference is saved.</p>
+            ) : (
+              <div className="mt-5 flex flex-col gap-3">
+                <label className="text-[13px] text-[#667085]">Bank reference
+                  <input aria-label="Bank reference" value={guide.utr} onChange={(event) => setGuide({ ...guide, utr: event.target.value })} placeholder="UTR from your bank" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
+                </label>
+                <label className="text-[13px] text-[#667085]">Note
+                  <input aria-label="Payment note" value={guide.note} onChange={(event) => setGuide({ ...guide, note: event.target.value })} placeholder="What this payment is for" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
+                </label>
+                <button type="button" onClick={() => void markPaid()} className="h-12 rounded-full bg-[#6B1D2E] text-[15px] font-semibold text-white active:scale-[0.98]">Mark paid</button>
+              </div>
+            )}
+            <button type="button" onClick={() => setGuide(null)} className="mt-3 h-11 text-[14px] font-semibold text-[#6B1D2E]">Close</button>
           </div>
         </div>
       ) : null}

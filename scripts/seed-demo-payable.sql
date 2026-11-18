@@ -99,29 +99,34 @@ VALUES (
 )
 ON CONFLICT (id) DO UPDATE SET status = 'captured', amount = 12500.00, method = 'online';
 
+-- This payment has no Razorpay payment id, so the fee stays unknown.
+-- Do not store ₹250 or 2%. The pay screen refuses to pay until a real fee arrives.
 INSERT INTO supplier_payable_lines (
   id, order_id, vendor_id, status,
   commercial_base, collected_amount, refunded_amount, recognised_base,
-  commission_rate_pct, commission_amount, net_payable,
+  commission_rate_pct, commission_amount, razorpay_fee, razorpay_fee_unknown, net_payable,
   rate_snapshotted_at, breakdown
 )
 VALUES (
   '88888888-8888-4888-8888-888888888801',
   '66666666-6666-4666-8666-666666666601',
   '33333333-3333-4333-8333-333333333301',
-  'eligible',
+  'fee_unknown',
   12500.00, 12500.00, 0, 12500.00,
-  8.00, 1000.00, 11500.00,
+  8.00, 1000.00, NULL, true, 0.00,
   now(),
   '{"taxTreatment":"tax_inclusive_subtotal_pending_client_confirmation","ratePct":"8.00","supplierPromo":"0.00","supplierCoupon":"0.00","platformCoupon":"0.00","grossCollected":"12500.00"}'::jsonb
 )
 ON CONFLICT (order_id) DO UPDATE
-SET status = 'eligible',
+SET status = 'fee_unknown',
     commercial_base = 12500.00,
     collected_amount = 12500.00,
     recognised_base = 12500.00,
     commission_rate_pct = 8.00,
     commission_amount = 1000.00,
-    net_payable = 11500.00,
+    razorpay_fee = NULL,
+    razorpay_fee_unknown = true,
+    net_payable = 0.00,
     vendor_id = '33333333-3333-4333-8333-333333333301',
-    finance_batch_id = NULL;
+    finance_batch_id = NULL
+WHERE supplier_payable_lines.status <> 'settled';

@@ -5,7 +5,7 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { AUDIT_ACTIONS, logAction } from '@/lib/auditLog';
 import { listSupplierPayables } from '@/modules/finance/supplierPayable.service';
-import { createFinanceDraft } from '@/modules/finance/supplierSettlement.service';
+import { createFinanceDraft, paySupplierNow } from '@/modules/finance/supplierSettlement.service';
 import { paiseToRupees } from '@/modules/finance/money';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
@@ -32,6 +32,9 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           pendingCapture: paiseToRupees(data.kpis.pendingCapturePaise),
           awaitingCompletion: paiseToRupees(data.kpis.awaitingCompletionPaise),
           commission: paiseToRupees(data.kpis.commissionPaise),
+          customerPaid: paiseToRupees(data.kpis.customerPaidPaise),
+          razorpayFee: paiseToRupees(data.kpis.razorpayFeePaise),
+          razorpayFeeUnknown: data.kpis.razorpayFeeUnknown,
           settledPeriod: paiseToRupees(data.kpis.settledPeriodPaise),
           onHold: paiseToRupees(data.kpis.onHoldPaise),
           blockedSale: paiseToRupees(data.kpis.blockedSalePaise),
@@ -39,6 +42,8 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         rows: data.rows.map((row) => ({
           ...row,
           eligibleSale: paiseToRupees(row.eligibleSalePaise),
+          razorpayFee: row.razorpayFeeUnknown ? null : paiseToRupees(row.razorpayFeePaise),
+          razorpayFeeUnknown: row.razorpayFeeUnknown,
           commission: paiseToRupees(row.commissionPaise),
           adjustments: paiseToRupees(row.adjustmentPaise),
           outstanding: paiseToRupees(row.outstandingPaise),
@@ -57,12 +62,35 @@ const draftSchema = z.object({
   vendorId: z.string().uuid(),
   orderIds: z.array(z.string().uuid()).optional(),
   idempotencyKey: z.string().min(8).max(80).optional(),
+  utr: z.string().min(6).optional(),
+  note: z.string().min(3).max(500).optional(),
 });
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'payments.create');
     const body = draftSchema.parse(await req.json());
+    if (body.utr && body.note) {
+      const paid = await paySupplierNow({
+        vendorId: body.vendorId,
+        actorId: ctx.userId,
+        utr: body.utr,
+        note: body.note,
+      });
+      void logAction(ctx, req, {
+        action: AUDIT_ACTIONS.supplierSettlementSettle,
+        entity: 'FinanceSettlementBatch',
+        entityId: paid.batch.id,
+        after: {
+          supplierId: body.vendorId,
+          amount: paid.batch.netAmount.toString(),
+          utr: body.utr,
+          note: body.note,
+          bankVerified: false,
+        },
+      });
+      return NextResponse.json({ success: true, data: paid.batch });
+    }
     const result = await createFinanceDraft({ ...body, actorId: ctx.userId });
     void logAction(ctx, req, {
       action: AUDIT_ACTIONS.supplierSettlementDraft,

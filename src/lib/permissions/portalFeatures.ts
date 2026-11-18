@@ -113,7 +113,7 @@ const VENDOR_FEATURES: PortalFeatureMap = {
   grn:           { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
   dispatch:      { label: 'Dispatch', actions: MODULE_ACTIONS.dispatch, routes: ['/vendor/warehouse'] },
   deliveries:    { label: 'Deliveries', actions: MODULE_ACTIONS.deliveries, routes: ['/vendor/warehouse'] },
-  wallet:        { label: 'Wallet', actions: MODULE_ACTIONS.wallet, routes: ['/vendor/wallet'] },
+  wallet:        { label: 'Wallet', actions: MODULE_ACTIONS.wallet, routes: ['/vendor/wallet', '/vendor/receive'] },
   ledger:        { label: 'Ledger', actions: MODULE_ACTIONS.ledger, routes: ['/vendor/ledger'] },
   creditLine:    { label: 'Credit & Collections', actions: MODULE_ACTIONS.creditLine, routes: ['/vendor/credit', '/vendor/collections'] },
   customers:     { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/vendor/customers'] },

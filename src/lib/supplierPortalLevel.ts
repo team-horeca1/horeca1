@@ -38,6 +38,7 @@ export const SUPPLIER_LEVEL_PREFIXES = [
   '/vendor/team',
   '/vendor/reports',
   '/vendor/ledger',
+  '/vendor/receive',
   '/vendor/notifications',
   '/vendor/account',
 ] as const;

@@ -28,6 +28,8 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           collectedAmount: line.collectedAmount.toString(),
           recognisedBase: line.recognisedBase.toString(),
           commissionAmount: line.commissionAmount.toString(),
+          razorpayFee: line.razorpayFee == null ? null : line.razorpayFee.toString(),
+          razorpayFeeUnknown: line.razorpayFeeUnknown,
           netPayable: line.netPayable.toString(),
           provisionalBase: line.provisionalBase.toString(),
           blockedSale: line.blockedSale.toString(),

@@ -19,6 +19,8 @@ type Detail = {
     collectedAmount: string;
     recognisedBase: string;
     commissionAmount: string;
+    razorpayFee: string | null;
+    razorpayFeeUnknown: boolean;
     netPayable: string;
     provisionalBase: string;
     blockedSale: string;
@@ -35,6 +37,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending_capture: 'Pending capture',
   awaiting_completion: 'Captured — awaiting completion',
   commission_unconfigured: 'Commission not configured',
+  fee_unknown: 'Razorpay fee not received',
   eligible: 'Eligible',
   on_hold: 'On hold',
   in_batch: 'In a batch',
@@ -130,14 +133,15 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
               <article key={line.id} className="rounded-xl border border-[#E9E3DD] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-semibold">{line.order.orderNumber}</h3>
+                    <h3 className="font-semibold">{line.order.orderNumber} <a className="text-[13px] font-semibold text-[#6B1D2E]" href={`/api/v1/admin/orders/${line.orderId}/invoice`}>Invoice</a></h3>
                     <p className="text-[12px] text-[#667085]">Order {line.order.status} · payment {line.order.paymentStatus} · {line.order.paymentMethod ?? 'no method'}</p>
                   </div>
                   <span className="rounded-full bg-[#F8E8EC] px-3 py-1 text-[12px] font-semibold text-[#6B1D2E]">{STATUS_LABEL[line.status] ?? line.status}</span>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-2 text-[13px] md:grid-cols-4">
                   <div><dt className="text-[#667085]">Commercial base</dt><dd className="tabular-nums font-medium">{inr(line.commercialBase)}</dd></div>
-                  <div><dt className="text-[#667085]">Cash collected</dt><dd className="tabular-nums font-medium">{inr(line.collectedAmount)}</dd></div>
+                  <div><dt className="text-[#667085]">Customer paid</dt><dd className="tabular-nums font-medium">{inr(line.collectedAmount)}</dd></div>
+                  <div><dt className="text-[#667085]">Razorpay cut</dt><dd className="tabular-nums font-medium">{line.razorpayFeeUnknown ? 'Razorpay fee not received' : inr(line.razorpayFee ?? 0)}</dd></div>
                   <div><dt className="text-[#667085]">Recognised base</dt><dd className="tabular-nums font-medium">{inr(line.recognisedBase)}</dd></div>
                   <div><dt className="text-[#667085]">Net payable</dt><dd className="tabular-nums font-semibold">{inr(line.netPayable)}</dd></div>
                 </dl>

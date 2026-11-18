@@ -24,6 +24,7 @@ export type PayableStatus =
   | 'pending_capture'
   | 'awaiting_completion'
   | 'commission_unconfigured'
+  | 'fee_unknown'
   | 'eligible'
   | 'on_hold'
   | 'in_batch'
@@ -32,10 +33,15 @@ export type PayableStatus =
 
 export type LiabilityBucket = 'eligible' | 'held' | 'batched' | 'settled';
 
+export const GATEWAY_METHODS = new Set(['online', 'prepaid', 'razorpay']);
+
 export interface CashPaymentInput {
   amount: string;
   status: string;
   method: string | null;
+  /** Null means Razorpay did not return a fee. Absent on non-gateway payments. */
+  razorpayFeePaise?: number | null;
+  hasRazorpayPayment?: boolean;
 }
 
 export interface ProcessedRefundInput {
@@ -76,6 +82,8 @@ export interface PayableAssessment {
   commissionPaise: number;
   provisionalCommissionPaise: number;
   netPayablePaise: number;
+  razorpayFeePaise: number;
+  razorpayFeeUnknown: boolean;
   blockedSalePaise: number;
   aboveCashPaise: number;
   supplierPromoPaise: number;
@@ -90,6 +98,21 @@ export function isCashMethod(method: string | null | undefined): boolean {
   const normalised = method.trim().toLowerCase();
   if (NON_CASH_METHODS.has(normalised)) return false;
   return CASH_METHODS.has(normalised);
+}
+
+export function razorpayFeeFromPayments(payments: CashPaymentInput[]): { feePaise: number; unknown: boolean } {
+  let feePaise = 0;
+  let unknown = false;
+  for (const payment of payments) {
+    if (payment.status !== 'captured' && payment.status !== 'refunded') continue;
+    if (!isCashMethod(payment.method)) continue;
+    const method = (payment.method ?? '').toLowerCase();
+    const gateway = GATEWAY_METHODS.has(method) || payment.hasRazorpayPayment === true;
+    if (!gateway) continue;
+    if (payment.razorpayFeePaise == null) unknown = true;
+    else feePaise += Math.max(0, payment.razorpayFeePaise);
+  }
+  return { feePaise, unknown };
 }
 
 export function grossCashPaise(payments: CashPaymentInput[]): number {
@@ -189,6 +212,8 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
     commissionPaise: 0,
     provisionalCommissionPaise: input.ratePct == null ? 0 : commissionPaise(provisionalBasePaise, input.ratePct),
     netPayablePaise: 0,
+    razorpayFeePaise: 0,
+    razorpayFeeUnknown: false,
     blockedSalePaise: 0,
     aboveCashPaise,
     supplierPromoPaise,
@@ -219,9 +244,21 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
     return { ...empty, status: 'pending_capture' };
   }
 
-  const recognisedBasePaise = cashCappedBase;
+  const recognisedBasePaise = netCollectedPaise;
+  const fee = razorpayFeeFromPayments(input.payments);
   const commission = commissionPaise(recognisedBasePaise, input.ratePct);
+  if (fee.unknown) {
+    return {
+      ...empty,
+      status: 'fee_unknown',
+      recognisedBasePaise,
+      commissionPaise: commission,
+      razorpayFeeUnknown: true,
+      netPayablePaise: 0,
+    };
+  }
   const rawNet = recognisedBasePaise
+    - fee.feePaise
     - commission
     + (input.manualCreditPaise ?? 0)
     - (input.manualDebitPaise ?? 0);
@@ -238,6 +275,8 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
     bucket: liabilityBucket(status),
     recognisedBasePaise,
     commissionPaise: commission,
+    razorpayFeePaise: fee.feePaise,
+    razorpayFeeUnknown: false,
     provisionalCommissionPaise: 0,
     netPayablePaise: status === 'closed' ? 0 : netPayablePaise,
   };

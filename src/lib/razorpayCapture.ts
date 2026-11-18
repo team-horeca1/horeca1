@@ -77,6 +77,9 @@ export interface CapturedRazorpayPayment {
   status: 'captured';
   amount: number;
   method: string | null;
+  /** Null when Razorpay did not return a fee. Never invented. */
+  feePaise: number | null;
+  taxPaise: number | null;
 }
 
 /** Signature is valid, but Razorpay has not captured yet. Do not mark the order paid. */
@@ -108,6 +111,8 @@ interface GatewayPayment {
   amount: number | string;
   currency?: string;
   method?: string | null;
+  fee?: number | string | null;
+  tax?: number | string | null;
 }
 
 function asPaise(amount: number | string): number {
@@ -132,12 +137,20 @@ function isAlreadyCapturedError(err: unknown): boolean {
   return /already been captured/i.test(gatewayErrorText(err));
 }
 
+function optionalPaise(amount: number | string | null | undefined): number | null {
+  if (amount == null || amount === '') return null;
+  const paise = asPaise(amount);
+  return Number.isFinite(paise) ? paise : null;
+}
+
 function toCaptured(payment: GatewayPayment): CapturedRazorpayPayment {
   return {
     id: payment.id,
     status: 'captured',
     amount: asPaise(payment.amount),
     method: payment.method ?? null,
+    feePaise: optionalPaise(payment.fee),
+    taxPaise: optionalPaise(payment.tax),
   };
 }
 

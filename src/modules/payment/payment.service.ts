@@ -12,6 +12,7 @@ import {
   razorpayOrderCaptureFields,
   razorpayOrderOfferFields,
 } from '@/lib/razorpayCapture';
+import { allocatePaise, rupeesToPaise } from '@/modules/finance/money';
 import crypto from 'crypto';
 
 function timingSafeEqHex(expectedHex?: string | null, providedHex?: string | null): boolean {
@@ -221,9 +222,13 @@ export class PaymentService {
 
     const expectedPaise = Math.round(payments.reduce((sum, p) => sum + Number(p.amount), 0) * 100);
     let method: string | null = null;
+    let razorpayFeePaise: number | null = null;
+    let razorpayTaxPaise: number | null = null;
     try {
       const captured = await ensurePaymentCaptured(razorpayPaymentId, expectedPaise);
       method = captured.method;
+      razorpayFeePaise = captured.feePaise;
+      razorpayTaxPaise = captured.taxPaise;
     } catch (err) {
       if (err instanceof CapturePendingError) {
         await this.rememberAuthorized(razorpayOrderId, razorpayPaymentId, razorpaySignature);
@@ -249,6 +254,8 @@ export class PaymentService {
       razorpayPaymentId,
       method,
       razorpaySignature,
+      razorpayFeePaise,
+      razorpayTaxPaise,
     });
   }
 
@@ -262,6 +269,8 @@ export class PaymentService {
     razorpayPaymentId: string;
     method?: string | null;
     razorpaySignature?: string | null;
+    razorpayFeePaise?: number | null;
+    razorpayTaxPaise?: number | null;
   }) {
     const payments = await prisma.payment.findMany({
       where: { razorpayOrderId: opts.razorpayOrderId },
@@ -287,16 +296,24 @@ export class PaymentService {
       };
     }
 
+    const feeShares = opts.razorpayFeePaise == null
+      ? open.map(() => null)
+      : allocatePaise(opts.razorpayFeePaise, open.map((payment) => rupeesToPaise(payment.amount.toString())));
+    const taxShares = opts.razorpayTaxPaise == null
+      ? open.map(() => null)
+      : allocatePaise(opts.razorpayTaxPaise, open.map((payment) => rupeesToPaise(payment.amount.toString())));
     await prisma.$transaction([
-      prisma.payment.updateMany({
-        where: { id: { in: open.map((p) => p.id) }, status: { notIn: ['captured', 'refunded'] } },
+      ...open.map((payment, index) => prisma.payment.updateMany({
+        where: { id: payment.id, status: { notIn: ['captured', 'refunded'] } },
         data: {
           razorpayPaymentId: opts.razorpayPaymentId,
           ...(opts.razorpaySignature ? { razorpaySignature: opts.razorpaySignature } : {}),
           ...(opts.method ? { method: opts.method } : {}),
+          razorpayFeePaise: feeShares[index],
+          razorpayTaxPaise: taxShares[index],
           status: 'captured',
         },
-      }),
+      })),
       prisma.order.updateMany({
         where: { id: { in: open.map((p) => p.orderId) }, status: { not: 'cancelled' } },
         data: { paymentStatus: 'paid', paymentMethod: 'online', abandonedAt: null },
@@ -517,6 +534,8 @@ export class PaymentService {
           razorpayOrderId: entity.order_id,
           razorpayPaymentId: captured.id,
           method: captured.method ?? entity.method ?? null,
+          razorpayFeePaise: captured.feePaise,
+          razorpayTaxPaise: captured.taxPaise,
         });
         return { processed: true, event };
       } catch (err) {
@@ -583,6 +602,8 @@ export class PaymentService {
         razorpayOrderId: entity.order_id,
         razorpayPaymentId: captured.id,
         method: captured.method ?? entity.method ?? null,
+        razorpayFeePaise: captured.feePaise,
+        razorpayTaxPaise: captured.taxPaise,
       });
       return true;
     } catch (err) {

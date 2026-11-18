@@ -117,6 +117,12 @@ export const SUPPLIER_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Settings', icon: Settings, href: '/vendor/account', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },
+  {
+    label: 'Finance',
+    links: [
+      { name: 'What I receive', icon: Receipt, href: '/vendor/receive', feature: 'wallet', requiredPerm: 'wallet.view' },
+    ],
+  },
 ];
 
 /** Online Store ops (Panel 3). */
@@ -156,6 +162,7 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Finance',
     links: [
       { name: 'Credit & Collections', icon: CreditCard, href: '/vendor/credit', feature: 'creditLine', requiredPerm: ['creditLine.view', 'creditLine.approve'] },
+      { name: 'What I receive', icon: Receipt, href: '/vendor/receive', feature: 'wallet', requiredPerm: 'wallet.view' },
       { name: 'Wallet', icon: Wallet, href: '/vendor/wallet', feature: 'wallet', requiredPerm: 'wallet.view' },
       { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'ledger', requiredPerm: 'ledger.view' },
       { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
