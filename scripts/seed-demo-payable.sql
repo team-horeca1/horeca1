@@ -130,3 +130,16 @@ SET status = 'fee_unknown',
     vendor_id = '33333333-3333-4333-8333-333333333301',
     finance_batch_id = NULL
 WHERE supplier_payable_lines.status <> 'settled';
+
+-- This order has no Razorpay payment id, so an earlier draft is not payable.
+UPDATE finance_settlement_batches
+SET status = 'cancelled',
+    cancelled_at = now(),
+    cancel_reason = 'Razorpay fee was not received, so this draft is not payable.'
+WHERE vendor_id = '33333333-3333-4333-8333-333333333301'
+  AND status IN ('draft', 'in_review');
+
+UPDATE supplier_settlement_claims
+SET released_at = now()
+WHERE order_id = '66666666-6666-4666-8666-666666666601'
+  AND released_at IS NULL;
