@@ -63,7 +63,7 @@ function money(value: string | undefined): number {
 }
 
 function rowState(row: Row): RowState {
-  if (money(row.eligible) > 0 && !row.razorpayFeeUnknown) return 'ready';
+  if (money(row.eligible) > 0) return 'ready';
   if (row.waitingDelivery) return 'waiting';
   if (row.razorpayFeeUnknown) return 'fee';
   if (row.ratePct == null || row.unconfigured) return 'rate';
@@ -381,7 +381,7 @@ function PayButton({ row, busy, enabled, onPay, className }: { row: Row; busy: s
     <button
       type="button"
       disabled={!enabled || saving}
-      title={enabled ? undefined : 'Turns on after delivery'}
+      title={enabled ? undefined : row.waitingDelivery ? 'Turns on after delivery' : row.ratePct == null ? 'Set a commission rate first' : 'Waiting for the Razorpay fee'}
       onClick={(event) => { event.stopPropagation(); if (enabled) onPay(row); }}
       className={cn(
         'rounded-lg px-4 text-[13px] font-semibold',

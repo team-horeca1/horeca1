@@ -35,6 +35,9 @@ export type LiabilityBucket = 'eligible' | 'held' | 'batched' | 'settled';
 
 export const GATEWAY_METHODS = new Set(['online', 'prepaid', 'razorpay']);
 
+/** Razorpay stores the instrument, not the order method. A card or UPI capture is still customer cash. */
+export const RAZORPAY_INSTRUMENTS = new Set(['card', 'upi', 'netbanking', 'emi', 'paylater', 'cardless_emi']);
+
 export interface CashPaymentInput {
   amount: string;
   status: string;
@@ -98,10 +101,12 @@ export interface PayableAssessment {
   taxTreatment: 'tax_inclusive_subtotal_pending_client_confirmation';
 }
 
-export function isCashMethod(method: string | null | undefined): boolean {
+export function isCashMethod(method: string | null | undefined, hasRazorpayPayment = false): boolean {
+  if (hasRazorpayPayment) return true;
   if (!method) return false;
   const normalised = method.trim().toLowerCase();
   if (NON_CASH_METHODS.has(normalised)) return false;
+  if (RAZORPAY_INSTRUMENTS.has(normalised)) return true;
   return CASH_METHODS.has(normalised);
 }
 
@@ -110,9 +115,9 @@ export function razorpayFeeFromPayments(payments: CashPaymentInput[]): { feePais
   let unknown = false;
   for (const payment of payments) {
     if (payment.status !== 'captured' && payment.status !== 'refunded') continue;
-    if (!isCashMethod(payment.method)) continue;
+    if (!isCashMethod(payment.method, payment.hasRazorpayPayment)) continue;
     const method = (payment.method ?? '').toLowerCase();
-    const gateway = GATEWAY_METHODS.has(method) || payment.hasRazorpayPayment === true;
+    const gateway = GATEWAY_METHODS.has(method) || RAZORPAY_INSTRUMENTS.has(method) || payment.hasRazorpayPayment === true;
     if (!gateway) continue;
     if (payment.razorpayFeePaise == null) unknown = true;
     else feePaise += Math.max(0, payment.razorpayFeePaise);
@@ -123,7 +128,7 @@ export function razorpayFeeFromPayments(payments: CashPaymentInput[]): { feePais
 export function grossCashPaise(payments: CashPaymentInput[]): number {
   return payments.reduce((sum, payment) => {
     if (payment.status !== 'captured' && payment.status !== 'refunded') return sum;
-    if (!isCashMethod(payment.method)) return sum;
+    if (!isCashMethod(payment.method, payment.hasRazorpayPayment)) return sum;
     return sum + Math.max(0, rupeesToPaise(payment.amount));
   }, 0);
 }
@@ -279,10 +284,13 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
   }
 
   if (input.ratePct == null) {
+    const fee = netCollectedPaise > 0 ? razorpayFeeFromPayments(input.payments) : { feePaise: 0, unknown: false };
     return {
       ...empty,
       status: 'commission_unconfigured',
       blockedSalePaise: cashCappedBase,
+      razorpayFeePaise: fee.unknown ? 0 : fee.feePaise,
+      razorpayFeeUnknown: fee.unknown,
     };
   }
 

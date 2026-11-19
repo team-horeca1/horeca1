@@ -90,6 +90,45 @@ describe('supplier payable calculation', () => {
     expect(result.status).toBe('eligible');
   });
 
+  it('counts a Razorpay card capture as customer cash and uses its fee', () => {
+    const result = assessPayable(input({
+      subtotal: '1514.10',
+      payments: [{ amount: '1514.10', status: 'captured', method: 'card', razorpayFeePaise: 4316, hasRazorpayPayment: true }],
+      ratePct: '8.00',
+    }));
+    expect(result.netCollectedPaise).toBe(151410);
+    expect(result.razorpayFeePaise).toBe(4316);
+    expect(result.commissionPaise).toBe(commissionPaise(151410, '8.00'));
+    expect(result.netPayablePaise).toBe(151410 - 4316 - result.commissionPaise);
+    expect(result.status).toBe('eligible');
+  });
+
+  it('counts a captured Razorpay payment when the instrument was not stored', () => {
+    const result = assessPayable(input({
+      subtotal: '267.00',
+      payments: [{ amount: '267.00', status: 'captured', method: null, razorpayFeePaise: null, hasRazorpayPayment: true }],
+      ratePct: '8.00',
+    }));
+    expect(result.netCollectedPaise).toBe(26700);
+    expect(result.status).toBe('fee_unknown');
+    expect(result.razorpayFeeUnknown).toBe(true);
+    expect(result.netPayablePaise).toBe(0);
+  });
+
+  it('shows the Razorpay cut when the supplier has no rate, without inventing a payable', () => {
+    const result = assessPayable(input({
+      subtotal: '1514.10',
+      payments: [{ amount: '1514.10', status: 'captured', method: 'card', razorpayFeePaise: 4316, hasRazorpayPayment: true }],
+      ratePct: null,
+    }));
+    expect(result.status).toBe('commission_unconfigured');
+    expect(result.netCollectedPaise).toBe(151410);
+    expect(result.razorpayFeePaise).toBe(4316);
+    expect(result.commissionPaise).toBe(0);
+    expect(result.netPayablePaise).toBe(0);
+    expect(result.bucket).toBeNull();
+  });
+
   it('does not treat a missing rate as 0%', () => {
     const result = assessPayable(input({ ratePct: null }));
     expect(result.status).toBe('commission_unconfigured');

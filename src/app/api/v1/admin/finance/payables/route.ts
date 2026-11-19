@@ -43,7 +43,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         rows: data.rows.map((row) => ({
           ...row,
           eligibleSale: paiseToRupees(row.eligibleSalePaise),
-          razorpayFee: row.razorpayFeeUnknown ? null : paiseToRupees(row.razorpayFeePaise),
+          razorpayFee: paiseToRupees(row.razorpayFeePaise),
           razorpayFeeUnknown: row.razorpayFeeUnknown,
           commission: paiseToRupees(row.commissionPaise),
           adjustments: paiseToRupees(row.adjustmentPaise),

@@ -68,7 +68,7 @@ async function agreementRate(
 }
 
 function processedRefunds(input: {
-  payments: Array<{ id: string; amount: Prisma.Decimal; status: string; method: string | null }>;
+  payments: Array<{ id: string; amount: Prisma.Decimal; status: string; method: string | null; razorpayPaymentId?: string | null }>;
   returnRequests: Array<{ id: string; status: string; resolutionType: string | null; refundAmount: Prisma.Decimal | null }>;
 }): ProcessedRefundInput[] {
   const fromReturns = input.returnRequests
@@ -76,7 +76,7 @@ function processedRefunds(input: {
     .map((row) => ({ id: row.id, amount: row.refundAmount!.toString() }));
   const returnPaise = fromReturns.reduce((sum, row) => sum + rupeesToPaise(row.amount), 0);
   const refundedCash = input.payments.reduce((sum, payment) => {
-    if (payment.status !== 'refunded' || !isCashMethod(payment.method)) return sum;
+    if (payment.status !== 'refunded' || !isCashMethod(payment.method, Boolean(payment.razorpayPaymentId))) return sum;
     return sum + Math.max(0, rupeesToPaise(payment.amount.toString()));
   }, 0);
   // Cash-method filtering happens in the calculator. The shortfall here is only
