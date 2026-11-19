@@ -101,6 +101,22 @@ export interface PayableAssessment {
   taxTreatment: 'tax_inclusive_subtotal_pending_client_confirmation';
 }
 
+/**
+ * A delivered order keeps the rate it was first calculated with.
+ * Until that snapshot exists, use the rate that was already in force at delivery,
+ * and if none was, the supplier's current rate. Setting 3% after delivery must
+ * not leave commission at zero.
+ */
+export function resolvePayableRate(input: {
+  snapshottedAt: Date | null;
+  snapshottedRate: string | null;
+  rateAtDelivery: string | null;
+  currentRate: string | null;
+}): string | null {
+  if (input.snapshottedAt) return input.snapshottedRate;
+  return input.rateAtDelivery ?? input.currentRate;
+}
+
 export function isCashMethod(method: string | null | undefined, hasRazorpayPayment = false): boolean {
   if (hasRazorpayPayment) return true;
   if (!method) return false;

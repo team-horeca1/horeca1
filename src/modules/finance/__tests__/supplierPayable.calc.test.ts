@@ -5,6 +5,7 @@ import {
   assertSingleBucket,
   grossCashPaise,
   outstandingPaise,
+  resolvePayableRate,
   type PayableAssessmentInput,
   type PayableStatus,
 } from '@/modules/finance/supplierPayable.calc';
@@ -30,6 +31,35 @@ function input(overrides: Partial<PayableAssessmentInput> = {}): PayableAssessme
     ...overrides,
   };
 }
+
+describe('payable rate selection', () => {
+  it('uses the current rate when the order was delivered before any rate existed', () => {
+    expect(resolvePayableRate({
+      snapshottedAt: null,
+      snapshottedRate: null,
+      rateAtDelivery: null,
+      currentRate: '3.00',
+    })).toBe('3.00');
+  });
+
+  it('keeps the rate that was already in force at delivery', () => {
+    expect(resolvePayableRate({
+      snapshottedAt: null,
+      snapshottedRate: null,
+      rateAtDelivery: '10.00',
+      currentRate: '3.00',
+    })).toBe('10.00');
+  });
+
+  it('does not replace a rate already stored on a delivered order', () => {
+    expect(resolvePayableRate({
+      snapshottedAt: new Date('2026-11-19T10:52:52.699Z'),
+      snapshottedRate: '8.00',
+      rateAtDelivery: null,
+      currentRate: '3.00',
+    })).toBe('8.00');
+  });
+});
 
 describe('paise conversion', () => {
   it('round trips rupees without binary drift', () => {

@@ -6,6 +6,7 @@ import {
   assessPayable,
   isCashMethod,
   outstandingPaise,
+  resolvePayableRate,
   type PayableAssessment,
   type PayableStatus,
   type ProcessedRefundInput,
@@ -67,6 +68,14 @@ async function agreementRate(
   return row ? row.ratePct.toString() : null;
 }
 
+async function currentVendorRate(db: Db, vendorId: string): Promise<string | null> {
+  const vendor = await db.vendor.findUnique({
+    where: { id: vendorId },
+    select: { platformFeePct: true },
+  });
+  return vendor?.platformFeePct == null ? null : vendor.platformFeePct.toString();
+}
+
 function processedRefunds(input: {
   payments: Array<{ id: string; amount: Prisma.Decimal; status: string; method: string | null; razorpayPaymentId?: string | null }>;
   returnRequests: Array<{ id: string; status: string; resolutionType: string | null; refundAmount: Prisma.Decimal | null }>;
@@ -125,9 +134,13 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
   const refunds = processedRefunds(order);
   const manual = await manualPaise(db, orderId);
   const asOf = order.deliveredAt ?? new Date();
-  const liveRate = existing?.rateSnapshottedAt
-    ? (existing.commissionRatePct == null ? null : existing.commissionRatePct.toString())
-    : await agreementRate(db, order.vendorId, asOf);
+  const snapshottedAt = existing?.rateSnapshottedAt ?? null;
+  const liveRate = resolvePayableRate({
+    snapshottedAt,
+    snapshottedRate: existing?.commissionRatePct == null ? null : existing.commissionRatePct.toString(),
+    rateAtDelivery: snapshottedAt ? null : await agreementRate(db, order.vendorId, asOf),
+    currentRate: snapshottedAt ? null : await currentVendorRate(db, order.vendorId),
+  });
   const openHold = (existing?.holds.length ?? 0) > 0;
   const batchOpen = existing?.batch != null && (existing.batch.status === 'draft' || existing.batch.status === 'in_review');
 
