@@ -147,7 +147,7 @@ test.describe('Supplier payables', () => {
     await passwordLogin(page, 'fee-example-supply@example.com', 'vendor123');
     await page.goto('/vendor/receive');
     await expect(page.getByRole('heading', { name: 'What I receive' })).toBeVisible();
-    const mine = page.locator('li').filter({ hasText: 'PO-FEE-100' });
+    const mine = page.getByRole('row', { name: /PO-FEE-100/ });
     await expect(mine.getByText('₹100.00').first()).toBeVisible();
     await expect(mine.getByText('₹1.18')).toBeVisible();
     await expect(mine.getByText('₹10.00')).toBeVisible();

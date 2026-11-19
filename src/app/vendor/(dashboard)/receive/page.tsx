@@ -90,18 +90,43 @@ export default function WhatIReceivePage() {
           <div className="border-b border-[#E9E3DD] px-4 py-3">
             <h2 className="text-[15px] font-semibold">Statement</h2>
           </div>
-          <div className="hidden grid-cols-[1.3fr_repeat(4,1fr)_auto] gap-3 bg-[#FAF7F2] px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#667085] md:grid">
-            <span>Order</span>
-            <span className="text-right">Customer paid</span>
-            <span className="text-right">Razorpay cut</span>
-            <span className="text-right">Commission</span>
-            <span className="text-right">You receive</span>
-            <span className="text-right">Advice</span>
+          <div className="hidden md:block">
+            <table className="w-full table-fixed text-left text-[13px]">
+              <thead className="bg-[#FAF7F2] text-[11px] font-semibold uppercase tracking-wide text-[#667085]">
+                <tr>
+                  <th className="w-[22%] px-4 py-2.5 font-semibold">Order</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Customer paid</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Razorpay cut</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Commission</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">You receive</th>
+                  <th className="w-[16%] px-4 py-2.5 text-right font-semibold">Advice</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E9E3DD]">
+                {lines.map((line) => (
+                  <tr key={line.orderId}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold">{line.orderNumber}</p>
+                      <p className={`text-[12px] font-medium ${line.paid ? 'text-[#16A34A]' : 'text-[#667085]'}`}>
+                        {STATUS_LABEL[line.status] ?? line.status}
+                      </p>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">{inr(line.customerPaid)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">{line.razorpayFeeUnknown ? 'Not received' : inr(line.razorpayFee)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">{inr(line.commission)}</td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums whitespace-nowrap">{inr(line.receive)}{line.paid ? ' · Paid' : ''}</td>
+                    <td className="px-4 py-3 text-right">
+                      <a className="text-[12px] font-semibold text-[#6B1D2E]" href={`/api/v1/vendor/payables/orders/${line.orderId}/payment-invoice`}>Payment invoice</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <ul className="divide-y divide-[#E9E3DD]">
+          <ul className="divide-y divide-[#E9E3DD] md:hidden">
             {lines.map((line) => (
-              <li key={line.orderId} className="grid gap-3 px-4 py-4 md:grid-cols-[1.3fr_repeat(4,1fr)_auto] md:items-center">
-                <div>
+              <li key={line.orderId} className="space-y-2 px-4 py-4 text-[13px]">
+                <div className="flex items-start justify-between gap-3">
                   <p className="font-semibold">{line.orderNumber}</p>
                   <p className={`text-[12px] font-medium ${line.paid ? 'text-[#16A34A]' : 'text-[#667085]'}`}>
                     {STATUS_LABEL[line.status] ?? line.status}
@@ -111,7 +136,7 @@ export default function WhatIReceivePage() {
                 <Amount label="Razorpay cut" value={line.razorpayFeeUnknown ? 'Not received' : inr(line.razorpayFee)} />
                 <Amount label="Commission" value={inr(line.commission)} />
                 <Amount label="You receive" value={`${inr(line.receive)}${line.paid ? ' · Paid' : ''}`} strong />
-                <a className="text-[13px] font-semibold text-[#6B1D2E] md:text-right" href={`/api/v1/vendor/payables/orders/${line.orderId}/payment-invoice`}>
+                <a className="inline-block text-[12px] font-semibold text-[#6B1D2E]" href={`/api/v1/vendor/payables/orders/${line.orderId}/payment-invoice`}>
                   Payment invoice
                 </a>
               </li>
@@ -137,9 +162,9 @@ function Card({ label, value, tone }: { label: string; value: string; tone?: 'pa
 
 function Amount({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 md:block md:text-right">
-      <p className="text-[11px] text-[#667085] md:hidden">{label}</p>
-      <p className={`tabular-nums ${strong ? 'font-semibold' : 'font-medium'}`}>{value}</p>
+    <div className="flex items-baseline justify-between gap-3">
+      <p className="text-[11px] text-[#667085]">{label}</p>
+      <p className={`tabular-nums whitespace-nowrap ${strong ? 'font-semibold' : 'font-medium'}`}>{value}</p>
     </div>
   );
 }
