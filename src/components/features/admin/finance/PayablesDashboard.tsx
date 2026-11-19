@@ -2,21 +2,16 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { cn } from '@/lib/utils';
 
 type Kpis = {
-  outstanding: string;
   eligible: string;
-  pendingCapture: string;
-  awaitingCompletion: string;
   commission: string;
   customerPaid: string;
   razorpayFee: string;
   razorpayFeeUnknown: boolean;
-  settledPeriod: string;
-  onHold: string;
-  blockedSale: string;
 };
 
 type Row = {
@@ -24,16 +19,29 @@ type Row = {
   supplier: string;
   supplierCode: string | null;
   ratePct: string | null;
-  outstanding: string;
   eligible: string;
-  onHold: string;
-  settled: string;
   eligibleSale: string;
   razorpayFee: string | null;
   razorpayFeeUnknown: boolean;
   commission: string;
   unconfigured: boolean;
-  orders: Array<{ orderId: string; orderNumber: string }>;
+};
+
+type RowState = 'ready' | 'fee' | 'rate' | 'waiting';
+
+const FILTERS: { id: string; label: string }[] = [
+  { id: '', label: 'Everyone' },
+  { id: 'eligible', label: 'Ready to pay' },
+  { id: 'outstanding', label: 'Still owed' },
+  { id: 'on_hold', label: 'Paused' },
+  { id: 'settled', label: 'Already paid' },
+];
+
+const STATE_LABEL: Record<RowState, string> = {
+  ready: 'Ready',
+  fee: 'Fee missing',
+  rate: 'No rate',
+  waiting: 'Not yet',
 };
 
 function inr(value: string | number): string {
@@ -46,10 +54,19 @@ function money(value: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function rowState(row: Row): RowState {
+  if (money(row.eligible) > 0 && !row.razorpayFeeUnknown) return 'ready';
+  if (row.razorpayFeeUnknown) return 'fee';
+  if (row.ratePct == null || row.unconfigured) return 'rate';
+  return 'waiting';
+}
+
 export function PayablesDashboard() {
+  const router = useRouter();
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
@@ -79,6 +96,7 @@ export function PayablesDashboard() {
       setKpis(json.data.kpis);
       setRows(json.data.rows);
       setTotal(json.data.pagination.total);
+      setPageSize(json.data.pagination.pageSize ?? 20);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this page');
     } finally {
@@ -111,183 +129,157 @@ export function PayablesDashboard() {
     }
   }
 
-  const featured = rows.find((row) => money(row.eligible) > 0) ?? null;
-  const split = kpis
-    ? [{
-      name: 'Money',
-      ready: money(kpis.eligible),
-      unpaid: money(kpis.pendingCapture),
-      delivering: money(kpis.awaitingCompletion),
-      paused: money(kpis.onHold),
-      missing: money(kpis.blockedSale),
-    }]
-    : [];
-  const splitTotal = split[0]
-    ? split[0].ready + split[0].unpaid + split[0].delivering + split[0].paused + split[0].missing
-    : 0;
+  function openSupplier(event: React.MouseEvent, vendorId: string) {
+    if ((event.target as HTMLElement).closest('a, button')) return;
+    router.push(`/admin/finance/payables/${vendorId}`);
+  }
+
+  function pay(row: Row) {
+    setGuide({
+      supplier: row.supplier,
+      vendorId: row.vendorId,
+      net: row.eligible,
+      utr: '',
+      note: '',
+      notice: 'Add the bank reference and a note. We do not call the bank.',
+      paid: false,
+    });
+  }
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-8 pb-16 text-[#1C1C1C]">
-      <header className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#6B1D2E]">Finance</p>
-        <h1 className="mt-2 text-[clamp(2rem,3vw+1rem,2.75rem)] font-semibold tracking-[-0.03em]">Pay suppliers</h1>
-        <p className="mt-2 max-w-xl text-[16px] leading-7 text-[#3F3F46]">
-          The customer pays. Razorpay takes its fee. Horeca1 keeps the commission. What is left is what you pay the supplier. We do not call the bank.
+    <div className="space-y-6 pb-8 text-[#1C1C1C]">
+      <header>
+        <h1 className="text-[clamp(1.5rem,2vw+0.5rem,1.75rem)] font-semibold tracking-tight">Pay suppliers</h1>
+        <p className="mt-1 max-w-2xl text-[14px] leading-6 text-[#667085]">
+          The customer pays. Razorpay takes its fee. Horeca1 keeps the commission. What is left is what you transfer. We do not call the bank.
         </p>
       </header>
 
-      {loading && !kpis ? (
-        <div className="flex items-center gap-2 py-16 text-[#6B1D2E]"><Loader2 className="animate-spin" size={18} /> Loading the ledger</div>
-      ) : null}
-      {error ? <p role="alert" className="rounded-2xl border border-[#DC2626]/30 bg-white px-4 py-3 text-[14px] text-[#DC2626]">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl border border-[#DC2626]/30 bg-white px-4 py-3 text-[14px] text-[#DC2626]">{error}</p> : null}
 
       {kpis ? (
-        <section className="animate-in fade-in slide-in-from-bottom-2 duration-700 overflow-hidden rounded-[28px] bg-[#2A1218] text-[#FAF7F2] shadow-[0_24px_60px_-32px_rgba(42,18,24,0.7)]">
-          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-            <div>
-              <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#E7C5CE]">To pay</p>
-              <p className="mt-3 font-semibold tabular-nums tracking-[-0.04em] text-[clamp(2.8rem,6vw,4.5rem)] leading-none">{inr(kpis.eligible)}</p>
-              <p className="mt-4 max-w-sm text-[14px] leading-6 text-[#E7C5CE]">
-                Customer paid, minus the Razorpay fee, minus commission.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
-              <p className="text-[12px] uppercase tracking-[0.16em] text-[#E7C5CE]">Razorpay cut</p>
-              <p className="mt-2 text-[clamp(1.8rem,3vw,2.4rem)] font-semibold tabular-nums">{inr(kpis.razorpayFee)}</p>
-              {kpis.razorpayFeeUnknown ? <p className="mt-2 text-[13px] leading-5 text-[#E7C5CE]">Some Razorpay fees have not been received. Those suppliers stay unpaid.</p> : null}
-              <p className="mt-2 text-[13px] leading-5 text-[#E7C5CE]">Commission kept {inr(kpis.commission)}. Customer paid {inr(kpis.customerPaid)}.</p>
-            </div>
-          </div>
-
-          {featured ? (
-            <div className="mx-6 mb-6 grid gap-2 rounded-2xl bg-[#FAF7F2] p-4 text-[#1C1C1C] sm:mx-8 sm:grid-cols-[1.2fr_auto_auto_auto] sm:items-end">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">Worked example</p>
-                <p className="mt-1 text-[18px] font-semibold">{featured.supplier}</p>
-                <p className="text-[13px] text-[#667085]">{featured.ratePct == null ? 'No commission set' : `${featured.ratePct}% commission`}</p>
-              </div>
-              <Figure label="Customer paid" value={inr(featured.eligibleSale)} />
-              <Figure label="Razorpay cut" value={featured.razorpayFeeUnknown ? 'Not received' : inr(featured.razorpayFee ?? 0)} />
-              <Figure label="Commission" value={inr(featured.commission)} />
-              <Figure label="To pay" value={inr(featured.eligible)} strong />
-            </div>
-          ) : null}
-
-          {splitTotal > 0 ? (
-            <div className="border-t border-white/10 px-6 py-5 sm:px-8">
-              <p className="mb-3 text-[12px] uppercase tracking-[0.14em] text-[#E7C5CE]">Where the money is</p>
-              <div className="h-3 w-full">
-                <ResponsiveContainer width="100%" height={12}>
-                  <BarChart data={split} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                    <XAxis type="number" hide domain={[0, splitTotal]} />
-                    <Tooltip
-                      cursor={false}
-                      formatter={(value, name) => [inr(Number(value ?? 0)), SPLIT_LABEL[String(name)] ?? String(name)]}
-                      contentStyle={{ borderRadius: 12, border: '1px solid #E9E3DD', fontSize: 13 }}
-                    />
-                    <Bar dataKey="ready" stackId="m" fill="#F8E8EC" radius={[6, 0, 0, 6]} />
-                    <Bar dataKey="unpaid" stackId="m" fill="#8D6E76" />
-                    <Bar dataKey="delivering" stackId="m" fill="#C4A4AE" />
-                    <Bar dataKey="paused" stackId="m" fill="#F59E0B" />
-                    <Bar dataKey="missing" stackId="m" fill="#6B1D2E" radius={[0, 6, 6, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#E7C5CE]">
-                <Legend dot="bg-[#F8E8EC]" label="Ready" value={kpis.eligible} />
-                <Legend dot="bg-[#8D6E76]" label="Customer has not paid" value={kpis.pendingCapture} />
-                <Legend dot="bg-[#C4A4AE]" label="Not delivered" value={kpis.awaitingCompletion} />
-                <Legend dot="bg-[#F59E0B]" label="Paused" value={kpis.onHold} />
-                <Legend dot="bg-[#6B1D2E]" label="No commission rate" value={kpis.blockedSale} />
-              </ul>
-            </div>
-          ) : null}
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Figure label="To pay" value={inr(kpis.eligible)} tone="pay" />
+          <Figure label="Customer paid" value={inr(kpis.customerPaid)} />
+          <Figure
+            label="Razorpay cut"
+            value={inr(kpis.razorpayFee)}
+            note={kpis.razorpayFeeUnknown ? 'Some fees have not arrived' : undefined}
+          />
+          <Figure label="Commission" value={inr(kpis.commission)} />
         </section>
       ) : null}
 
-      <section className="space-y-3">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-[20px] font-semibold tracking-tight">Suppliers</h2>
-            <p className="text-[14px] text-[#667085]">Open a name to see the orders. Pay only the ones marked ready.</p>
-          </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <input
+          aria-label="Search supplier"
+          value={q}
+          onChange={(event) => { setQ(event.target.value); setPage(1); }}
+          placeholder="Name or code"
+          className="h-12 w-full rounded-xl border border-[#E9E3DD] bg-white px-4 text-[15px] text-[#1C1C1C] outline-none focus:border-[#6B1D2E] lg:max-w-sm"
+        />
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter.label}
+              type="button"
+              aria-pressed={status === filter.id}
+              onClick={() => { setStatus(filter.id); setPage(1); }}
+              className={cn(
+                'h-10 rounded-lg px-3 text-[13px] font-semibold',
+                status === filter.id
+                  ? 'bg-[#F8E8EC] text-[#6B1D2E]'
+                  : 'border border-[#E9E3DD] bg-white text-[#667085]',
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
-        <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const next = String(new FormData(event.currentTarget).get('supplier') ?? ''); setQ(next); setPage(1); }}>
-          <label className="flex-1 text-[13px] text-[#667085]">Find a supplier
-            <input name="supplier" aria-label="Search supplier" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or code" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] bg-white px-4 text-[15px] text-[#1C1C1C] outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-[#6B1D2E] focus:shadow-[0_0_0_4px_rgba(107,29,46,0.12)]" />
-          </label>
-          <label className="text-[13px] text-[#667085]">Show
-            <select aria-label="Show" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="mt-1 block h-12 rounded-2xl border border-[#E9E3DD] bg-white px-3">
-              <option value="">Everyone</option>
-              <option value="outstanding">We still owe them</option>
-              <option value="eligible">Ready to pay</option>
-              <option value="on_hold">Paused</option>
-              <option value="settled">Already paid</option>
-            </select>
-          </label>
-          <button type="submit" className="h-12 self-end rounded-2xl bg-[#6B1D2E] px-5 text-[15px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98]">Apply</button>
-        </form>
+      </div>
 
-        {rows.length === 0 && !loading ? (
-          <p className="rounded-[24px] border border-dashed border-[#E9E3DD] bg-white px-4 py-12 text-center text-[15px] text-[#667085]">No supplier matches. Clear the search to see everyone.</p>
-        ) : (
-          <ul className="space-y-2">
+      {loading && rows.length === 0 ? (
+        <div className="flex items-center gap-2 py-16 text-[#6B1D2E]"><Loader2 className="animate-spin" size={18} /> Loading the ledger</div>
+      ) : rows.length === 0 ? (
+        error ? null : (
+          <p className="rounded-xl border border-dashed border-[#E9E3DD] bg-white px-4 py-12 text-center text-[15px] text-[#667085]">
+            No supplier matches. Clear the search to see everyone.
+          </p>
+        )
+      ) : (
+        <>
+          <ul className="divide-y divide-[#E9E3DD] overflow-hidden rounded-xl border border-[#E9E3DD] bg-white md:hidden">
             {rows.map((row) => {
-              const ready = money(row.eligible) > 0 && !row.razorpayFeeUnknown;
+              const state = rowState(row);
               return (
-                <li key={row.vendorId} className="group flex flex-col gap-4 rounded-[22px] border border-[#E9E3DD] bg-white p-4 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-28px_rgba(42,18,24,0.45)] sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <Link href={`/admin/finance/payables/${row.vendorId}`} className="text-[17px] font-semibold tracking-tight text-[#1C1C1C] underline-offset-4 hover:text-[#6B1D2E] hover:underline">{row.supplier}</Link>
-                    <p className="mt-1 text-[13px] text-[#667085]">
-                      {row.ratePct == null ? 'Commission not set — we will not guess a rate' : `We keep ${row.ratePct}%`}
-                      {row.supplierCode ? ` · ${row.supplierCode}` : ''}
-                    </p>
-                    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[13px]">
-                      {(row.orders ?? []).map((order) => (
-                        <span key={order.orderId} className="inline-flex items-center gap-2">
-                          <span className="text-[#667085]">{order.orderNumber}</span>
-                          <a className="font-semibold text-[#6B1D2E]" href={`/api/v1/admin/orders/${order.orderId}/invoice`}>Invoice</a>
-                        </span>
-                      ))}
+                <li key={row.vendorId} onClick={(event) => openSupplier(event, row.vendorId)} className="cursor-pointer px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <SupplierIdentity row={row} state={state} />
+                    <p className={cn('text-right text-[16px] font-semibold tabular-nums', state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#667085]')}>
+                      {state === 'ready' ? inr(row.eligible) : '—'}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <Stat label="Customer paid" value={inr(row.eligibleSale)} />
-                    <Stat label="Razorpay cut" value={row.razorpayFeeUnknown ? 'Razorpay fee not received' : inr(row.razorpayFee ?? 0)} />
-                    <Stat label="Commission" value={row.ratePct == null ? 'Not set' : inr(row.commission)} />
-                    <Stat label="To pay" value={ready ? inr(row.eligible) : 'Not yet'} tone={ready ? 'ready' : 'muted'} />
-                    {ready ? (
-                      <button
-                        type="button"
-                        disabled={busy === row.vendorId}
-                        onClick={() => setGuide({
-                          supplier: row.supplier,
-                          vendorId: row.vendorId,
-                          net: row.eligible,
-                          utr: '',
-                          note: '',
-                          notice: 'Add the bank reference and a note. We do not call the bank.',
-                          paid: false,
-                        })}
-                        className="h-11 rounded-full bg-[#6B1D2E] px-4 text-[14px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.98] disabled:bg-[#EFEAE4] disabled:text-[#8A8178]"
-                      >
-                        {busy === row.vendorId ? 'Saving…' : 'Pay'}
-                      </button>
-                    ) : null}
-                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                    <MoneyItem label="Customer paid" value={inr(row.eligibleSale)} />
+                    <MoneyItem label="Razorpay cut" value={row.razorpayFeeUnknown ? '—' : inr(row.razorpayFee ?? 0)} />
+                    <MoneyItem label="Commission" value={row.ratePct == null ? '—' : inr(row.commission)} />
+                    <MoneyItem label="Rate" value={row.ratePct == null ? '—' : `${row.ratePct}%`} />
+                  </dl>
+                  {state === 'ready' ? <PayButton row={row} busy={busy} onPay={pay} className="mt-3 min-h-12 w-full" /> : null}
                 </li>
               );
             })}
           </ul>
-        )}
-        <div className="flex items-center justify-between text-[14px] text-[#667085]">
-          <span>{total} suppliers</span>
-          <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)} className="h-10 rounded-full border border-[#E9E3DD] bg-white px-4 disabled:opacity-40">Previous</button>
-            <button type="button" disabled={page * 20 >= total} onClick={() => setPage((n) => n + 1)} className="h-10 rounded-full border border-[#E9E3DD] bg-white px-4 disabled:opacity-40">Next</button>
+
+          <div className="hidden overflow-hidden rounded-xl border border-[#E9E3DD] bg-white md:block">
+            <table className="w-full text-left text-[13px]">
+              <thead className="bg-[#FAF7F2] text-[11px] font-semibold uppercase tracking-wide text-[#667085]">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Supplier</th>
+                  <th className="px-3 py-3 text-right font-semibold">Rate</th>
+                  <th className="px-3 py-3 text-right font-semibold">Customer paid</th>
+                  <th className="px-3 py-3 text-right font-semibold">Razorpay cut</th>
+                  <th className="px-3 py-3 text-right font-semibold">Commission</th>
+                  <th className="px-3 py-3 text-right font-semibold">To pay</th>
+                  <th className="px-4 py-3"><span className="sr-only">Pay</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E9E3DD]">
+                {rows.map((row) => {
+                  const state = rowState(row);
+                  return (
+                    <tr key={row.vendorId} onClick={(event) => openSupplier(event, row.vendorId)} className="cursor-pointer hover:bg-[#FAF7F2]">
+                      <td className="px-4 py-3"><SupplierIdentity row={row} state={state} /></td>
+                      <td className="px-3 py-3 text-right tabular-nums text-[#667085]">{row.ratePct == null ? '—' : `${row.ratePct}%`}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{inr(row.eligibleSale)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{row.razorpayFeeUnknown ? '—' : inr(row.razorpayFee ?? 0)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{row.ratePct == null ? '—' : inr(row.commission)}</td>
+                      <td className={cn('px-3 py-3 text-right font-semibold tabular-nums', state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#667085]')}>
+                        {state === 'ready' ? inr(row.eligible) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {state === 'ready' ? <PayButton row={row} busy={busy} onPay={pay} className="h-10" /> : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        </>
+      )}
+
+      <div className="flex items-center justify-between text-[14px] text-[#667085]">
+        <span>{total} suppliers</span>
+        <div className="flex gap-2">
+          <button type="button" disabled={page <= 1} onClick={() => setPage((n) => n - 1)} className="h-10 rounded-lg border border-[#E9E3DD] bg-white px-4 disabled:opacity-40">Previous</button>
+          <button type="button" disabled={page * pageSize >= total} onClick={() => setPage((n) => n + 1)} className="h-10 rounded-lg border border-[#E9E3DD] bg-white px-4 disabled:opacity-40">Next</button>
         </div>
-      </section>
+      </div>
+
+      <p className="text-[14px] text-[#667085]">
+        <Link href="/admin/ledger" className="font-semibold text-[#6B1D2E]">Older wallet</Link>
+      </p>
 
       {guide ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1C1C1C]/50 p-4 sm:items-center" role="presentation" onClick={() => setGuide(null)}>
@@ -295,7 +287,7 @@ export function PayablesDashboard() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="pay-dialog-title"
-            className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">Payment</p>
@@ -303,69 +295,66 @@ export function PayablesDashboard() {
             <p className="mt-2 text-[28px] font-semibold tabular-nums">{inr(guide.net)}</p>
             {guide.paid ? null : <p className="mt-2 text-[15px] leading-6 text-[#3F3F46]">{guide.notice}</p>}
             {guide.paid ? (
-              <p className="mt-5 rounded-2xl bg-[#F0FDF4] px-4 py-3 text-[15px] font-medium text-[#166534]">Paid. The reference is saved.</p>
+              <p className="mt-5 rounded-xl bg-[#F0FDF4] px-4 py-3 text-[15px] font-medium text-[#166534]">Paid. The reference is saved.</p>
             ) : (
               <div className="mt-5 flex flex-col gap-3">
                 <label className="text-[13px] text-[#667085]">Bank reference
-                  <input aria-label="Bank reference" value={guide.utr} onChange={(event) => setGuide({ ...guide, utr: event.target.value })} placeholder="UTR from your bank" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
+                  <input aria-label="Bank reference" value={guide.utr} onChange={(event) => setGuide({ ...guide, utr: event.target.value })} placeholder="UTR from your bank" className="mt-1 h-12 w-full rounded-xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
                 </label>
                 <label className="text-[13px] text-[#667085]">Note
-                  <input aria-label="Payment note" value={guide.note} onChange={(event) => setGuide({ ...guide, note: event.target.value })} placeholder="What this payment is for" className="mt-1 h-12 w-full rounded-2xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
+                  <input aria-label="Payment note" value={guide.note} onChange={(event) => setGuide({ ...guide, note: event.target.value })} placeholder="What this payment is for" className="mt-1 h-12 w-full rounded-xl border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]" />
                 </label>
-                <button type="button" onClick={() => void markPaid()} className="h-12 rounded-full bg-[#6B1D2E] text-[15px] font-semibold text-white active:scale-[0.98]">Mark paid</button>
+                <button type="button" onClick={() => void markPaid()} className="h-12 rounded-lg bg-[#6B1D2E] text-[15px] font-semibold text-white hover:bg-[#5A1926]">Mark paid</button>
               </div>
             )}
             <button type="button" onClick={() => setGuide(null)} className="mt-3 h-11 text-[14px] font-semibold text-[#6B1D2E]">Close</button>
           </div>
         </div>
       ) : null}
-
-      <footer className="border-t border-[#E9E3DD] pt-4 text-[14px] text-[#667085]">
-        Other records:{' '}
-        <Link href="/admin/finance/payments" className="font-semibold text-[#6B1D2E]">customer payments</Link>
-        {' · '}
-        <Link href="/admin/ledger" className="font-semibold text-[#6B1D2E]">older supplier wallet</Link>
-        {' · '}
-        <Link href="/admin/reports" className="font-semibold text-[#6B1D2E]">sales reports</Link>
-      </footer>
-
     </div>
   );
 }
 
-const SPLIT_LABEL: Record<string, string> = {
-  ready: 'Ready to pay',
-  unpaid: 'Customer has not paid',
-  delivering: 'Not delivered yet',
-  paused: 'Paused',
-  missing: 'No commission rate',
-};
+function Figure({ label, value, note, tone }: { label: string; value: string; note?: string; tone?: 'pay' }) {
+  return (
+    <div className="rounded-xl border border-[#E9E3DD] bg-white px-4 py-3">
+      <p className="text-[12px] font-medium text-[#667085]">{label}</p>
+      <p className={cn('mt-1 text-[clamp(1.15rem,1.5vw,1.5rem)] font-semibold tabular-nums', tone === 'pay' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]')}>{value}</p>
+      {note ? <p className="mt-1 text-[12px] leading-4 text-[#667085]">{note}</p> : null}
+    </div>
+  );
+}
 
-function Figure({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function SupplierIdentity({ row, state }: { row: Row; state: RowState }) {
+  return (
+    <div className="min-w-0">
+      <Link href={`/admin/finance/payables/${row.vendorId}`} className="font-semibold text-[#1C1C1C] hover:text-[#6B1D2E]">
+        {row.supplier}
+      </Link>
+      {row.supplierCode ? <p className="text-[12px] text-[#667085]">{row.supplierCode}</p> : null}
+      <p className={cn('text-[12px] font-medium', state === 'ready' ? 'text-[#16A34A]' : 'text-[#667085]')}>{STATE_LABEL[state]}</p>
+    </div>
+  );
+}
+
+function MoneyItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[12px] text-[#667085]">{label}</p>
-      <p className={`tabular-nums ${strong ? 'text-[20px] font-semibold text-[#6B1D2E]' : 'text-[16px] font-medium'}`}>{value}</p>
+      <dt className="text-[11px] text-[#667085]">{label}</dt>
+      <dd className="font-medium tabular-nums">{value}</dd>
     </div>
   );
 }
 
-function Legend({ dot, label, value }: { dot: string; label: string; value: string }) {
-  if (money(value) <= 0) return null;
+function PayButton({ row, busy, onPay, className }: { row: Row; busy: string; onPay: (row: Row) => void; className?: string }) {
   return (
-    <li className="inline-flex items-center gap-1.5">
-      <span className={`inline-block h-2 w-2 rounded-full ${dot}`} />
-      {label} {inr(value)}
-    </li>
-  );
-}
-
-function Stat({ label, value, tone = 'ink' }: { label: string; value: string; tone?: 'ink' | 'ready' | 'muted' }) {
-  const color = tone === 'ready' ? 'text-[#166534]' : tone === 'muted' ? 'text-[#8A8178]' : 'text-[#1C1C1C]';
-  return (
-    <div>
-      <p className="text-[11px] uppercase tracking-[0.12em] text-[#8A8178]">{label}</p>
-      <p className={`text-[16px] font-semibold tabular-nums ${color}`}>{value}</p>
-    </div>
+    <button
+      type="button"
+      disabled={busy === row.vendorId}
+      onClick={(event) => { event.stopPropagation(); onPay(row); }}
+      className={cn('rounded-lg bg-[#6B1D2E] px-4 text-[13px] font-semibold text-white hover:bg-[#5A1926] disabled:bg-[#E9E3DD] disabled:text-[#6B7280]', className)}
+    >
+      {busy === row.vendorId ? 'Saving…' : 'Pay'}
+    </button>
   );
 }

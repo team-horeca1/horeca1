@@ -61,7 +61,7 @@ export default function WhatIReceivePage() {
         {lines.map((line) => (
           <li key={line.orderId} className="rounded-[22px] border border-[#E9E3DD] bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold">{line.orderNumber} <a className="text-[13px] font-semibold text-[#6B1D2E]" href={`/api/v1/vendor/orders/${line.orderId}/invoice`}>Invoice</a></p>
+              <p className="font-semibold">{line.orderNumber} <a className="text-[13px] font-semibold text-[#6B1D2E]" href={`/api/v1/vendor/payables/orders/${line.orderId}/payment-invoice`}>Payment invoice</a></p>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-3 text-[14px] sm:grid-cols-4">
               <div><dt className="text-[#667085]">Customer paid</dt><dd className="tabular-nums font-medium">{inr(line.customerPaid)}</dd></div>

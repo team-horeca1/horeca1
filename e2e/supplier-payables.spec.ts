@@ -50,7 +50,6 @@ test.describe('Supplier payables', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByLabel('Search supplier').fill('no-such-supplier-xyz');
-    await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByText('No supplier matches. Clear the search to see everyone.')).toBeVisible();
 
     const response = await page.request.get('/api/v1/admin/finance/payables');
@@ -77,18 +76,22 @@ test.describe('Supplier payables', () => {
     await passwordLogin(page, 'admin@horeca1.com', 'admin123');
     await page.goto('/admin/finance');
     await page.getByLabel('Search supplier').fill('Fee');
-    await page.getByRole('button', { name: 'Apply' }).click();
 
-    const ready = page.locator('li').filter({ hasText: 'Fee Example Supply' });
+    const ready = page.getByRole('row', { name: /Fee Example Supply/ });
     await expect(ready.getByText('₹100.00').first()).toBeVisible();
     await expect(ready.getByText('₹1.18')).toBeVisible();
     await expect(ready.getByText('₹10.00')).toBeVisible();
     await expect(ready.getByText('₹88.82')).toBeVisible();
-    await expect(ready.getByRole('link', { name: 'Invoice' })).toBeVisible();
+    await expect(ready.getByRole('link', { name: 'Invoice' })).toHaveCount(0);
 
-    const blocked = page.locator('li').filter({ hasText: 'Missing Fee Supply' });
-    await expect(blocked.getByText('Razorpay fee not received')).toBeVisible();
+    const blocked = page.getByRole('row', { name: /Missing Fee Supply/ });
+    await expect(blocked.getByText('Fee missing')).toBeVisible();
     await expect(blocked.getByRole('button', { name: 'Pay' })).toHaveCount(0);
+
+    await ready.getByRole('link', { name: 'Fee Example Supply' }).click();
+    await expect(page.getByRole('heading', { name: 'Fee Example Supply' })).toBeVisible();
+    await expect(page.getByRole('row', { name: /PO-FEE-100/ }).getByRole('link', { name: 'Payment invoice' })).toBeVisible();
+    await page.goto('/admin/finance');
 
     const invoice = await page.request.get(`/api/v1/admin/orders/${FEE_ORDER}/invoice`);
     expect(invoice.ok()).toBeTruthy();
@@ -115,8 +118,7 @@ test.describe('Supplier payables', () => {
 
     await page.goto('/admin/finance');
     await page.getByLabel('Search supplier').fill('Fee Example');
-    await page.getByRole('button', { name: 'Apply' }).click();
-    const still = page.locator('li').filter({ hasText: 'Fee Example Supply' });
+    const still = page.getByRole('row', { name: /Fee Example Supply/ });
     await expect(still.getByText('₹10.00')).toBeVisible();
     await expect(still.getByText('₹88.82')).toBeVisible();
     await expect(still.getByText('₹12.00')).toHaveCount(0);
