@@ -84,6 +84,11 @@ export interface PayableAssessment {
   netPayablePaise: number;
   razorpayFeePaise: number;
   razorpayFeeUnknown: boolean;
+  /** Display-only cuts before delivery. They are not payable and are not settled. */
+  quoteFeePaise: number;
+  quoteFeeUnknown: boolean;
+  quoteCommissionPaise: number;
+  quoteNetPaise: number;
   blockedSalePaise: number;
   aboveCashPaise: number;
   supplierPromoPaise: number;
@@ -177,6 +182,38 @@ export function assertSingleBucket(rows: Array<{ id: string; status: PayableStat
   }
 }
 
+function quotedCuts(input: PayableAssessmentInput, netCollectedPaise: number): {
+  feePaise: number;
+  feeUnknown: boolean;
+  commissionPaise: number;
+  netPaise: number;
+} {
+  if (netCollectedPaise <= 0) {
+    return { feePaise: 0, feeUnknown: false, commissionPaise: 0, netPaise: 0 };
+  }
+  const fee = razorpayFeeFromPayments(input.payments);
+  const commission = input.ratePct == null ? 0 : commissionPaise(netCollectedPaise, input.ratePct);
+  if (input.ratePct == null || fee.unknown) {
+    return {
+      feePaise: fee.unknown ? 0 : fee.feePaise,
+      feeUnknown: fee.unknown,
+      commissionPaise: commission,
+      netPaise: 0,
+    };
+  }
+  const rawNet = netCollectedPaise
+    - fee.feePaise
+    - commission
+    + (input.manualCreditPaise ?? 0)
+    - (input.manualDebitPaise ?? 0);
+  return {
+    feePaise: fee.feePaise,
+    feeUnknown: false,
+    commissionPaise: commission,
+    netPaise: Math.min(rawNet, netCollectedPaise),
+  };
+}
+
 export function assessPayable(input: PayableAssessmentInput): PayableAssessment {
   const supplierPromoPaise = Math.max(0, rupeesToPaise(input.promoDiscount));
   const couponPaise = Math.max(0, rupeesToPaise(input.couponDiscount));
@@ -214,6 +251,10 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
     netPayablePaise: 0,
     razorpayFeePaise: 0,
     razorpayFeeUnknown: false,
+    quoteFeePaise: 0,
+    quoteFeeUnknown: false,
+    quoteCommissionPaise: 0,
+    quoteNetPaise: 0,
     blockedSalePaise: 0,
     aboveCashPaise,
     supplierPromoPaise,
@@ -226,9 +267,14 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
   if (replacement || cancelledBeforeDelivery) return empty;
 
   if (!delivered) {
+    const quote = quotedCuts(input, netCollectedPaise);
     return {
       ...empty,
       status: netCollectedPaise > 0 ? 'awaiting_completion' : 'pending_capture',
+      quoteFeePaise: quote.feePaise,
+      quoteFeeUnknown: quote.feeUnknown,
+      quoteCommissionPaise: quote.commissionPaise,
+      quoteNetPaise: quote.netPaise,
     };
   }
 

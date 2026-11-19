@@ -22,6 +22,13 @@ type Line = {
   blockedSale: string;
   aboveCash: string;
   order: { orderNumber: string; status: string; paymentStatus: string; paymentMethod: string | null };
+  breakdown?: {
+    ratePct?: string | null;
+    quoteFee?: string;
+    quoteFeeUnknown?: boolean;
+    quoteCommission?: string;
+    quoteNet?: string;
+  } | null;
 };
 
 type Detail = {
@@ -134,9 +141,9 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
                   </div>
                   <dl className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
                     <Money label="Customer paid" value={inr(line.collectedAmount)} />
-                    <Money label="Razorpay cut" value={line.razorpayFeeUnknown ? 'Fee missing' : inr(line.razorpayFee ?? 0)} />
-                    <Money label="Commission" value={inr(line.commissionAmount)} />
-                    <Money label="Net" value={inr(line.netPayable)} />
+                    <Money label="Razorpay cut" value={cutFee(line)} />
+                    <Money label="Commission" value={cutCommission(line)} />
+                    <Money label="Net" value={cutNet(line)} />
                   </dl>
                   <div className="mt-3"><LineAction line={line} onHold={hold} /></div>
                 </li>
@@ -163,9 +170,9 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
                       <td className="px-4 py-3 font-semibold">{line.order.orderNumber}</td>
                       <td className="px-3 py-3 text-[#667085]">{STATUS_LABEL[line.status] ?? line.status}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{inr(line.collectedAmount)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{line.razorpayFeeUnknown ? 'Fee missing' : inr(line.razorpayFee ?? 0)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{inr(line.commissionAmount)}</td>
-                      <td className="px-3 py-3 text-right font-semibold tabular-nums">{inr(line.netPayable)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{cutFee(line)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{cutCommission(line)}</td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums">{cutNet(line)}</td>
                       <td className="px-3 py-3">
                         <a className="font-semibold text-[#6B1D2E]" href={`/api/v1/admin/finance/payables/orders/${line.orderId}/payment-invoice`}>Payment invoice</a>
                       </td>
@@ -225,6 +232,32 @@ function footnote(lines: Line[]): string {
     parts.push('Amount above the cash collected is not booked.');
   }
   return parts.join(' ');
+}
+
+function isPreview(line: Line): boolean {
+  return line.status === 'awaiting_completion' || line.status === 'pending_capture';
+}
+
+function cutFee(line: Line): string {
+  if (isPreview(line)) {
+    if (line.breakdown?.quoteFeeUnknown) return 'Fee missing';
+    return inr(line.breakdown?.quoteFee ?? 0);
+  }
+  return line.razorpayFeeUnknown ? 'Fee missing' : inr(line.razorpayFee ?? 0);
+}
+
+function cutCommission(line: Line): string {
+  if (line.breakdown?.ratePct == null) return '—';
+  if (isPreview(line)) return inr(line.breakdown?.quoteCommission ?? 0);
+  return inr(line.commissionAmount);
+}
+
+function cutNet(line: Line): string {
+  if (isPreview(line)) {
+    if (line.breakdown?.quoteFeeUnknown || line.breakdown?.ratePct == null) return '—';
+    return inr(line.breakdown?.quoteNet ?? 0);
+  }
+  return inr(line.netPayable);
 }
 
 function Money({ label, value }: { label: string; value: string }) {

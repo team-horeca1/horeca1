@@ -58,16 +58,26 @@ export async function generatePaymentInvoicePdf(
   });
   if (!line) throw Errors.notFound('Payable');
 
-  const breakdown = (line.breakdown ?? {}) as { ratePct?: string | null };
+  const breakdown = (line.breakdown ?? {}) as {
+    ratePct?: string | null;
+    quoteFee?: string;
+    quoteFeeUnknown?: boolean;
+    quoteCommission?: string;
+    quoteNet?: string;
+  };
+  const preview = line.status === 'awaiting_completion' || line.status === 'pending_capture';
   const ratePct = breakdown.ratePct == null ? null : String(breakdown.ratePct);
   const supplier = (order.vendor.displayName?.trim() || order.vendor.businessName).trim();
   const statusLabel = STATUS_LABEL[line.status] ?? line.status;
-  const razorpayCut = line.razorpayFeeUnknown
-    ? 'Fee not received'
-    : inr(line.razorpayFee ?? 0);
+  const feeUnknown = preview ? breakdown.quoteFeeUnknown === true : line.razorpayFeeUnknown;
+  const feeAmount = preview ? (breakdown.quoteFee ?? 0) : (line.razorpayFee ?? 0);
+  const commissionAmount = preview ? (breakdown.quoteCommission ?? 0) : line.commissionAmount;
+  const netAmount = preview ? (breakdown.quoteNet ?? 0) : line.netPayable;
+  const razorpayCut = feeUnknown ? 'Fee not received' : inr(feeAmount);
   const commissionLabel = ratePct == null
-    ? inr(line.commissionAmount)
-    : `${inr(line.commissionAmount)} (${ratePct}%)`;
+    ? 'Rate not set'
+    : `${inr(commissionAmount)} (${ratePct}%)`;
+  const toPay = preview && (feeUnknown || ratePct == null) ? '—' : inr(netAmount);
 
   const pdf = await new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ margin: 48, size: 'A4' });
@@ -104,7 +114,7 @@ export async function generatePaymentInvoicePdf(
       { label: 'Customer paid', value: inr(line.collectedAmount) },
       { label: 'Razorpay cut', value: razorpayCut },
       { label: 'Commission', value: commissionLabel },
-      { label: 'To pay', value: inr(line.netPayable), strong: true },
+      { label: 'To pay', value: toPay, strong: true },
     ];
 
     for (const row of rows) {

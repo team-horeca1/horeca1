@@ -12,6 +12,7 @@ type Kpis = {
   customerPaid: string;
   razorpayFee: string;
   razorpayFeeUnknown: boolean;
+  quotedNet: string;
 };
 
 type Row = {
@@ -20,11 +21,13 @@ type Row = {
   supplierCode: string | null;
   ratePct: string | null;
   eligible: string;
+  shownToPay: string;
   eligibleSale: string;
   razorpayFee: string | null;
   razorpayFeeUnknown: boolean;
   commission: string;
   unconfigured: boolean;
+  waitingDelivery: boolean;
 };
 
 type RowState = 'ready' | 'fee' | 'rate' | 'waiting';
@@ -44,6 +47,11 @@ const STATE_LABEL: Record<RowState, string> = {
   waiting: 'Not yet',
 };
 
+function stateLabel(row: Row, state: RowState): string {
+  if (state === 'waiting' && row.waitingDelivery) return 'Not delivered';
+  return STATE_LABEL[state];
+}
+
 function inr(value: string | number): string {
   const n = typeof value === 'number' ? value : Number(value);
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number.isFinite(n) ? n : 0);
@@ -56,9 +64,25 @@ function money(value: string | undefined): number {
 
 function rowState(row: Row): RowState {
   if (money(row.eligible) > 0 && !row.razorpayFeeUnknown) return 'ready';
+  if (row.waitingDelivery) return 'waiting';
   if (row.razorpayFeeUnknown) return 'fee';
   if (row.ratePct == null || row.unconfigured) return 'rate';
   return 'waiting';
+}
+
+function feeText(row: Row): string {
+  if (row.razorpayFeeUnknown && money(row.razorpayFee ?? undefined) === 0) return '—';
+  return inr(row.razorpayFee ?? 0);
+}
+
+function toPayText(row: Row, state: RowState): string {
+  if (money(row.shownToPay) > 0) return inr(row.shownToPay);
+  if (state === 'ready') return inr(row.eligible);
+  return '—';
+}
+
+function payHighlight(row: Row, state: RowState): boolean {
+  return state === 'ready' && !row.waitingDelivery;
 }
 
 export function PayablesDashboard() {
@@ -159,7 +183,12 @@ export function PayablesDashboard() {
 
       {kpis ? (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Figure label="To pay" value={inr(kpis.eligible)} tone="pay" />
+          <Figure
+            label="To pay"
+            value={inr(kpis.eligible)}
+            tone="pay"
+            note={money(kpis.quotedNet) > 0 ? 'More is waiting on delivery' : undefined}
+          />
           <Figure label="Customer paid" value={inr(kpis.customerPaid)} />
           <Figure
             label="Razorpay cut"
@@ -215,17 +244,17 @@ export function PayablesDashboard() {
                 <li key={row.vendorId} onClick={(event) => openSupplier(event, row.vendorId)} className="cursor-pointer px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <SupplierIdentity row={row} state={state} />
-                    <p className={cn('text-right text-[16px] font-semibold tabular-nums', state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#667085]')}>
-                      {state === 'ready' ? inr(row.eligible) : '—'}
+                    <p className={cn('text-right text-[16px] font-semibold tabular-nums', payHighlight(row, state) ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]')}>
+                      {toPayText(row, state)}
                     </p>
                   </div>
                   <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                     <MoneyItem label="Customer paid" value={inr(row.eligibleSale)} />
-                    <MoneyItem label="Razorpay cut" value={row.razorpayFeeUnknown ? '—' : inr(row.razorpayFee ?? 0)} />
+                    <MoneyItem label="Razorpay cut" value={feeText(row)} />
                     <MoneyItem label="Commission" value={row.ratePct == null ? '—' : inr(row.commission)} />
                     <MoneyItem label="Rate" value={row.ratePct == null ? '—' : `${row.ratePct}%`} />
                   </dl>
-                  {state === 'ready' ? <PayButton row={row} busy={busy} onPay={pay} className="mt-3 min-h-12 w-full" /> : null}
+                  <PayButton row={row} busy={busy} enabled={state === 'ready'} onPay={pay} className="mt-3 min-h-12 w-full" />
                 </li>
               );
             })}
@@ -252,13 +281,13 @@ export function PayablesDashboard() {
                       <td className="px-4 py-3"><SupplierIdentity row={row} state={state} /></td>
                       <td className="px-3 py-3 text-right tabular-nums text-[#667085]">{row.ratePct == null ? '—' : `${row.ratePct}%`}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{inr(row.eligibleSale)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{row.razorpayFeeUnknown ? '—' : inr(row.razorpayFee ?? 0)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{feeText(row)}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{row.ratePct == null ? '—' : inr(row.commission)}</td>
-                      <td className={cn('px-3 py-3 text-right font-semibold tabular-nums', state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#667085]')}>
-                        {state === 'ready' ? inr(row.eligible) : '—'}
+                      <td className={cn('px-3 py-3 text-right font-semibold tabular-nums', payHighlight(row, state) ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]')}>
+                        {toPayText(row, state)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {state === 'ready' ? <PayButton row={row} busy={busy} onPay={pay} className="h-10" /> : null}
+                        <PayButton row={row} busy={busy} enabled={state === 'ready'} onPay={pay} className="h-10" />
                       </td>
                     </tr>
                   );
@@ -332,7 +361,7 @@ function SupplierIdentity({ row, state }: { row: Row; state: RowState }) {
         {row.supplier}
       </Link>
       {row.supplierCode ? <p className="text-[12px] text-[#667085]">{row.supplierCode}</p> : null}
-      <p className={cn('text-[12px] font-medium', state === 'ready' ? 'text-[#16A34A]' : 'text-[#667085]')}>{STATE_LABEL[state]}</p>
+      <p className={cn('text-[12px] font-medium', state === 'ready' ? 'text-[#16A34A]' : 'text-[#667085]')}>{stateLabel(row, state)}</p>
     </div>
   );
 }
@@ -346,15 +375,23 @@ function MoneyItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PayButton({ row, busy, onPay, className }: { row: Row; busy: string; onPay: (row: Row) => void; className?: string }) {
+function PayButton({ row, busy, enabled, onPay, className }: { row: Row; busy: string; enabled: boolean; onPay: (row: Row) => void; className?: string }) {
+  const saving = busy === row.vendorId;
   return (
     <button
       type="button"
-      disabled={busy === row.vendorId}
-      onClick={(event) => { event.stopPropagation(); onPay(row); }}
-      className={cn('rounded-lg bg-[#6B1D2E] px-4 text-[13px] font-semibold text-white hover:bg-[#5A1926] disabled:bg-[#E9E3DD] disabled:text-[#6B7280]', className)}
+      disabled={!enabled || saving}
+      title={enabled ? undefined : 'Turns on after delivery'}
+      onClick={(event) => { event.stopPropagation(); if (enabled) onPay(row); }}
+      className={cn(
+        'rounded-lg px-4 text-[13px] font-semibold',
+        enabled
+          ? 'bg-[#6B1D2E] text-white hover:bg-[#5A1926] disabled:bg-[#E9E3DD] disabled:text-[#6B7280]'
+          : 'cursor-not-allowed bg-[#E9E3DD] text-[#6B7280]',
+        className,
+      )}
     >
-      {busy === row.vendorId ? 'Saving…' : 'Pay'}
+      {saving ? 'Saving…' : 'Pay'}
     </button>
   );
 }

@@ -19,6 +19,27 @@ function money(paise: number): string {
   return paiseToRupees(paise);
 }
 
+function quoteOf(breakdown: Prisma.JsonValue): { feePaise: number; feeUnknown: boolean; commissionPaise: number; netPaise: number } {
+  if (!breakdown || typeof breakdown !== 'object' || Array.isArray(breakdown)) {
+    return { feePaise: 0, feeUnknown: false, commissionPaise: 0, netPaise: 0 };
+  }
+  const row = breakdown as Record<string, unknown>;
+  const amount = (value: unknown) => rupeesToPaise(typeof value === 'string' || typeof value === 'number' ? value : '0');
+  return {
+    feePaise: amount(row.quoteFee),
+    feeUnknown: row.quoteFeeUnknown === true,
+    commissionPaise: amount(row.quoteCommission),
+    netPaise: amount(row.quoteNet),
+  };
+}
+
+function previewOf(status: string, breakdown: Prisma.JsonValue) {
+  if (status !== 'awaiting_completion' && status !== 'pending_capture') {
+    return { feePaise: 0, feeUnknown: false, commissionPaise: 0, netPaise: 0 };
+  }
+  return quoteOf(breakdown);
+}
+
 function paymentInputs(payments: Array<{ amount: { toString(): string }; status: string; method: string | null; razorpayFeePaise: number | null; razorpayPaymentId: string | null }>) {
   return payments.map((payment) => ({
     amount: payment.amount.toString(),
@@ -224,6 +245,10 @@ function lineData(assessed: PayableAssessment, vendorId: string, financeBatchId:
       grossCollected: money(assessed.grossCollectedPaise),
       refundsRejected: money(assessed.refundsRejectedPaise),
       provisionalCommission: money(assessed.provisionalCommissionPaise),
+      quoteFee: money(assessed.quoteFeePaise),
+      quoteFeeUnknown: assessed.quoteFeeUnknown,
+      quoteCommission: money(assessed.quoteCommissionPaise),
+      quoteNet: money(assessed.quoteNetPaise),
       ratePct: assessed.ratePct,
       aboveCash: money(assessed.aboveCashPaise),
     },
@@ -448,6 +473,15 @@ export async function listSupplierPayables(query: PayableListQuery) {
         netPayablePaise: rupeesToPaise(batch.netAmount.toString()),
       })),
     ];
+    const preview = own.reduce((sum, line) => {
+      const quote = previewOf(line.status, line.breakdown);
+      return {
+        feePaise: sum.feePaise + quote.feePaise,
+        feeUnknown: sum.feeUnknown || quote.feeUnknown,
+        commissionPaise: sum.commissionPaise + quote.commissionPaise,
+        netPaise: sum.netPaise + quote.netPaise,
+      };
+    }, { feePaise: 0, feeUnknown: false, commissionPaise: 0, netPaise: 0 });
     const latestSettled = batches.find((batch) => batch.vendorId === vendor.id && batch.status === 'settled');
     const settledPaise = batches
       .filter((batch) => batch.vendorId === vendor.id && batch.status === 'settled')
@@ -460,9 +494,11 @@ export async function listSupplierPayables(query: PayableListQuery) {
       commissionConfigured: vendor.platformFeePct != null,
       settlementCycle: vendor.settlementCycle,
       eligibleSalePaise: own.reduce((sum, line) => sum + rupeesToPaise(line.collectedAmount.toString()), 0),
-      razorpayFeePaise: own.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())), 0),
-      razorpayFeeUnknown: own.some((line) => line.razorpayFeeUnknown),
-      commissionPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.commissionAmount.toString()), 0),
+      razorpayFeePaise: own.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())), 0) + preview.feePaise,
+      razorpayFeeUnknown: own.some((line) => line.razorpayFeeUnknown) || preview.feeUnknown,
+      commissionPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.commissionAmount.toString()), 0) + preview.commissionPaise,
+      shownToPayPaise: own.filter((line) => line.status === 'eligible').reduce((sum, line) => sum + rupeesToPaise(line.netPayable.toString()), 0) + preview.netPaise,
+      waitingDelivery: own.some((line) => line.status === 'awaiting_completion'),
       adjustmentPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.aboveCash.toString()), 0),
       outstandingPaise: outstandingPaise(parts, recovery),
       eligiblePaise: own.filter((line) => line.status === 'eligible').reduce((sum, line) => sum + rupeesToPaise(line.netPayable.toString()), 0),
@@ -487,9 +523,12 @@ export async function listSupplierPayables(query: PayableListQuery) {
   filtered.sort((a, b) => {
     const dir = sort.startsWith('-') ? -1 : 1;
     const key = sort.replace(/^-/, '');
+    const attention = (row: { shownToPayPaise: number; eligibleSalePaise: number }) => (
+      row.shownToPayPaise > 0 ? row.shownToPayPaise : row.eligibleSalePaise
+    );
     const map: Record<string, number> = {
       supplier: a.supplier.localeCompare(b.supplier),
-      outstanding: a.outstandingPaise - b.outstandingPaise,
+      outstanding: attention(a) - attention(b),
       eligible: a.eligiblePaise - b.eligiblePaise,
       commission: a.commissionPaise - b.commissionPaise,
       settled: a.settledPaise - b.settledPaise,
@@ -514,8 +553,9 @@ export async function listSupplierPayables(query: PayableListQuery) {
       const deliveredAt = line.order.deliveredAt;
       if (!deliveredAt || deliveredAt < period.gte || deliveredAt > period.lte) return sum;
     }
-    return sum + rupeesToPaise(line.commissionAmount.toString());
+    return sum + rupeesToPaise(line.commissionAmount.toString()) + previewOf(line.status, line.breakdown).commissionPaise;
   }, 0);
+  const quotedNet = lines.reduce((sum, line) => sum + previewOf(line.status, line.breakdown).netPaise, 0);
   const settledPeriod = batches
     .filter((batch) => batch.status === 'settled' && (!period || (batch.settledAt != null && batch.settledAt >= period.gte && batch.settledAt <= period.lte)))
     .reduce((sum, batch) => sum + rupeesToPaise(batch.netAmount.toString()), 0);
@@ -526,8 +566,9 @@ export async function listSupplierPayables(query: PayableListQuery) {
       outstandingPaise: outstanding,
       eligiblePaise: eligible,
       customerPaidPaise: lines.reduce((sum, line) => sum + rupeesToPaise(line.collectedAmount.toString()), 0),
-      razorpayFeePaise: lines.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())), 0),
-      razorpayFeeUnknown: lines.some((line) => line.razorpayFeeUnknown),
+      razorpayFeePaise: lines.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())) + previewOf(line.status, line.breakdown).feePaise, 0),
+      razorpayFeeUnknown: lines.some((line) => line.razorpayFeeUnknown || previewOf(line.status, line.breakdown).feeUnknown),
+      quotedNetPaise: quotedNet,
       pendingCapturePaise: pendingCapture,
       awaitingCompletionPaise: awaiting,
       commissionPaise: commission,

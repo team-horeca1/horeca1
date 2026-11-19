@@ -86,7 +86,7 @@ test.describe('Supplier payables', () => {
 
     const blocked = page.getByRole('row', { name: /Missing Fee Supply/ });
     await expect(blocked.getByText('Fee missing')).toBeVisible();
-    await expect(blocked.getByRole('button', { name: 'Pay' })).toHaveCount(0);
+    await expect(blocked.getByRole('button', { name: 'Pay' })).toBeDisabled();
 
     await ready.getByRole('link', { name: 'Fee Example Supply' }).click();
     await expect(page.getByRole('heading', { name: 'Fee Example Supply' })).toBeVisible();

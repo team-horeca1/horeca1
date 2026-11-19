@@ -106,6 +106,39 @@ describe('supplier payable calculation', () => {
     expect(result.netPayablePaise).toBe(0);
     expect(result.provisionalBasePaise).toBe(1_000_000);
     expect(result.provisionalCommissionPaise).toBe(100_000);
+    expect(result.quoteCommissionPaise).toBe(100_000);
+    expect(result.quoteFeePaise).toBe(0);
+    expect(result.quoteNetPaise).toBe(900_000);
+  });
+
+  it('quotes the Razorpay cut before delivery without making it payable', () => {
+    const result = assessPayable(input({
+      orderStatus: 'confirmed',
+      subtotal: '100.00',
+      payments: [{ amount: '100.00', status: 'captured', method: 'online', razorpayFeePaise: 118 }],
+      ratePct: '10.00',
+    }));
+    expect(result.status).toBe('awaiting_completion');
+    expect(result.commissionPaise).toBe(0);
+    expect(result.netPayablePaise).toBe(0);
+    expect(result.bucket).toBeNull();
+    expect(result.quoteFeePaise).toBe(118);
+    expect(result.quoteFeeUnknown).toBe(false);
+    expect(result.quoteCommissionPaise).toBe(1000);
+    expect(result.quoteNetPaise).toBe(10000 - 118 - 1000);
+  });
+
+  it('quotes commission before delivery when the Razorpay fee has not arrived', () => {
+    const result = assessPayable(input({
+      orderStatus: 'confirmed',
+      payments: [{ amount: '100.00', status: 'captured', method: 'online', razorpayFeePaise: null }],
+    }));
+    expect(result.status).toBe('awaiting_completion');
+    expect(result.netPayablePaise).toBe(0);
+    expect(result.quoteFeeUnknown).toBe(true);
+    expect(result.quoteFeePaise).toBe(0);
+    expect(result.quoteCommissionPaise).toBe(1000);
+    expect(result.quoteNetPaise).toBe(0);
   });
 
   it('does not count an authorised payment as cash', () => {
