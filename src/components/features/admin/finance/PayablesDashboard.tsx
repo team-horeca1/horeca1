@@ -28,9 +28,10 @@ type Row = {
   commission: string;
   unconfigured: boolean;
   waitingDelivery: boolean;
+  settled: string;
 };
 
-type RowState = 'ready' | 'fee' | 'rate' | 'waiting';
+type RowState = 'ready' | 'paid' | 'fee' | 'rate' | 'waiting';
 
 const FILTERS: { id: string; label: string }[] = [
   { id: '', label: 'Everyone' },
@@ -42,6 +43,7 @@ const FILTERS: { id: string; label: string }[] = [
 
 const STATE_LABEL: Record<RowState, string> = {
   ready: 'Ready',
+  paid: 'Paid',
   fee: 'Fee missing',
   rate: 'No rate',
   waiting: 'Not yet',
@@ -67,6 +69,7 @@ function rowState(row: Row): RowState {
   if (row.waitingDelivery) return 'waiting';
   if (row.razorpayFeeUnknown) return 'fee';
   if (row.ratePct == null || row.unconfigured) return 'rate';
+  if (money(row.settled) > 0) return 'paid';
   return 'waiting';
 }
 
@@ -76,6 +79,7 @@ function feeText(row: Row): string {
 }
 
 function toPayText(row: Row, state: RowState): string {
+  if (state === 'paid') return inr(row.settled);
   if (money(row.shownToPay) > 0) return inr(row.shownToPay);
   if (state === 'ready') return inr(row.eligible);
   return '—';
@@ -361,7 +365,7 @@ function SupplierIdentity({ row, state }: { row: Row; state: RowState }) {
         {row.supplier}
       </Link>
       {row.supplierCode ? <p className="text-[12px] text-[#667085]">{row.supplierCode}</p> : null}
-      <p className={cn('text-[12px] font-medium', state === 'ready' ? 'text-[#16A34A]' : 'text-[#667085]')}>{stateLabel(row, state)}</p>
+      <p className={cn('text-[12px] font-medium', state === 'ready' || state === 'paid' ? 'text-[#16A34A]' : 'text-[#667085]')}>{stateLabel(row, state)}</p>
     </div>
   );
 }
@@ -381,7 +385,7 @@ function PayButton({ row, busy, enabled, onPay, className }: { row: Row; busy: s
     <button
       type="button"
       disabled={!enabled || saving}
-      title={enabled ? undefined : row.waitingDelivery ? 'Turns on after delivery' : row.ratePct == null ? 'Set a commission rate first' : 'Waiting for the Razorpay fee'}
+      title={enabled ? undefined : row.settled && money(row.settled) > 0 && money(row.eligible) === 0 ? 'Already paid' : row.waitingDelivery ? 'Turns on after delivery' : row.ratePct == null ? 'Set a commission rate first' : 'Waiting for the Razorpay fee'}
       onClick={(event) => { event.stopPropagation(); if (enabled) onPay(row); }}
       className={cn(
         'rounded-lg px-4 text-[13px] font-semibold',
@@ -391,7 +395,7 @@ function PayButton({ row, busy, enabled, onPay, className }: { row: Row; busy: s
         className,
       )}
     >
-      {saving ? 'Saving…' : 'Pay'}
+      {saving ? 'Saving…' : !enabled && money(row.settled) > 0 && money(row.eligible) === 0 ? 'Paid' : 'Pay'}
     </button>
   );
 }
