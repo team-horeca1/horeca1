@@ -21,6 +21,75 @@ function money(paise: number): string {
   return paiseToRupees(paise);
 }
 
+function kolkataDate(value: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+}
+
+type DatedLine = {
+  orderId: string;
+  status: string;
+  netPayable: { toString(): string };
+  razorpayFeeUnknown: boolean;
+  breakdown: Prisma.JsonValue;
+  order: { deliveredAt: Date | null; createdAt: Date };
+};
+
+function payableDates(lines: DatedLine[]) {
+  const days = new Map<string, {
+    date: string;
+    kind: 'due' | 'wait';
+    orderCount: number;
+    orderIds: string[];
+    eligiblePaise: number;
+    quotePaise: number;
+    feeUnknown: boolean;
+    unconfigured: boolean;
+  }>();
+  for (const line of lines) {
+    if (line.status === 'settled' || line.status === 'closed') continue;
+    const waiting = line.status === 'awaiting_completion' || line.status === 'pending_capture';
+    const at = waiting ? line.order.createdAt : (line.order.deliveredAt ?? line.order.createdAt);
+    const date = kolkataDate(at);
+    const key = `${date}:${waiting ? 'wait' : 'due'}`;
+    const day = days.get(key) ?? {
+      date,
+      kind: waiting ? 'wait' as const : 'due' as const,
+      orderCount: 0,
+      orderIds: [],
+      eligiblePaise: 0,
+      quotePaise: 0,
+      feeUnknown: false,
+      unconfigured: false,
+    };
+    day.orderCount += 1;
+    if (line.status === 'eligible') {
+      day.orderIds.push(line.orderId);
+      day.eligiblePaise += rupeesToPaise(line.netPayable.toString());
+    }
+    if (waiting) day.quotePaise += previewOf(line.status, line.breakdown).netPaise;
+    if (line.status === 'fee_unknown' || line.razorpayFeeUnknown) day.feeUnknown = true;
+    if (line.status === 'commission_unconfigured') day.unconfigured = true;
+    days.set(key, day);
+  }
+  return [...days.values()]
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'due' ? -1 : 1))
+    .map((day) => ({
+      date: day.date,
+      orderCount: day.orderCount,
+      orderIds: day.orderIds,
+      netPaise: day.eligiblePaise > 0 ? day.eligiblePaise : day.quotePaise,
+      payable: day.eligiblePaise > 0,
+      waitingDelivery: day.kind === 'wait',
+      feeUnknown: day.feeUnknown && day.eligiblePaise === 0,
+      unconfigured: day.unconfigured && day.eligiblePaise === 0,
+    }));
+}
+
 function quoteOf(breakdown: Prisma.JsonValue): { feePaise: number; feeUnknown: boolean; commissionPaise: number; netPaise: number } {
   if (!breakdown || typeof breakdown !== 'object' || Array.isArray(breakdown)) {
     return { feePaise: 0, feeUnknown: false, commissionPaise: 0, netPaise: 0 };
@@ -470,7 +539,7 @@ export async function listSupplierPayables(query: PayableListQuery) {
     ? []
     : await prisma.supplierPayableLine.findMany({
       where: { vendorId: { in: vendorIds } },
-      include: { order: { select: { deliveredAt: true, orderNumber: true } } },
+      include: { order: { select: { deliveredAt: true, createdAt: true, orderNumber: true } } },
     });
   const batches = vendorIds.length === 0
     ? []
@@ -527,6 +596,7 @@ export async function listSupplierPayables(query: PayableListQuery) {
       return latest;
     }, undefined);
     const settledPaise = settledBatches.reduce((sum, batch) => sum + rupeesToPaise(batch.netAmount.toString()), 0);
+    const dates = payableDates(own);
     return {
       vendorId: vendor.id,
       supplier: (vendor.displayName?.trim() || vendor.businessName).trim(),
@@ -541,6 +611,8 @@ export async function listSupplierPayables(query: PayableListQuery) {
       commissionPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.commissionAmount.toString()), 0) + preview.commissionPaise,
       shownToPayPaise: Math.max(0, eligibleNetPaise - appliedRecoveryPaise(openRecoveryPaise, eligibleNetPaise)),
       waitingDelivery: own.some((line) => line.status === 'awaiting_completion'),
+      hasUnsettledOrder: own.some((line) => line.status !== 'settled' && line.status !== 'closed'),
+      dates,
       adjustmentPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.aboveCash.toString()), 0),
       outstandingPaise: outstandingPaise(parts, recovery),
       eligiblePaise: eligibleNetPaise,

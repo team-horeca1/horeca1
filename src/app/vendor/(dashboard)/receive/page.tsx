@@ -86,10 +86,10 @@ export default function WhatIReceivePage() {
     { paid: 0, fee: 0, commission: 0, received: 0, waiting: 0 },
   );
 
-  const outcome =
-    totals.waiting > 0
-      ? { label: 'Still to receive', value: totals.waiting }
-      : { label: 'Received', value: totals.received };
+  const hasOpenOrder = lines.some((line) => line.status !== 'settled' && line.status !== 'closed');
+  const outcome = hasOpenOrder
+    ? { label: 'Still to receive', value: totals.waiting }
+    : { label: 'Received', value: totals.received };
 
   function exportCsv() {
     if (lines.length === 0) return;

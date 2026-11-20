@@ -60,7 +60,20 @@ type Row = {
   commission: string;
   unconfigured: boolean;
   waitingDelivery: boolean;
+  hasUnsettledOrder: boolean;
   settled: string;
+  dates: PayDate[];
+};
+
+type PayDate = {
+  date: string;
+  orderCount: number;
+  orderIds: string[];
+  net: string;
+  payable: boolean;
+  waitingDelivery: boolean;
+  feeUnknown: boolean;
+  unconfigured: boolean;
 };
 
 type RowState = 'ready' | 'paid' | 'fee' | 'rate' | 'waiting';
@@ -100,12 +113,13 @@ function rowState(row: Row): RowState {
   if (row.waitingDelivery) return 'waiting';
   if (row.razorpayFeeUnknown) return 'fee';
   if (row.ratePct == null || row.unconfigured) return 'rate';
+  if (row.hasUnsettledOrder) return 'waiting';
   if (money(row.settled) > 0) return 'paid';
   return 'waiting';
 }
 
 function settledClear(row: Row): boolean {
-  return money(row.settled) > 0 && money(row.eligible) === 0;
+  return money(row.settled) > 0 && money(row.eligible) === 0 && !row.hasUnsettledOrder;
 }
 
 function feeText(row: Row): string {
@@ -120,11 +134,46 @@ function toPayText(row: Row, state: RowState): string {
 }
 
 function payTitle(row: Row): string | undefined {
-  if (money(row.eligible) > 0) return undefined;
+  if (money(row.shownToPay) > 0) return undefined;
   if (row.waitingDelivery) return 'Turns on after delivery';
   if (row.ratePct == null || row.unconfigured) return 'Set a commission rate first';
   if (row.razorpayFeeUnknown) return 'Waiting for the Razorpay fee';
+  if (row.hasUnsettledOrder) return 'Turns on when this order can be paid';
   return 'Nothing to pay';
+}
+
+function formatPayDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  if (!year || !month || !day) return isoDate;
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function dateTitle(day: PayDate): string | undefined {
+  if (day.payable) return undefined;
+  if (day.waitingDelivery) return 'Turns on after delivery';
+  if (day.unconfigured) return 'Set a commission rate first';
+  if (day.feeUnknown) return 'Waiting for the Razorpay fee';
+  return 'Turns on when this order can be paid';
+}
+
+function dateLabel(day: PayDate): string {
+  if (day.payable) return 'Delivered';
+  if (day.waitingDelivery) return 'Not delivered';
+  if (day.unconfigured) return 'No rate';
+  if (day.feeUnknown) return 'Fee missing';
+  return 'Not yet';
+}
+
+function dateTone(day: PayDate): PillTone {
+  if (day.payable) return 'ready';
+  if (day.unconfigured) return 'danger';
+  if (day.feeUnknown) return 'warn';
+  return 'muted';
 }
 
 function resolvedSort(status: string, sortKey: SortKey): string {
@@ -188,6 +237,8 @@ export function PayablesDashboard() {
     code: string | null;
     vendorId: string;
     net: string;
+    orderIds?: string[];
+    scope: string;
     utr: string;
     note: string;
     notice: string;
@@ -255,6 +306,7 @@ export function PayablesDashboard() {
           utr: guide.utr.trim(),
           note: guide.note.trim(),
           amount: guide.net,
+          ...(guide.orderIds?.length ? { orderIds: guide.orderIds } : {}),
         }),
       });
       const json = await res.json();
@@ -337,12 +389,16 @@ export function PayablesDashboard() {
     router.push(`/admin/finance/payables/${vendorId}`);
   }
 
-  function pay(row: Row) {
+  function pay(row: Row, day?: PayDate) {
     setGuide({
       supplier: row.supplier,
       code: row.supplierCode,
       vendorId: row.vendorId,
-      net: row.shownToPay,
+      net: day ? day.net : row.shownToPay,
+      orderIds: day?.orderIds,
+      scope: day
+        ? `${formatPayDate(day.date)} · ${day.orderCount} order${day.orderCount === 1 ? '' : 's'}`
+        : 'All delivered orders that are ready',
       utr: '',
       note: '',
       notice: '',
@@ -371,8 +427,8 @@ export function PayablesDashboard() {
             Pay suppliers
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#667085]">
-            The customer pays, Razorpay takes its fee, Horeca1 keeps the commission, and what is
-            left is what you transfer. We do not call the bank.
+            The supplier comes first. Dates underneath are what is still to pay. Pay is visible
+            before delivery and turns on after delivery. Pay together settles every ready order.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
@@ -634,46 +690,61 @@ export function PayablesDashboard() {
             <ul className="divide-y divide-[#E9E3DD]">
               {rows.map((row) => {
                 const state = rowState(row);
+                const dates = row.dates ?? [];
                 return (
-                  <li
-                    key={row.vendorId}
-                    onClick={(event) => openSupplier(event, row.vendorId)}
-                    className="cursor-pointer p-4 transition-colors hover:bg-[#FAF7F2]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <SupplierIdentity row={row} state={state} />
-                      <div className="text-right">
-                        <span className="block text-[11px] font-medium text-[#667085]">To pay</span>
-                        <p
-                          className={cn(
-                            'text-base font-bold tabular-nums',
-                            state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]',
-                          )}
-                        >
-                          {toPayText(row, state)}
-                        </p>
+                  <li key={row.vendorId} className="p-4">
+                    <div
+                      onClick={(event) => openSupplier(event, row.vendorId)}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <SupplierIdentity row={row} state={state} />
+                        <div className="text-right">
+                          <span className="block text-[11px] font-medium text-[#667085]">To pay</span>
+                          <p
+                            className={cn(
+                              'text-base font-bold tabular-nums',
+                              state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]',
+                            )}
+                          >
+                            {toPayText(row, state)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="mt-3.5 grid grid-cols-2 gap-2 rounded-xl bg-[#FAF7F2] p-3 text-xs">
-                      <MoneyItem label="Customer paid" value={inr(row.eligibleSale)} />
-                      <MoneyItem label="Razorpay fee" value={feeText(row)} />
-                      <MoneyItem
-                        label="Commission"
-                        value={row.ratePct == null ? '—' : inr(row.commission)}
-                      />
-                      <MoneyItem
-                        label="Rate"
-                        value={row.ratePct == null ? '—' : `${row.ratePct}%`}
+                      <PayButton
+                        row={row}
+                        busy={busy}
+                        onPay={pay}
+                        label={dates.length > 1 ? 'Pay together' : 'Pay'}
+                        className="mt-3.5 h-11 w-full justify-center"
                       />
                     </div>
-
-                    <PayButton
-                      row={row}
-                      busy={busy}
-                      onPay={pay}
-                      className="mt-3.5 h-11 w-full justify-center"
-                    />
+                    {dates.length > 0 ? (
+                      <ul className="mt-3 space-y-2 border-l-2 border-[#F3D7DE] pl-3">
+                        {dates.map((day) => (
+                          <li key={`${day.date}-${day.waitingDelivery}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F2] px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold tabular-nums">{formatPayDate(day.date)}</p>
+                              <p className="text-[11px] text-[#667085]">
+                                {day.orderCount} order{day.orderCount === 1 ? '' : 's'}
+                              </p>
+                              <StatusPill tone={dateTone(day)}>{dateLabel(day)}</StatusPill>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold tabular-nums text-[#1C1C1C]">{money(day.net) > 0 ? inr(day.net) : '—'}</p>
+                              <ActionButton
+                                label="Pay"
+                                enabled={day.payable}
+                                busy={busy === row.vendorId}
+                                title={dateTitle(day)}
+                                onClick={() => pay(row, day)}
+                                className="mt-1.5 h-9"
+                              />
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </li>
                 );
               })}
@@ -713,42 +784,76 @@ export function PayablesDashboard() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E9E3DD]">
+                <tbody>
                   {rows.map((row) => {
                     const state = rowState(row);
+                    const dates = row.dates ?? [];
                     return (
-                      <tr
-                        key={row.vendorId}
-                        onClick={(event) => openSupplier(event, row.vendorId)}
-                        className="cursor-pointer transition-colors duration-100 hover:bg-[#FAF7F2]/70"
-                      >
-                        <td className="px-5 py-3.5">
-                          <SupplierIdentity row={row} state={state} />
-                        </td>
-                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums font-medium text-[#667085]">
-                          {row.ratePct == null ? '—' : `${row.ratePct}%`}
-                        </td>
-                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#1C1C1C]">
-                          {inr(row.eligibleSale)}
-                        </td>
-                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#667085]">
-                          {feeText(row)}
-                        </td>
-                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#667085]">
-                          {row.ratePct == null ? '—' : inr(row.commission)}
-                        </td>
-                        <td
-                          className={cn(
-                            'whitespace-nowrap px-3.5 py-3.5 text-right font-bold tabular-nums text-sm',
-                            state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]',
-                          )}
+                      <React.Fragment key={row.vendorId}>
+                        <tr
+                          onClick={(event) => openSupplier(event, row.vendorId)}
+                          className="cursor-pointer border-t border-[#E9E3DD] transition-colors duration-100 hover:bg-[#FAF7F2]/70"
                         >
-                          {toPayText(row, state)}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <PayButton row={row} busy={busy} onPay={pay} className="h-9" />
-                        </td>
-                      </tr>
+                          <td className="px-5 py-3.5">
+                            <SupplierIdentity row={row} state={state} />
+                          </td>
+                          <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums font-medium text-[#667085]">
+                            {row.ratePct == null ? '—' : `${row.ratePct}%`}
+                          </td>
+                          <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#1C1C1C]">
+                            {inr(row.eligibleSale)}
+                          </td>
+                          <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#667085]">
+                            {feeText(row)}
+                          </td>
+                          <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#667085]">
+                            {row.ratePct == null ? '—' : inr(row.commission)}
+                          </td>
+                          <td
+                            className={cn(
+                              'whitespace-nowrap px-3.5 py-3.5 text-right font-bold tabular-nums text-sm',
+                              state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]',
+                            )}
+                          >
+                            {toPayText(row, state)}
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <PayButton
+                              row={row}
+                              busy={busy}
+                              onPay={pay}
+                              label={dates.length > 1 ? 'Pay together' : 'Pay'}
+                              className="h-9"
+                            />
+                          </td>
+                        </tr>
+                        {dates.map((day) => (
+                          <tr key={`${row.vendorId}-${day.date}-${day.waitingDelivery}`} className="bg-[#FAF7F2]/70">
+                            <td className="border-l-2 border-[#F3D7DE] py-2.5 pl-12 pr-5">
+                              <p className="font-semibold text-[#1C1C1C]">{formatPayDate(day.date)}</p>
+                              <p className="text-[11px] text-[#667085]">
+                                {day.orderCount} order{day.orderCount === 1 ? '' : 's'}
+                              </p>
+                            </td>
+                            <td className="px-3.5 py-2.5" colSpan={4}>
+                              <StatusPill tone={dateTone(day)}>{dateLabel(day)}</StatusPill>
+                            </td>
+                            <td className="whitespace-nowrap px-3.5 py-2.5 text-right font-semibold tabular-nums text-[#1C1C1C]">
+                              {money(day.net) > 0 ? inr(day.net) : '—'}
+                            </td>
+                            <td className="px-5 py-2.5 text-right">
+                              <ActionButton
+                                label="Pay"
+                                enabled={day.payable}
+                                busy={busy === row.vendorId}
+                                title={dateTitle(day)}
+                                onClick={() => pay(row, day)}
+                                className="h-9"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -799,7 +904,7 @@ export function PayablesDashboard() {
             <div className="mt-4 rounded-xl border border-[#F3D7DE] bg-gradient-to-br from-[#FAF0F3] to-[#FDF6F8] p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-[#6B1D2E]/80">Amount to Transfer</p>
-                <p className="text-xs text-[#667085] mt-0.5">Recorded against eligible orders</p>
+                <p className="text-xs text-[#667085] mt-0.5">{guide.scope}</p>
               </div>
               <p className="text-2xl font-bold tabular-nums text-[#6B1D2E] tracking-tight">
                 {inr(guide.net)}
@@ -965,60 +1070,103 @@ function MoneyItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PayButton({
-  row,
+function PaidMark({ className }: { className?: string }) {
+  return (
+    <span
+      onClick={(event) => event.stopPropagation()}
+      className={cn(
+        'inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 select-none',
+        className,
+      )}
+    >
+      <Check size={13} aria-hidden />
+      Paid
+    </span>
+  );
+}
+
+function ActionButton({
+  label,
+  enabled,
   busy,
-  onPay,
+  title,
+  onClick,
   className,
 }: {
-  row: Row;
-  busy: string;
-  onPay: (row: Row) => void;
+  label: string;
+  enabled: boolean;
+  busy: boolean;
+  title?: string;
+  onClick: () => void;
   className?: string;
 }) {
-  const saving = busy === row.vendorId;
-  const enabled = money(row.eligible) > 0 && !saving;
-  if (!saving && settledClear(row)) {
-    return (
-      <span
-        onClick={(event) => event.stopPropagation()}
-        className={cn(
-          'inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 select-none',
-          className,
-        )}
-      >
-        <Check size={13} aria-hidden />
-        Paid
-      </span>
-    );
-  }
+  const on = enabled && !busy;
   return (
     <button
       type="button"
-      disabled={!enabled}
-      title={enabled ? undefined : payTitle(row)}
+      disabled={!on}
+      title={on ? undefined : title}
       onClick={(event) => {
         event.stopPropagation();
-        if (enabled) onPay(row);
+        if (on) onClick();
       }}
       className={cn(
         'inline-flex items-center justify-center rounded-xl px-4 py-1.5 text-xs font-semibold transition-all duration-150',
         focusRing,
-        enabled
+        on
           ? 'bg-[#6B1D2E] text-white shadow-xs hover:bg-[#5A1926] hover:shadow-sm'
           : 'cursor-not-allowed bg-zinc-100 text-zinc-400 border border-zinc-200/60',
         className,
       )}
     >
-      {saving ? (
+      {busy ? (
         <span className="flex items-center gap-1.5">
           <Loader2 className="animate-spin" size={13} />
           Saving…
         </span>
       ) : (
-        'Pay'
+        label
       )}
     </button>
+  );
+}
+
+function PayButton({
+  row,
+  busy,
+  onPay,
+  label,
+  className,
+}: {
+  row: Row;
+  busy: string;
+  onPay: (row: Row, day?: PayDate) => void;
+  label: string;
+  className?: string;
+}) {
+  const saving = busy === row.vendorId;
+  if (!saving && settledClear(row)) return <PaidMark className={className} />;
+  if ((row.dates ?? []).length === 0 && money(row.shownToPay) === 0 && money(row.settled) === 0) {
+    return (
+      <ActionButton
+        label="Pay"
+        enabled={false}
+        busy={false}
+        title={payTitle(row)}
+        onClick={() => undefined}
+        className={className}
+      />
+    );
+  }
+  return (
+    <ActionButton
+      label={label}
+      enabled={money(row.shownToPay) > 0}
+      busy={saving}
+      title={payTitle(row)}
+      onClick={() => onPay(row)}
+      className={className}
+    />
   );
 }
 

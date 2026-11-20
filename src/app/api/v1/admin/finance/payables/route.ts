@@ -53,6 +53,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           shownToPay: paiseToRupees(row.shownToPayPaise),
           onHold: paiseToRupees(row.onHoldPaise),
           settled: paiseToRupees(row.settledPaise),
+          dates: row.dates.map((day) => ({
+            date: day.date,
+            orderCount: day.orderCount,
+            orderIds: day.orderIds,
+            net: paiseToRupees(day.netPaise),
+            payable: day.payable,
+            waitingDelivery: day.waitingDelivery,
+            feeUnknown: day.feeUnknown,
+            unconfigured: day.unconfigured,
+          })),
         })),
       },
     });
@@ -81,6 +91,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         utr: body.utr,
         note: body.note,
         expectedNet: body.amount,
+        orderIds: body.orderIds,
       });
       void logAction(ctx, req, {
         action: AUDIT_ACTIONS.supplierSettlementSettle,

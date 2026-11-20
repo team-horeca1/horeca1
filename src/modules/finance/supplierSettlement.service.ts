@@ -358,12 +358,17 @@ export async function paySupplierNow(input: {
   utr: string;
   note: string;
   expectedNet?: string;
+  orderIds?: string[];
 }) {
   const note = input.note.trim();
   if (note.length < 3) throw Errors.badRequest('Add a short note');
   // Pay the lines that are eligible now. An older open batch is a separate
   // settlement and must not be marked paid in place of those lines.
-  const draft = await createFinanceDraft({ vendorId: input.vendorId, actorId: input.actorId });
+  const draft = await createFinanceDraft({
+    vendorId: input.vendorId,
+    actorId: input.actorId,
+    orderIds: input.orderIds,
+  });
   const batchId = draft.batch.id;
   if (input.expectedNet != null) {
     const expected = rupeesToPaise(input.expectedNet);
