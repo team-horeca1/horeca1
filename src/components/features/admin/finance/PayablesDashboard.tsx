@@ -67,7 +67,7 @@ type Row = {
 
 type PayDate = {
   date: string;
-  orderCount: number;
+  orderNumber: string;
   orderIds: string[];
   net: string;
   payable: boolean;
@@ -131,15 +131,6 @@ function toPayText(row: Row, state: RowState): string {
   if (state === 'paid') return inr(row.settled);
   if (state === 'ready' || money(row.shownToPay) > 0) return inr(row.shownToPay);
   return '—';
-}
-
-function payTitle(row: Row): string | undefined {
-  if (money(row.shownToPay) > 0) return undefined;
-  if (row.waitingDelivery) return 'Turns on after delivery';
-  if (row.ratePct == null || row.unconfigured) return 'Set a commission rate first';
-  if (row.razorpayFeeUnknown) return 'Waiting for the Razorpay fee';
-  if (row.hasUnsettledOrder) return 'Turns on when this order can be paid';
-  return 'Nothing to pay';
 }
 
 function formatPayDate(isoDate: string): string {
@@ -384,7 +375,7 @@ export function PayablesDashboard() {
       net: day ? day.net : row.shownToPay,
       orderIds: day?.orderIds,
       scope: day
-        ? `${formatPayDate(day.date)} · ${day.orderCount} order${day.orderCount === 1 ? '' : 's'}`
+        ? `${formatPayDate(day.date)} · ${day.orderNumber}`
         : 'All delivered orders that are ready',
       utr: '',
       note: '',
@@ -414,7 +405,7 @@ export function PayablesDashboard() {
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#667085]">
             The supplier comes first. Open the arrow to see the dates still to pay, and close it
-            when you are done. Pay turns on after delivery. Pay together settles every ready date.
+            when you are done. Each order is paid on its own row. Pay turns on after delivery.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
@@ -689,22 +680,23 @@ export function PayablesDashboard() {
                           </p>
                         </div>
                       </div>
-                      <PayButton
-                        row={row}
-                        busy={busy}
-                        onPay={pay}
-                        label={dates.length > 1 ? 'Pay together' : 'Pay'}
-                        className="mt-3.5 h-11 w-full justify-center"
-                      />
+                      {dates.length === 0 ? (
+                        <PayButton
+                          row={row}
+                          busy={busy}
+                          onPay={pay}
+                          className="mt-3.5 h-11 w-full justify-center"
+                        />
+                      ) : null}
                     </div>
                     {open && dates.length > 0 ? (
                       <ul className="mt-3 space-y-2 border-l-2 border-[#F3D7DE] pl-3">
                         {dates.map((day) => (
-                          <li key={`${day.date}-${day.waitingDelivery}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F2] px-3 py-2.5">
+                          <li key={day.orderNumber} className="flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F2] px-3 py-2.5">
                             <div className="min-w-0">
                               <p className="text-sm font-semibold tabular-nums">{formatPayDate(day.date)}</p>
                               <p className="text-[11px] text-[#667085]">
-                                {day.orderCount} order{day.orderCount === 1 ? '' : 's'}
+                                {day.orderNumber}
                               </p>
                               <StatusPill tone={dateTone(day)}>{dateLabel(day)}</StatusPill>
                             </div>
@@ -804,21 +796,17 @@ export function PayablesDashboard() {
                             {toPayText(row, state)}
                           </td>
                           <td className="px-5 py-3.5 text-right">
-                            <PayButton
-                              row={row}
-                              busy={busy}
-                              onPay={pay}
-                              label={dates.length > 1 ? 'Pay together' : 'Pay'}
-                              className="h-9"
-                            />
+                            {dates.length === 0 ? (
+                              <PayButton row={row} busy={busy} onPay={pay} className="h-9" />
+                            ) : null}
                           </td>
                         </tr>
                         {open ? dates.map((day) => (
-                          <tr key={`${row.vendorId}-${day.date}-${day.waitingDelivery}`} className="bg-[#FAF7F2]/70">
+                          <tr key={`${row.vendorId}-${day.orderNumber}`} className="bg-[#FAF7F2]/70">
                             <td className="border-l-2 border-[#F3D7DE] py-2.5 pl-12 pr-5">
                               <p className="font-semibold text-[#1C1C1C]">{formatPayDate(day.date)}</p>
                               <p className="text-[11px] text-[#667085]">
-                                {day.orderCount} order{day.orderCount === 1 ? '' : 's'}
+                                {day.orderNumber}
                               </p>
                             </td>
                             <td className="px-3.5 py-2.5" colSpan={4}>
@@ -1155,35 +1143,21 @@ function PayButton({
   row,
   busy,
   onPay,
-  label,
   className,
 }: {
   row: Row;
   busy: string;
   onPay: (row: Row, day?: PayDate) => void;
-  label: string;
   className?: string;
 }) {
   const saving = busy === row.vendorId;
   if (!saving && settledClear(row)) return <PaidMark className={className} />;
-  if ((row.dates ?? []).length === 0 && money(row.shownToPay) === 0 && money(row.settled) === 0) {
-    return (
-      <ActionButton
-        label="Pay"
-        enabled={false}
-        busy={false}
-        title={payTitle(row)}
-        onClick={() => undefined}
-        className={className}
-      />
-    );
-  }
+  if ((row.dates ?? []).length > 0 || money(row.shownToPay) === 0) return null;
   return (
     <ActionButton
-      label={label}
-      enabled={money(row.shownToPay) > 0}
+      label="Pay"
+      enabled
       busy={saving}
-      title={payTitle(row)}
       onClick={() => onPay(row)}
       className={className}
     />

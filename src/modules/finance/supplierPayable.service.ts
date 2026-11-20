@@ -36,58 +36,29 @@ type DatedLine = {
   netPayable: { toString(): string };
   razorpayFeeUnknown: boolean;
   breakdown: Prisma.JsonValue;
-  order: { deliveredAt: Date | null; createdAt: Date };
+  order: { deliveredAt: Date | null; createdAt: Date; orderNumber: string };
 };
 
 function payableDates(lines: DatedLine[]) {
-  const days = new Map<string, {
-    date: string;
-    kind: 'due' | 'wait';
-    orderCount: number;
-    orderIds: string[];
-    eligiblePaise: number;
-    quotePaise: number;
-    feeUnknown: boolean;
-    unconfigured: boolean;
-  }>();
-  for (const line of lines) {
-    if (line.status === 'settled' || line.status === 'closed') continue;
-    const waiting = line.status === 'awaiting_completion' || line.status === 'pending_capture';
-    const at = waiting ? line.order.createdAt : (line.order.deliveredAt ?? line.order.createdAt);
-    const date = kolkataDate(at);
-    const key = `${date}:${waiting ? 'wait' : 'due'}`;
-    const day = days.get(key) ?? {
-      date,
-      kind: waiting ? 'wait' as const : 'due' as const,
-      orderCount: 0,
-      orderIds: [],
-      eligiblePaise: 0,
-      quotePaise: 0,
-      feeUnknown: false,
-      unconfigured: false,
-    };
-    day.orderCount += 1;
-    if (line.status === 'eligible') {
-      day.orderIds.push(line.orderId);
-      day.eligiblePaise += rupeesToPaise(line.netPayable.toString());
-    }
-    if (waiting) day.quotePaise += previewOf(line.status, line.breakdown).netPaise;
-    if (line.status === 'fee_unknown' || line.razorpayFeeUnknown) day.feeUnknown = true;
-    if (line.status === 'commission_unconfigured') day.unconfigured = true;
-    days.set(key, day);
-  }
-  return [...days.values()]
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'due' ? -1 : 1))
-    .map((day) => ({
-      date: day.date,
-      orderCount: day.orderCount,
-      orderIds: day.orderIds,
-      netPaise: day.eligiblePaise > 0 ? day.eligiblePaise : day.quotePaise,
-      payable: day.eligiblePaise > 0,
-      waitingDelivery: day.kind === 'wait',
-      feeUnknown: day.feeUnknown && day.eligiblePaise === 0,
-      unconfigured: day.unconfigured && day.eligiblePaise === 0,
-    }));
+  return lines
+    .filter((line) => line.status !== 'settled' && line.status !== 'closed')
+    .map((line) => {
+      const waiting = line.status === 'awaiting_completion' || line.status === 'pending_capture';
+      const at = waiting ? line.order.createdAt : (line.order.deliveredAt ?? line.order.createdAt);
+      const eligible = line.status === 'eligible';
+      const quote = waiting ? previewOf(line.status, line.breakdown).netPaise : 0;
+      return {
+        date: kolkataDate(at),
+        orderNumber: line.order.orderNumber,
+        orderIds: eligible ? [line.orderId] : [],
+        netPaise: eligible ? rupeesToPaise(line.netPayable.toString()) : quote,
+        payable: eligible,
+        waitingDelivery: waiting,
+        feeUnknown: !eligible && (line.status === 'fee_unknown' || line.razorpayFeeUnknown),
+        unconfigured: !eligible && line.status === 'commission_unconfigured',
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.orderNumber.localeCompare(b.orderNumber));
 }
 
 function quoteOf(breakdown: Prisma.JsonValue): { feePaise: number; feeUnknown: boolean; commissionPaise: number; netPaise: number } {

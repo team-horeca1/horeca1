@@ -55,7 +55,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           settled: paiseToRupees(row.settledPaise),
           dates: row.dates.map((day) => ({
             date: day.date,
-            orderCount: day.orderCount,
+            orderNumber: day.orderNumber,
             orderIds: day.orderIds,
             net: paiseToRupees(day.netPaise),
             payable: day.payable,
