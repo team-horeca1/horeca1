@@ -113,7 +113,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
             ? 'This supplier stays marked Commission not configured. Payables are not finalised at 0%.'
             : mode === 'zero'
               ? '0% is a real rate. Delivered, captured orders can be settled with no commission.'
-              : 'This rate applies to new recognition. Lines already snapshotted keep their earlier rate.'}
+              : 'This rate applies to every order that has not been paid yet. Settled orders keep the rate they were paid with.'}
         </p>
         <button
           type="button"

@@ -71,10 +71,11 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         return NextResponse.json({ success: true, data: { rows: data, period } });
       }
 
+      const orderCount = data.reduce((sum, row) => sum + row.orderCount, 0);
       const platformRevenue = data.reduce((s, r) => s + r.platformFee, 0);
       const totalGmv = data.reduce((s, r) => s + r.gross, 0);
 
-      const [returnsCount, settlementsPending] = await Promise.all([
+      const [returnsCount, settlementsPending, dailyRaw] = await Promise.all([
         prisma.returnRequest.count({
           where: { createdAt: { gte: start }, status: 'refunded' },
         }),
@@ -83,6 +84,17 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           _sum: { netAmount: true },
           _count: { id: true },
         }),
+        prisma.$queryRaw<Array<{ day: Date; sales: number; orders: number }>>`
+          SELECT
+            (delivered_at AT TIME ZONE 'Asia/Kolkata')::date AS day,
+            COALESCE(SUM(total_amount), 0)::float AS sales,
+            COUNT(*)::int AS orders
+          FROM orders
+          WHERE status = 'delivered'
+            AND delivered_at >= ${start}
+          GROUP BY 1
+          ORDER BY 1 ASC
+        `,
       ]);
 
       const monthlyRaw = await prisma.$queryRaw<Array<{ month: string; gmv: number; fees: number }>>`
@@ -103,6 +115,8 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           period,
           summary: {
             totalGmv,
+            orderCount,
+            averageOrder: orderCount > 0 ? totalGmv / orderCount : 0,
             platformRevenue,
             returnsRefunded: returnsCount,
             pendingSettlements: Number(settlementsPending._sum.netAmount ?? 0),
@@ -110,6 +124,11 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           },
           salesByVendor: data.slice(0, 10),
           monthlyTrend: monthlyRaw.map((r) => ({ name: r.month, gmv: Number(r.gmv), fees: Number(r.fees) })),
+          dailyTrend: dailyRaw.map((row) => ({
+            name: new Date(row.day).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+            sales: Number(row.sales),
+            orders: Number(row.orders),
+          })),
         },
       });
     }

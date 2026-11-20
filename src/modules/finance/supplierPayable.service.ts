@@ -92,23 +92,6 @@ function paymentInputs(payments: Array<{ amount: { toString(): string }; status:
   }));
 }
 
-async function agreementRate(
-  db: Db,
-  vendorId: string,
-  at: Date,
-): Promise<string | null> {
-  const row = await db.supplierCommissionAgreement.findFirst({
-    where: {
-      vendorId,
-      effectiveFrom: { lte: at },
-      OR: [{ effectiveTo: null }, { effectiveTo: { gt: at } }],
-    },
-    orderBy: { effectiveFrom: 'desc' },
-    select: { ratePct: true },
-  });
-  return row ? row.ratePct.toString() : null;
-}
-
 async function currentVendorRate(db: Db, vendorId: string): Promise<string | null> {
   const vendor = await db.vendor.findUnique({
     where: { id: vendorId },
@@ -174,14 +157,15 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
   const locked = existing?.batch?.status === 'finalised' || existing?.batch?.status === 'settled' || existing?.status === 'settled';
   const refunds = processedRefunds(order);
   const manual = await manualPaise(db, orderId);
-  const asOf = order.deliveredAt ?? new Date();
   const snapshottedAt = existing?.rateSnapshottedAt ?? null;
-  const liveRate = resolvePayableRate({
-    snapshottedAt,
-    snapshottedRate: existing?.commissionRatePct == null ? null : existing.commissionRatePct.toString(),
-    rateAtDelivery: snapshottedAt ? null : await agreementRate(db, order.vendorId, asOf),
-    currentRate: snapshottedAt ? null : await currentVendorRate(db, order.vendorId),
-  });
+  const liveRate = locked
+    ? resolvePayableRate({
+      snapshottedAt,
+      snapshottedRate: existing?.commissionRatePct == null ? null : existing.commissionRatePct.toString(),
+      rateAtDelivery: null,
+      currentRate: null,
+    })
+    : await currentVendorRate(db, order.vendorId);
   const openHold = (existing?.holds.length ?? 0) > 0;
   const batchOpen = existing?.batch != null && (existing.batch.status === 'draft' || existing.batch.status === 'in_review');
 
@@ -259,12 +243,8 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
     },
     update: {
       ...data,
-      ...(existing?.rateSnapshottedAt
-        ? {}
-        : {
-          commissionRatePct: liveRate,
-          rateSnapshottedAt: snapshotRate ? new Date() : null,
-        }),
+      commissionRatePct: liveRate,
+      rateSnapshottedAt: snapshotRate ? new Date() : null,
     },
   });
 

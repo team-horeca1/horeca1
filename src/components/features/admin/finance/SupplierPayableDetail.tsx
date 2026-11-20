@@ -6,7 +6,6 @@ import {
   Download,
   Loader2,
   ArrowLeft,
-  Settings,
   Info,
   AlertCircle,
   FileText,
@@ -21,6 +20,7 @@ import {
   CreditCard,
   Percent,
 } from 'lucide-react';
+import { AdminVendorPlatformFee } from '@/components/features/admin/AdminVendorPlatformFee';
 import { cn } from '@/lib/utils';
 import {
   focusRing,
@@ -175,6 +175,7 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
   const [q, setQ] = useState('');
   const [reason, setReason] = useState('');
   const [tab, setTab] = useState<TabId>('orders');
+  const [globalDefaultPct, setGlobalDefaultPct] = useState(5);
   const [openId, setOpenId] = useState<string | null>(null);
   const [holding, setHolding] = useState('');
 
@@ -192,6 +193,16 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    fetch('/api/v1/admin/settings', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const pct = json?.data?.defaultCommissionPct;
+        if (pct != null) setGlobalDefaultPct(Number(pct));
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function hold(lineId: string, action: 'hold' | 'release') {
     if (action === 'hold' && reason.trim().length < 8) {
@@ -215,21 +226,6 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
     } finally {
       setHolding('');
     }
-  }
-
-  async function setCycle(settlementCycle: 'manual' | 'weekly') {
-    setActionError('');
-    const res = await fetch(`/api/v1/admin/finance/payables/${vendorId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ settlementCycle }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setActionError(json?.error?.message ?? 'Could not change the cycle');
-      return;
-    }
-    await load();
   }
 
   if (error)
@@ -320,37 +316,19 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
                 ) : (
                   <StatusPill tone="ready">{data.vendor.platformFeePct}% Commission</StatusPill>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setTab('history')}
+                  className={cn('font-semibold text-[#6B1D2E] hover:underline', focusRing)}
+                >
+                  Edit commission
+                </button>
               </div>
             </div>
           </div>
 
           {/* Controls & Statement Action */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            {/* Settlement cycle widget */}
-            <div className="flex items-center gap-3 rounded-xl border border-[#E9E3DD] bg-[#FAF7F2]/60 px-3.5 py-2">
-              <Settings size={16} className="text-[#6B1D2E] shrink-0" />
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#667085]">
-                  Settlement cycle
-                </label>
-                <select
-                  aria-label="Settlement cycle"
-                  value={data.vendor.settlementCycle}
-                  onChange={(event) =>
-                    void setCycle(event.target.value as 'manual' | 'weekly')
-                  }
-                  className={cn(
-                    'mt-0.5 bg-transparent text-xs font-semibold text-[#1C1C1C] outline-none cursor-pointer',
-                    focusRing,
-                  )}
-                >
-                  <option value="manual">Manual</option>
-                  <option value="weekly">Weekly draft only</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Download Statement */}
             <a
               href={`/api/v1/admin/finance/payables/${vendorId}/statement`}
               className={cn(
@@ -368,8 +346,8 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-900 leading-relaxed">
           <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
           <span>
-            Commission uses tax-inclusive subtotal. A captured amount is not payable until the
-            order is delivered. Weekly only prepares a draft. It does not transfer money.
+            Commission uses the tax-inclusive subtotal. A captured amount is not payable until the
+            order is delivered. Unpaid orders use the commission saved here.
           </span>
         </div>
       </div>
@@ -657,8 +635,16 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
         >
           <h2 className="text-sm font-bold text-[#1C1C1C]">Commission history</h2>
           <p className="mt-1 text-xs text-[#667085]">
-            Changes to the supplier rate are recorded with effective dates and reason.
+            The rate below is the same commission as the supplier page. It applies to orders that are not paid yet.
           </p>
+          <div className="mt-4">
+            <AdminVendorPlatformFee
+              vendorId={vendorId}
+              platformFeePct={data.vendor.platformFeePct == null ? null : Number(data.vendor.platformFeePct)}
+              globalDefaultPct={globalDefaultPct}
+              onSaved={() => { void load(); }}
+            />
+          </div>
           {data.agreements.length === 0 ? (
             <p className="mt-4 rounded-xl border border-dashed border-[#E9E3DD] p-8 text-center text-xs text-[#667085]">
               No rate has been set. A blank rate is not 0%.

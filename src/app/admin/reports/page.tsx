@@ -1,14 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { BarChart3, Download, Loader2, TrendingUp } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { FinanceSummaryStrip } from '@/components/features/finance/FinanceSummaryStrip';
+import React, { useEffect, useState } from 'react';
+import { Download, IndianRupee, Loader2, ShoppingBag, TrendingUp } from 'lucide-react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { cn } from '@/lib/utils';
+import { FinanceKpiCard, focusRing, inr } from '@/components/features/finance/financeChrome';
 
 interface OverviewData {
   period: string;
   summary: {
     totalGmv: number;
+    orderCount: number;
+    averageOrder: number;
     platformRevenue: number;
     returnsRefunded: number;
     pendingSettlements: number;
@@ -17,158 +30,159 @@ interface OverviewData {
     vendorName: string;
     orderCount: number;
     gross: number;
-    platformFee: number;
-    netVendor: number;
   }>;
-  monthlyTrend: Array<{ name: string; gmv: number; fees: number }>;
+  dailyTrend: Array<{ name: string; sales: number; orders: number }>;
 }
 
-const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const PERIODS = [
+  { id: '7d', label: '7 days' },
+  { id: '30d', label: '30 days' },
+  { id: '90d', label: '90 days' },
+] as const;
 
 export default function AdminReportsPage() {
-  const [period, setPeriod] = useState('30d');
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>('30d');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<OverviewData | null>(null);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/v1/admin/reports?period=${period}`)
-      .then((r) => r.json())
+      .then((res) => res.json())
       .then((json) => { if (json.success) setData(json.data); })
       .finally(() => setLoading(false));
   }, [period]);
 
-  const exportCsv = (type: string) => {
-    window.open(`/api/v1/admin/reports?type=${type}&period=${period}&format=csv`, '_blank');
-  };
+  const orders = data?.summary.orderCount ?? 0;
+  const sales = data?.summary.totalGmv ?? 0;
+  const average = orders > 0 ? sales / orders : 0;
 
   return (
-    <div className="space-y-6 pb-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 pb-12 text-[#1C1C1C]">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-[clamp(1.25rem,2vw+0.75rem,1.75rem)] font-bold text-[#181725]">Sales reports</h1>
-          <p className="text-[12px] text-[#7C7C7C]">How much was sold. This is not the page for paying suppliers.</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Sales reports</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#667085]">
+            Delivered sales for the period. This page is not used to pay suppliers.
+          </p>
         </div>
-        <div className="flex gap-2">
-          {(['7d', '30d', '90d'] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPeriod(p)}
-              className={`min-h-12 min-w-12 px-4 rounded-full text-[13px] font-semibold ${period === p ? 'bg-primary text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C]'}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#6B1D2E]" size={32} /></div>
-      ) : data && (
-        <>
-          <FinanceSummaryStrip
-            metrics={[
-              { label: 'GMV delivered', value: inr(data.summary.totalGmv) },
-              {
-                label: 'Platform revenue',
-                value: inr(data.summary.platformRevenue),
-                accent: 'green',
-                footnote: data.summary.totalGmv > 0 && data.summary.platformRevenue === 0
-                  ? 'Fees accrue when COD/prepaid orders are delivered'
-                  : undefined,
-              },
-              { label: 'Returns processed', value: String(data.summary.returnsRefunded) },
-              { label: 'Pending payouts', value: inr(data.summary.pendingSettlements), accent: 'amber' },
-            ]}
-          />
-
-          {data.summary.totalGmv > 0 && data.summary.platformRevenue === 0 && (
-            <p className="text-[12px] text-[#7C7C7C]">
-              GMV includes all delivered orders; platform fees only apply to COD and prepaid orders after delivery settlement.
-            </p>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {[
-              { type: 'sales_by_vendor', label: 'Sales by vendor', desc: 'Gross, fees, net per vendor' },
-              { type: 'settlements', label: 'Settlements', desc: 'Payout batches and status' },
-              { type: 'returns', label: 'Returns summary', desc: 'Refund requests and amounts' },
-            ].map((card) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl border border-[#E9E3DD] bg-white p-1" role="group" aria-label="Period">
+            {PERIODS.map((item) => (
               <button
-                key={card.type}
+                key={item.id}
                 type="button"
-                onClick={() => exportCsv(card.type)}
-                className="text-left bg-white rounded-[14px] border border-[#EEEEEE] p-5 hover:border-[#6B1D2E]/40 transition-colors"
+                aria-pressed={period === item.id}
+                onClick={() => setPeriod(item.id)}
+                className={cn(
+                  'h-9 rounded-lg px-3 text-xs font-semibold',
+                  focusRing,
+                  period === item.id ? 'bg-[#6B1D2E] text-white' : 'text-[#667085] hover:bg-[#FAF7F2]',
+                )}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <BarChart3 size={20} className="text-[#6B1D2E]" />
-                  <Download size={16} className="text-[#7C7C7C]" />
-                </div>
-                <p className="text-[14px] font-bold text-[#181725]">{card.label}</p>
-                <p className="text-[11px] text-[#AEAEAE] mt-1">{card.desc}</p>
+                {item.label}
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => window.open(`/api/v1/admin/reports?type=sales_by_vendor&period=${period}&format=csv`, '_blank')}
+            className={cn(
+              'inline-flex h-10 items-center gap-2 rounded-xl border border-[#E9E3DD] bg-white px-4 text-xs font-semibold hover:bg-[#FAF7F2]',
+              focusRing,
+            )}
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+        </div>
+      </header>
 
-          {data.monthlyTrend.length > 0 ? (
-            <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp size={18} className="text-[#6B1D2E]" />
-                <p className="text-[14px] font-bold">GMV & platform fees trend</p>
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-20 text-[#6B1D2E]">
+          <Loader2 className="animate-spin" size={22} />
+          <span className="text-sm font-semibold">Loading sales…</span>
+        </div>
+      ) : data ? (
+        <>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <FinanceKpiCard title="Orders" value={String(orders)} subtext="Delivered in this period" icon={<ShoppingBag className="h-4 w-4" />} iconTone="burgundy" />
+            <FinanceKpiCard title="Sales" value={inr(sales)} subtext="Customer total on delivered orders" icon={<IndianRupee className="h-4 w-4" />} variant="hero" iconTone="burgundy" />
+            <FinanceKpiCard title="Average order" value={inr(average)} subtext="Sales divided by orders" icon={<TrendingUp className="h-4 w-4" />} iconTone="blue" />
+          </section>
+
+          <section className="rounded-2xl border border-[#E9E3DD] bg-white p-5 shadow-xs">
+            <h2 className="text-sm font-bold">Sales over time</h2>
+            <p className="mt-1 text-xs text-[#667085]">Each point is one day of delivered orders.</p>
+            {data.dailyTrend.length === 0 ? (
+              <p className="py-16 text-center text-sm text-[#667085]">No delivered orders in this period.</p>
+            ) : (
+              <div className="mt-4 h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={data.dailyTrend}>
+                    <CartesianGrid stroke="#E9E3DD" strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#667085' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#667085' }} tickFormatter={(value) => inr(Number(value))} width={84} />
+                    <Tooltip formatter={(value) => inr(Number(value ?? 0))} />
+                    <Area type="monotone" dataKey="sales" name="Sales" stroke="#6B1D2E" fill="#F8E8EC" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={data.monthlyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v) => inr(Number(v ?? 0))} />
-                  <Area type="monotone" dataKey="gmv" stroke="#6B1D2E" fill="#F8E8EC" name="GMV" />
-                  <Area type="monotone" dataKey="fees" stroke="#8B5CF6" fill="#F3E8FF" name="Platform fees" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-10 text-center">
-              <TrendingUp size={36} className="text-[#E5E7EB] mx-auto mb-3" />
-              <p className="text-[13px] font-bold text-[#AEAEAE]">No trend data for this period — deliver orders to see GMV and fees</p>
-            </div>
-          )}
+            )}
+          </section>
 
-          <div className="bg-white rounded-[14px] border border-[#EEEEEE] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#F5F5F5]">
-              <p className="text-[14px] font-bold">Top vendors by GMV</p>
+          <section className="rounded-2xl border border-[#E9E3DD] bg-white p-5 shadow-xs">
+            <h2 className="text-sm font-bold">Top suppliers</h2>
+            <p className="mt-1 text-xs text-[#667085]">Highest delivered sales in this period.</p>
+            {data.salesByVendor.length === 0 ? (
+              <p className="py-16 text-center text-sm text-[#667085]">No suppliers with delivered orders.</p>
+            ) : (
+              <div className="mt-4 h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.salesByVendor} layout="vertical" margin={{ left: 16, right: 16 }}>
+                    <CartesianGrid stroke="#E9E3DD" strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: '#667085' }} tickFormatter={(value) => inr(Number(value))} />
+                    <YAxis type="category" dataKey="vendorName" width={140} tick={{ fontSize: 11, fill: '#1C1C1C' }} />
+                    <Tooltip formatter={(value) => inr(Number(value ?? 0))} />
+                    <Bar dataKey="gross" name="Sales" fill="#6B1D2E" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-[#E9E3DD] bg-white shadow-xs">
+            <div className="border-b border-[#E9E3DD] px-5 py-4">
+              <h2 className="text-sm font-bold">Supplier sales</h2>
             </div>
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="bg-[#FAFAFA]">
-                  <th className="text-left px-4 py-3 font-semibold text-[#7C7C7C]">Vendor</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Orders</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Gross</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Platform fee</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Vendor net</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F5F5F5]">
-                {data.salesByVendor.length === 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-xs">
+                <thead className="bg-[#FAF7F2] text-[11px] font-bold uppercase tracking-wider text-[#667085]">
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-[13px] font-bold text-[#AEAEAE]">
-                      No vendors with delivered orders in this period
-                    </td>
+                    <th className="px-5 py-3">Supplier</th>
+                    <th className="px-3 py-3 text-right">Orders</th>
+                    <th className="px-5 py-3 text-right">Sales</th>
                   </tr>
-                ) : data.salesByVendor.map((v) => (
-                  <tr key={v.vendorName} className="hover:bg-[#FAFAFA]">
-                    <td className="px-4 py-3 font-semibold">{v.vendorName}</td>
-                    <td className="px-4 py-3 text-right">{v.orderCount}</td>
-                    <td className="px-4 py-3 text-right">{inr(v.gross)}</td>
-                    <td className="px-4 py-3 text-right text-[#6B1D2E]">{inr(v.platformFee)}</td>
-                    <td className="px-4 py-3 text-right">{inr(v.netVendor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#E9E3DD]">
+                  {data.salesByVendor.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-5 py-12 text-center text-sm text-[#667085]">No delivered orders in this period.</td>
+                    </tr>
+                  ) : data.salesByVendor.map((vendor) => (
+                    <tr key={vendor.vendorName}>
+                      <td className="px-5 py-3 font-semibold">{vendor.vendorName}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{vendor.orderCount}</td>
+                      <td className="px-5 py-3 text-right font-semibold tabular-nums">{inr(vendor.gross)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
+      ) : (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">Could not load sales.</p>
       )}
     </div>
   );
