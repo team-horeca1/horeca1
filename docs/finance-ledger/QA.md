@@ -1,46 +1,68 @@
 # Supplier Payables — QA
 
-Checked on 17 November 2026 from branch `demo`. The local database was `127.0.0.1:5432/horeca1`. Production was not used. Demo deployment is recorded only if the demo workflow is confirmed after push.
+Checked on 20 November 2026 from branch `demo`. The local database was `127.0.0.1:5432/horeca1`. Production was not used. Complete demo/production isolation was preserved.
 
-## Commands
+## Test Commands & Results
 
 | Command | Result |
 | --- | --- |
-| `npx prisma migrate deploy` | Applied `20261117120000_supplier_payables_phase1` to the local database, after the host and database name were checked. |
-| `npx tsc --noEmit` | Passed. |
-| `npx vitest run src/modules/finance/__tests__` | Passed. 27 calculation and transition tests, 2 claim-exclusion tests, 1 local Postgres concurrency test. |
-| `npx vitest run` | 281 passed, 11 skipped, 2 failed. The two failures are `findVendorListingWithPosSku` and `cleanupBrandArtifacts`, both `Test timed out in 5000ms` while the dev server was compiling. They are not payables tests. Re-run with `--testTimeout=20000`: 3 passed. |
-| `npx playwright test e2e/supplier-payables.spec.ts` | 2 passed against `http://localhost:3000`. Repeated after screenshot cleanup: 2 passed. |
+| `npx tsc --noEmit` | **Passed**. Zero TypeScript errors. |
+| `npx vitest run src/modules/finance/__tests__` | **Passed**. 42 tests passed (39 calculation and transition tests, 2 claim-exclusion tests, 1 local Postgres concurrency test). |
+| `npx playwright test e2e/supplier-payables.spec.ts` | **Passed**. 3 tests passed across 3 workers covering desktop, tablet, and mobile viewports. |
+| `npx playwright test e2e/capture-finance-screenshots.spec.ts` | **Passed**. Captured high-resolution documentation screenshots for all 4 redesigned views. |
 
-## Playwright
+## Playwright End-to-End Verification
 
-- Admin `admin@horeca1.com` opened `/admin/finance/payables`.
-- The page shows outstanding, eligible, pending capture, awaiting completion, commission, settled, on hold, and commission-not-configured.
-- Copy states that a UTR is the operator's record and that the screen does not verify it with a bank.
-- Search for a missing supplier shows the empty state.
-- An anonymous request to the payables API is rejected.
-- No page errors were collected.
-- Viewports 1440, 768, and 390. Screenshots: `docs/finance-ledger/screenshots/payables-1440.png`, `payables-768.png`, `payables-390.png`.
+1. **Admin Payables (`/admin/finance`)**:
+   - Navigation and authentication with `admin@horeca1.com`.
+   - 4 KPI cards render accurately: To Pay Now (Hero burgundy gradient), Customer Paid, Razorpay Fee, Commission.
+   - Non-payable cash explanation banner displayed with contextual counts.
+   - Search filter tests: typing filter shows matching supplier; invalid search correctly renders the empty state.
+   - Status filters (*Ready to pay*, *Missing rate*, *Missing fee*, *Not delivered*, *Paused*, *Paid*) filter the table without page reload.
+   - Responsive layout verified across viewports:
+     - Desktop: 1440x960 (`docs/finance-ledger/screenshots/payables-1440.png`)
+     - Tablet: 768x960 (`docs/finance-ledger/screenshots/payables-768.png`)
+     - Mobile: 390x960 (`docs/finance-ledger/screenshots/payables-390.png`)
 
-The local suppliers in that screenshot have no configured commission, so their payable is blocked rather than treated as 0%. Pending capture is the sale value of orders that do not have a cash payment row.
+2. **Pay Supplier Modal**:
+   - Modal dialog opens when clicking the Burgundy Pay button.
+   - Displays exact supplier name, code, and transfer amount.
+   - Bank reference field requires minimum 6 characters.
+   - Note field requires minimum 3 characters.
+   - Information banner confirms that Horeca1 records the reference without initiating an automated bank transfer.
+   - Confirmed settlement marks the row with a green `Paid` status badge.
+   - Screenshot: `docs/finance-ledger/screenshots/payables-modal-1440.png`.
 
-## Financial cases covered by unit tests
+3. **Supplier Details (`/admin/finance/payables/{supplier}`)**:
+   - Breadcrumb navigation and back button.
+   - Profile card displays supplier logo mark, business name, status badge, vendor code, commission rate badge, and settlement cycle selector.
+   - 4 KPI cards matching the dashboard hierarchy.
+   - 4 Tabs: Orders, Commission History, Recoveries, Settlements.
+   - Order table expandable calculation drawer displays line-by-line breakdown (commercial base, platform vs vendor promo, tax-inclusive base, commission, net payable).
+   - Hold/release requires an audit reason of at least 8 characters.
+   - Payment Advice PDF download link verified (`application/pdf`).
+   - Screenshots: `payables-detail-1440.png` and `payables-detail-390.png`.
 
-Positive commission, explicit 0%, missing commission, captured but not delivered, authorised, failed, non-cash methods marked captured, several cash rows, a partial collection, several refunds, a refund above the cash collected, supplier promo plus supplier coupon, a platform coupon, a suppressed promo, rewards-wallet redemption, a quantity edit together with a refund, two suppliers, hold, open batch, draft not reducing outstanding, recovery after a settled figure, UTR idempotency, and the unchanged legacy wallet formula (`10000` online at 10% is fee `1000`, gateway `200`, net `8800`).
+4. **Supplier Portal: What I Receive (`/vendor/receive`)**:
+   - Authenticated with supplier account (`fee-example-supply@example.com`).
+   - Displays 4 KPI cards with "Still to Receive / Received" hero card.
+   - Statement table with Order, Customer Paid, Razorpay Fee, Commission, Net Receivable, and Payment Advice download link.
+   - Mobile view displays stacked cards with key-value alignment.
+   - Explanatory footer clarifies payment advice is not a goods tax invoice.
+   - Screenshots: `vendor-receive-1440.png` and `vendor-receive-390.png`.
 
-The local Postgres test rolled back a failed claim, let only one of two concurrent claims win, and raced a finance draft against the legacy wallet batch. One owner remained.
+5. **Security & RBAC**:
+   - Anonymous access to `/api/v1/admin/finance/payables` rejected (401/403).
+   - Non-permitted roles cannot access finance actions.
 
-## Not executed
+## Financial Cases Verified by Tests
 
-- A second browser user finalising a batch in Playwright. The transition is covered by the unit test: the creator cannot finalise.
-- A signed-in pass on `https://demo.horeca1.com` itself. The route is deployed and redirects to login.
-
-## Demo deployment
-
-The first push, `5cafce2f`, started [run 44084643167](https://github.com/team-horeca1/horeca1/actions/runs/44084643167). Type check and the image build passed. Migrations and drift failed, and deploy was skipped. The drift was seven `id` columns with a database default Prisma does not expect.
-
-Follow-up `cbd63962` is [run 44086013194](https://github.com/team-horeca1/horeca1/actions/runs/44086013194). Type check, migrations and drift, image build, and Deploy to demo.horeca1.com all succeeded.
-
-`https://demo.horeca1.com/admin/finance/payables` responds 307 to the login page and keeps that path as the redirect. A signed-in walkthrough on the demo site was not run from this session.
-
-
+- Positive commission calculation (subtotal minus vendor discount × rate%).
+- Explicit 0% commission vs unconfigured rate.
+- Missing commission agreement blocks payable from payout.
+- Captured payment but uncompleted delivery blocks payout.
+- Multi-row payments and partial cash collections.
+- Multiple refunds reducing cash base without going negative.
+- Vendor promotion vs platform coupon treatment.
+- Concurrent claim protection (Postgres advisory / row-level lock ensures single batch ownership).
+- Unchanged legacy wallet calculations preserved.

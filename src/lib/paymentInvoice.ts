@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
   awaiting_completion: 'Not delivered',
   commission_unconfigured: 'No rate',
   fee_unknown: 'Fee missing',
-  eligible: 'Ready',
+  eligible: 'Ready to Pay',
   on_hold: 'Paused',
   in_batch: 'In a payment',
   settled: 'Paid',
@@ -26,7 +26,7 @@ function inr(value: string | number | { toString(): string }): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  // Helvetica has no rupee glyph.
+  // Helvetica in standard PDF does not have the INR glyph.
   return `Rs ${amount}`;
 }
 
@@ -114,9 +114,11 @@ export async function generatePaymentInvoicePdf(
   const adviceDate = line.batch?.settledAt ?? order.deliveredAt ?? line.calculatedAt;
   const payeeLines = [
     supplier,
-    [order.vendor.addressLine, order.vendor.city, order.vendor.state, order.vendor.addressPincode].filter(Boolean).join(', '),
-    order.vendor.vendorCode ? `Code ${order.vendor.vendorCode}` : '',
-    order.vendor.gstNumber ? `GSTIN ${order.vendor.gstNumber}` : '',
+    [order.vendor.addressLine, order.vendor.city, order.vendor.state, order.vendor.addressPincode]
+      .filter(Boolean)
+      .join(', '),
+    order.vendor.vendorCode ? `Supplier Code: ${order.vendor.vendorCode}` : '',
+    order.vendor.gstNumber ? `GSTIN: ${order.vendor.gstNumber}` : '',
   ].filter((part) => part.trim().length > 0);
 
   const pdf = await new Promise<Buffer>((resolve, reject) => {
@@ -131,101 +133,130 @@ export async function generatePaymentInvoicePdf(
     const width = right - left;
     const logo = logoBuffer();
 
-    doc.rect(0, 0, doc.page.width, 12).fill('#6B1D2E');
+    // Top Brand Burgundy Bar
+    doc.rect(0, 0, doc.page.width, 10).fill('#6B1D2E');
 
+    // Brand Logo / Title
     if (logo) {
-      doc.image(logo, left, 32, { height: 32 });
+      doc.image(logo, left, 28, { height: 34 });
     } else {
-      doc.font('Helvetica-Bold').fontSize(16).fillColor('#6B1D2E').text('Horeca1', left, 38, { lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(18).fillColor('#6B1D2E').text('Horeca1', left, 32, { lineBreak: false });
+      doc.font('Helvetica').fontSize(8).fillColor('#667085').text('B2B HOSPITALITY MARKETPLACE', left, 54, { lineBreak: false });
     }
 
+    // Document Header Right
     doc.font('Helvetica-Bold').fontSize(16).fillColor('#1C1C1C');
-    doc.text('PAYMENT ADVICE', left, 30, { width, align: 'right', lineBreak: false });
+    doc.text('PAYMENT ADVICE', left, 28, { width, align: 'right', lineBreak: false });
     doc.font('Helvetica').fontSize(10).fillColor('#667085');
-    doc.text(`Order  ${order.orderNumber}`, left, 52, { width, align: 'right', lineBreak: false });
-    doc.text(`Date  ${formatDate(adviceDate)}`, left, 66, { width, align: 'right', lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(10).fillColor(line.status === 'settled' ? '#16A34A' : '#6B1D2E');
-    doc.text(statusLabel, left, 82, { width, align: 'right', lineBreak: false });
+    doc.text(`Order  ${order.orderNumber}`, left, 50, { width, align: 'right', lineBreak: false });
+    doc.text(`Date  ${formatDate(adviceDate)}`, left, 64, { width, align: 'right', lineBreak: false });
 
-    doc.moveTo(left, 108).lineTo(right, 108).strokeColor('#E9E3DD').stroke();
+    // Status Badge
+    const isSettled = line.status === 'settled';
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(isSettled ? '#16A34A' : '#6B1D2E');
+    doc.text(statusLabel.toUpperCase(), left, 80, { width, align: 'right', lineBreak: false });
 
-    const boxTop = 124;
-    const boxH = 104;
+    // Horizontal Divider
+    doc.moveTo(left, 104).lineTo(right, 104).strokeColor('#E9E3DD').lineWidth(1).stroke();
+
+    // Side-by-side From and Payee Cards
+    const boxTop = 118;
+    const boxH = 108;
     const gap = 16;
     const boxW = (width - gap) / 2;
+
+    // Card Backgrounds
     doc.save();
-    doc.rect(left, boxTop, boxW, boxH).fill('#FAF7F2');
-    doc.rect(left + boxW + gap, boxTop, boxW, boxH).fill('#FAF7F2');
+    doc.roundedRect(left, boxTop, boxW, boxH, 6).fillAndStroke('#FAF7F2', '#E9E3DD');
+    doc.roundedRect(left + boxW + gap, boxTop, boxW, boxH, 6).fillAndStroke('#FAF7F2', '#E9E3DD');
     doc.restore();
 
-    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('FROM', left + 14, boxTop + 12, { lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(13).fillColor('#1C1C1C').text('Horeca1', left + 14, boxTop + 30, { lineBreak: false });
-    doc.font('Helvetica').fontSize(10).fillColor('#667085').text('Marketplace payout', left + 14, boxTop + 50, { lineBreak: false });
-    doc.text('Does not start a bank transfer', left + 14, boxTop + 66, { width: boxW - 28, lineBreak: false });
+    // FROM Card Details
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#667085').text('FROM (PAYER)', left + 14, boxTop + 14, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(13).fillColor('#1C1C1C').text('Horeca1', left + 14, boxTop + 32, { lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('Horeca Consumer Goods Marketplace', left + 14, boxTop + 50, { lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('Marketplace Settlement & Payables', left + 14, boxTop + 65, { lineBreak: false });
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#9A3412').text('Does not initiate a bank transfer', left + 14, boxTop + 84, { lineBreak: false });
 
+    // PAYEE Card Details
     const payeeX = left + boxW + gap + 14;
-    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('PAYEE', payeeX, boxTop + 12, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#667085').text('PAYEE (SUPPLIER)', payeeX, boxTop + 14, { lineBreak: false });
     payeeLines.slice(0, 4).forEach((part, index) => {
-      doc.font(index === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(index === 0 ? 13 : 10).fillColor(index === 0 ? '#1C1C1C' : '#667085');
-      doc.text(part, payeeX, boxTop + 30 + index * 16, { width: boxW - 28, height: 16, ellipsis: true, lineBreak: false });
+      doc.font(index === 0 ? 'Helvetica-Bold' : 'Helvetica')
+        .fontSize(index === 0 ? 12 : 9)
+        .fillColor(index === 0 ? '#1C1C1C' : '#667085');
+      doc.text(part, payeeX, boxTop + 32 + index * 16, { width: boxW - 28, height: 16, ellipsis: true, lineBreak: false });
     });
 
-    let y = boxTop + boxH + 28;
+    // Itemized Financial Table
+    let y = boxTop + boxH + 24;
+
+    // Table Header
     doc.save();
-    doc.rect(left, y, width, 28).fill('#FAF7F2');
+    doc.roundedRect(left, y, width, 26, 4).fillAndStroke('#FAF7F2', '#E9E3DD');
     doc.restore();
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#667085');
-    doc.text('DESCRIPTION', left + 14, y + 9);
-    doc.text('AMOUNT', left, y + 9, { width: width - 14, align: 'right' });
-    y += 28;
+    doc.text('DESCRIPTION', left + 14, y + 8, { lineBreak: false });
+    doc.text('AMOUNT', left, y + 8, { width: width - 14, align: 'right', lineBreak: false });
+    y += 26;
 
     const rows: Array<{ label: string; value: string; total?: boolean }> = [
-      { label: 'Customer paid', value: inr(line.collectedAmount) },
-      { label: 'Razorpay fee', value: razorpayCut },
+      { label: 'Customer paid (gross captured amount)', value: inr(line.collectedAmount) },
+      { label: 'Razorpay payment gateway fee', value: razorpayCut },
       { label: commissionTitle, value: commissionLabel },
-      { label: 'Amount payable', value: toPay, total: true },
+      { label: 'Amount payable (Net to Supplier)', value: toPay, total: true },
     ];
 
     for (const row of rows) {
-      const rowH = row.total ? 42 : 32;
+      const rowH = row.total ? 40 : 32;
       if (row.total) {
         doc.save();
-        doc.rect(left, y, width, rowH).fill('#F8E8EC');
+        doc.roundedRect(left, y, width, rowH, 4).fillAndStroke('#F8E8EC', '#F3D7DE');
         doc.restore();
+      } else {
+        doc.moveTo(left, y + rowH).lineTo(right, y + rowH).strokeColor('#E9E3DD').lineWidth(0.75).stroke();
       }
-      doc.moveTo(left, y + rowH).lineTo(right, y + rowH).strokeColor('#E9E3DD').stroke();
-      doc.font(row.total ? 'Helvetica-Bold' : 'Helvetica').fontSize(row.total ? 12 : 11);
-      doc.fillColor(row.total ? '#6B1D2E' : '#1C1C1C');
-      doc.text(row.label, left + 14, y + (row.total ? 14 : 10), { width: width * 0.62, lineBreak: false });
+
+      doc.font(row.total ? 'Helvetica-Bold' : 'Helvetica')
+        .fontSize(row.total ? 11 : 10)
+        .fillColor(row.total ? '#6B1D2E' : '#1C1C1C');
+
+      doc.text(row.label, left + 14, y + (row.total ? 14 : 10), { width: width * 0.65, lineBreak: false });
       doc.text(row.value, left, y + (row.total ? 14 : 10), { width: width - 14, align: 'right', lineBreak: false });
       y += rowH;
     }
 
+    // Settlement Details Card (When Paid)
     const paidFacts = [
-      line.status === 'settled' && line.batch?.settledAt ? `Paid date  ${formatDate(line.batch.settledAt)}` : '',
-      line.batch?.bankReference ? `Bank reference  ${line.batch.bankReference}` : '',
-      line.batch?.batchNumber ? `Settlement  ${line.batch.batchNumber}` : '',
+      line.status === 'settled' && line.batch?.settledAt ? `Paid Date:  ${formatDate(line.batch.settledAt)}` : '',
+      line.batch?.bankReference ? `Bank Reference (UTR):  ${line.batch.bankReference}` : '',
+      line.batch?.batchNumber ? `Settlement Number:  ${line.batch.batchNumber}` : '',
     ].filter((fact) => fact.length > 0);
 
-    y += 22;
+    y += 20;
     if (paidFacts.length > 0) {
-      const box = 18 + paidFacts.length * 16;
+      const box = 22 + paidFacts.length * 18;
       doc.save();
-      doc.rect(left, y, width, box).fill('#F0FDF4');
+      doc.roundedRect(left, y, width, box, 6).fillAndStroke('#F0FDF4', '#DCFCE7');
       doc.restore();
-      doc.font('Helvetica').fontSize(10).fillColor('#166534');
+
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#166534').text('SETTLEMENT CONFIRMATION', left + 14, y + 10, { lineBreak: false });
+      doc.font('Helvetica').fontSize(9).fillColor('#166534');
       paidFacts.forEach((fact, index) => {
-        doc.text(fact, left + 14, y + 10 + index * 16, { width: width - 28, lineBreak: false });
+        doc.text(fact, left + 14, y + 26 + index * 16, { width: width - 28, lineBreak: false });
       });
       y += box + 16;
     }
 
-    doc.font('Helvetica').fontSize(9).fillColor('#667085');
+    // Bottom Disclaimer Footer
+    y = Math.max(y + 10, doc.page.height - 75);
+    doc.moveTo(left, y - 10).lineTo(right, y - 10).strokeColor('#E9E3DD').lineWidth(0.75).stroke();
+    doc.font('Helvetica').fontSize(8).fillColor('#667085');
     doc.text(
-      'This payment advice is the amount Horeca1 transfers to the supplier. It is not a tax invoice for goods, and it does not move money by itself.',
+      'Notice: This payment advice represents the marketplace calculation and recorded payout amount from Horeca1 to the supplier. It is not a goods tax invoice, does not replace a vendor tax filing, and does not initiate or verify a bank transfer.',
       left,
       y,
-      { width },
+      { width, lineGap: 3 },
     );
 
     doc.end();

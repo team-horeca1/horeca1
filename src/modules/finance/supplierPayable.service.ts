@@ -452,6 +452,20 @@ export async function listSupplierPayables(query: PayableListQuery) {
     : null;
 
   const vendorIds = vendors.map((vendor) => vendor.id);
+  if (vendorIds.length > 0) {
+    const unrefreshed = await prisma.order.findMany({
+      where: {
+        vendorId: { in: vendorIds },
+        status: { not: 'draft' },
+        payableLine: null,
+      },
+      select: { id: true },
+      take: 50,
+    });
+    for (const order of unrefreshed) {
+      await refreshSupplierPayable(order.id);
+    }
+  }
   const lines = vendorIds.length === 0
     ? []
     : await prisma.supplierPayableLine.findMany({

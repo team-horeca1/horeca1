@@ -3,9 +3,35 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  Wallet,
+  CreditCard,
+  Percent,
+  IndianRupee,
+  Search,
+  Info,
+  AlertCircle,
+  Clock,
+  ArrowRight,
+  SlidersHorizontal,
+  X,
+  FileSpreadsheet,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { focusRing, inr, money, StatusPill, SupplierMark, type PillTone } from '@/components/features/finance/financeChrome';
+import {
+  focusRing,
+  inr,
+  money,
+  StatusPill,
+  SupplierMark,
+  FinanceKpiCard,
+  type PillTone,
+} from '@/components/features/finance/financeChrome';
 
 type Kpis = {
   eligible: string;
@@ -60,7 +86,7 @@ const STATE_TONE: Record<RowState, PillTone> = {
   ready: 'ready',
   paid: 'paid',
   fee: 'warn',
-  rate: 'muted',
+  rate: 'danger',
   waiting: 'muted',
 };
 
@@ -102,7 +128,13 @@ function payTitle(row: Row): string | undefined {
 }
 
 function resolvedSort(status: string, sortKey: SortKey): string {
-  const key = sortKey || (status === 'settled' ? 'latest' : status === 'outstanding' || status === 'on_hold' ? 'outstanding' : 'ready');
+  const key =
+    sortKey ||
+    (status === 'settled'
+      ? 'latest'
+      : status === 'outstanding' || status === 'on_hold'
+      ? 'outstanding'
+      : 'ready');
   return key === 'supplier' ? 'supplier' : `-${key}`;
 }
 
@@ -116,11 +148,18 @@ function activeSort(status: string, sortKey: SortKey): Exclude<SortKey, ''> {
 function contextNotes(kpis: Kpis, ranged: boolean): string[] {
   const notes: string[] = [];
   const waiting = money(kpis.quotedNet) > 0 ? kpis.quotedNet : kpis.awaitingCompletion;
-  if (money(waiting) > 0) notes.push(`Waiting for delivery. ${inr(waiting)} is captured and is not payable yet.`);
-  if (money(kpis.blockedSale) > 0) notes.push(`Missing commission rate. ${inr(kpis.blockedSale)} stays unpaid until a rate is set. A blank rate is not 0%.`);
-  if (kpis.razorpayFeeUnknown) notes.push('Missing Razorpay fee. Pay stays off for those orders until the fee arrives.');
-  if (money(kpis.onHold) > 0) notes.push(`Paused. ${inr(kpis.onHold)} is held and is not in To pay now.`);
-  if (money(kpis.settledPeriod) > 0) notes.push(`Already paid ${inr(kpis.settledPeriod)}${ranged ? ' in this period' : ''}.`);
+  if (money(waiting) > 0)
+    notes.push(`Waiting for delivery. ${inr(waiting)} is captured and is not payable yet.`);
+  if (money(kpis.blockedSale) > 0)
+    notes.push(
+      `Missing commission rate. ${inr(kpis.blockedSale)} stays unpaid until a rate is set. A blank rate is not 0%.`,
+    );
+  if (kpis.razorpayFeeUnknown)
+    notes.push('Missing Razorpay fee. Pay stays off for those orders until the fee arrives.');
+  if (money(kpis.onHold) > 0)
+    notes.push(`Paused. ${inr(kpis.onHold)} is held and is not in To pay now.`);
+  if (money(kpis.settledPeriod) > 0)
+    notes.push(`Already paid ${inr(kpis.settledPeriod)}${ranged ? ' in this period' : ''}.`);
   return notes;
 }
 
@@ -157,18 +196,21 @@ export function PayablesDashboard() {
 
   const datesInvalid = Boolean(from && to && from > to);
 
-  const buildParams = useCallback((pageNo: number, size: number) => {
-    const params = new URLSearchParams({
-      page: String(pageNo),
-      pageSize: String(size),
-      sort: resolvedSort(status, sortKey),
-    });
-    if (q) params.set('q', q);
-    if (status) params.set('status', status);
-    if (from && !datesInvalid) params.set('from', from);
-    if (to && !datesInvalid) params.set('to', to);
-    return params;
-  }, [datesInvalid, from, q, sortKey, status, to]);
+  const buildParams = useCallback(
+    (pageNo: number, size: number) => {
+      const params = new URLSearchParams({
+        page: String(pageNo),
+        pageSize: String(size),
+        sort: resolvedSort(status, sortKey),
+      });
+      if (q) params.set('q', q);
+      if (status) params.set('status', status);
+      if (from && !datesInvalid) params.set('from', from);
+      if (to && !datesInvalid) params.set('to', to);
+      return params;
+    },
+    [datesInvalid, from, q, sortKey, status, to],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -227,7 +269,7 @@ export function PayablesDashboard() {
         setError('The amount changed. Check the new To pay figure, then pay again.');
         return;
       }
-      setGuide((current) => current ? { ...current, notice: message } : current);
+      setGuide((current) => (current ? { ...current, notice: message } : current));
     } finally {
       setBusy('');
     }
@@ -248,7 +290,17 @@ export function PayablesDashboard() {
         count = json.data.pagination.total;
         pageNo += 1;
       } while (collected.length < count && pageNo < 20);
-      const header = ['Supplier', 'Code', 'Status', 'Rate', 'Customer paid', 'Razorpay fee', 'Commission', 'To pay'];
+
+      const header = [
+        'Supplier',
+        'Code',
+        'Status',
+        'Rate',
+        'Customer paid',
+        'Razorpay fee',
+        'Commission',
+        'To pay',
+      ];
       const body = collected.map((row) => {
         const state = rowState(row);
         return [
@@ -260,9 +312,13 @@ export function PayablesDashboard() {
           feeText(row),
           row.ratePct == null ? '' : inr(row.commission),
           toPayText(row, state),
-        ].map(csvCell).join(',');
+        ]
+          .map(csvCell)
+          .join(',');
       });
-      const blob = new Blob([[header.join(','), ...body].join('\n')], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob([[header.join(','), ...body].join('\n')], {
+        type: 'text/csv;charset=utf-8',
+      });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -298,81 +354,195 @@ export function PayablesDashboard() {
   const sortValue = activeSort(status, sortKey);
 
   return (
-    <div className="space-y-5 pb-8 text-[#1C1C1C]">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="space-y-6 pb-12 text-[#1C1C1C]">
+      {/* Navigation Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-medium text-[#667085]">
+        <Link href="/admin/finance" className="hover:text-[#6B1D2E] transition-colors">
+          Finance
+        </Link>
+        <span className="text-zinc-300">/</span>
+        <span className="text-[#1C1C1C] font-semibold">Pay Suppliers</span>
+      </nav>
+
+      {/* Header section */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-[clamp(1.5rem,2vw+0.5rem,1.85rem)] font-semibold tracking-tight">Pay suppliers</h1>
-          <p className="mt-1 max-w-2xl text-[14px] leading-6 text-[#667085]">
-            The customer pays. Razorpay takes its fee. Horeca1 keeps the commission. What is left is what you transfer. We do not call the bank.
+          <h1 className="text-2xl font-bold tracking-tight text-[#1C1C1C] sm:text-3xl">
+            Pay suppliers
+          </h1>
+          <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#667085]">
+            The customer pays, Razorpay takes its fee, Horeca1 keeps the commission, and what is
+            left is what you transfer. We do not call the bank.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void exportCsv()}
-          disabled={exporting}
-          className={cn('inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#E9E3DD] bg-white px-3 text-[13px] font-semibold text-[#1C1C1C] hover:bg-[#FAF7F2] disabled:opacity-50', focusRing)}
-        >
-          {exporting ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
-          Export CSV
-        </button>
+        <div className="flex shrink-0 items-center gap-2.5">
+          <Link
+            href="/admin/ledger"
+            className={cn(
+              'inline-flex h-10 items-center justify-center rounded-xl border border-[#E9E3DD] bg-white px-3.5 text-xs font-semibold text-[#667085] hover:bg-[#FAF7F2] hover:text-[#1C1C1C] shadow-xs transition-colors',
+              focusRing,
+            )}
+          >
+            Older wallet
+          </Link>
+          <button
+            type="button"
+            onClick={() => void exportCsv()}
+            disabled={exporting}
+            className={cn(
+              'inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#E9E3DD] bg-white px-4 text-xs font-semibold text-[#1C1C1C] hover:bg-[#FAF7F2] disabled:opacity-50 shadow-xs transition-colors',
+              focusRing,
+            )}
+          >
+            {exporting ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
+            Export CSV
+          </button>
+        </div>
       </header>
 
-      {error ? <p role="alert" className="rounded-xl border border-[#DC2626]/30 bg-white px-4 py-3 text-[14px] text-[#DC2626]">{error}</p> : null}
-
-      {kpis ? (
-        <section className="overflow-hidden rounded-xl border border-[#E9E3DD] bg-white">
-          <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1.4fr)]">
-            <div className="border-b border-[#E9E3DD] px-5 py-5 lg:border-b-0 lg:border-r">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">To pay now</p>
-              <p className="mt-2 text-[clamp(1.85rem,2vw+1rem,2.5rem)] font-semibold tabular-nums tracking-tight text-[#6B1D2E]">{inr(kpis.eligible)}</p>
-              <p className="mt-2 max-w-sm text-[13px] leading-5 text-[#667085]">Only money that can be paid now. Waiting, missing, and paused amounts are not included.</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3">
-              <Quiet label="Customer paid" value={inr(kpis.customerPaid)} hint="Captured cash" />
-              <Quiet label="Razorpay fee" value={inr(kpis.razorpayFee)} hint={kpis.razorpayFeeUnknown ? 'Some fees have not arrived' : 'Known fees'} />
-              <Quiet label="Commission" value={inr(kpis.commission)} hint="Horeca1’s share" />
-            </div>
-          </div>
-          {notes.length > 0 ? (
-            <ul className="space-y-1 border-t border-[#E9E3DD] px-5 py-3 text-[13px] leading-5 text-[#667085]">
-              {notes.map((note) => <li key={note}>{note}</li>)}
-            </ul>
-          ) : null}
-        </section>
+      {error ? (
+        <div
+          role="alert"
+          className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-800 shadow-xs"
+        >
+          <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
+          <span>{error}</span>
+        </div>
       ) : null}
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <input
-            aria-label="Search supplier"
-            value={q}
-            onChange={(event) => { setQ(event.target.value); setPage(1); }}
-            placeholder="Name or code"
-            className={cn('h-11 w-full rounded-lg border border-[#E9E3DD] bg-white px-3 text-[15px] outline-none xl:max-w-xs', focusRing)}
-          />
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
-            {FILTERS.map((filter) => (
+      {/* Financial KPIs Overview */}
+      {kpis ? (
+        <div className="space-y-4">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <FinanceKpiCard
+              title="To pay now"
+              value={inr(kpis.eligible)}
+              subtext="Only money that can be paid now. Waiting, missing, and paused amounts are not included."
+              icon={<Wallet className="h-4 w-4" />}
+              variant="hero"
+            />
+            <FinanceKpiCard
+              title="Customer paid"
+              value={inr(kpis.customerPaid)}
+              subtext="All captured cash"
+              icon={<IndianRupee className="h-4 w-4" />}
+              iconTone="blue"
+            />
+            <FinanceKpiCard
+              title="Razorpay fee"
+              value={inr(kpis.razorpayFee)}
+              subtext={kpis.razorpayFeeUnknown ? 'Some fees have not arrived' : 'Known fees'}
+              icon={<CreditCard className="h-4 w-4" />}
+              iconTone="emerald"
+            />
+            <FinanceKpiCard
+              title="Commission"
+              value={inr(kpis.commission)}
+              subtext="Horeca1’s share"
+              icon={<Percent className="h-4 w-4" />}
+              iconTone="purple"
+            />
+          </section>
+
+          {notes.length > 0 ? (
+            <div className="rounded-xl border border-[#F3E7CA] bg-gradient-to-r from-[#FFFDF8] via-[#FFFBF2] to-[#FFFDF8] p-4 text-xs text-[#8A5A1F] shadow-xs">
+              <div className="flex items-center gap-2 font-semibold text-[#6E4717] mb-2">
+                <Info size={15} className="shrink-0 text-[#9E6520]" />
+                <span>Non-payable amounts & contextual notes:</span>
+              </div>
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 list-disc list-inside text-[#7C511B]">
+                {notes.map((note) => (
+                  <li key={note} className="leading-relaxed">
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Filter and Control Bar */}
+      <div className="space-y-3 rounded-2xl border border-[#E9E3DD] bg-white p-4 shadow-xs">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          {/* Search Box */}
+          <div className="relative w-full lg:max-w-xs">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+            />
+            <input
+              aria-label="Search supplier"
+              value={q}
+              onChange={(event) => {
+                setQ(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Search supplier..."
+              className={cn(
+                'h-10 w-full rounded-xl border border-[#E9E3DD] bg-white pl-10 pr-3.5 text-sm text-[#1C1C1C] placeholder:text-[#667085] hover:border-[#CDC4BA] transition-colors',
+                focusRing,
+              )}
+            />
+            {q && (
               <button
-                key={filter.label}
                 type="button"
-                aria-pressed={status === filter.id}
-                onClick={() => { setStatus(filter.id); setSortKey(''); setPage(1); }}
-                className={cn(
-                  'h-10 rounded-lg px-3 text-[13px] font-semibold',
-                  focusRing,
-                  status === filter.id ? 'bg-[#F8E8EC] text-[#6B1D2E]' : 'border border-[#E9E3DD] bg-white text-[#667085]',
-                )}
+                onClick={() => {
+                  setQ('');
+                  setPage(1);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
               >
-                {filter.label}
+                <X size={14} />
               </button>
-            ))}
+            )}
           </div>
-          <div className="flex flex-wrap gap-2 xl:ml-auto">
+
+          {/* Status Filter Pills */}
+          <div
+            className="flex flex-wrap items-center gap-1.5 overflow-x-auto py-0.5"
+            role="group"
+            aria-label="Show"
+          >
+            {FILTERS.map((filter) => {
+              const active = status === filter.id;
+              return (
+                <button
+                  key={filter.label}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setStatus(filter.id);
+                    setSortKey('');
+                    setPage(1);
+                  }}
+                  className={cn(
+                    'h-9 rounded-xl px-3.5 text-xs font-semibold transition-all duration-150',
+                    focusRing,
+                    active
+                      ? 'bg-[#6B1D2E] text-white shadow-xs'
+                      : 'border border-[#E9E3DD] bg-white text-[#667085] hover:border-[#CDC4BA] hover:text-[#1C1C1C]',
+                  )}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort & Pagination Selectors */}
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
             <select
               aria-label="Sort"
               value={sortValue}
-              onChange={(event) => { setSortKey(event.target.value as SortKey); setPage(1); }}
-              className={cn('h-10 rounded-lg border border-[#E9E3DD] bg-white px-3 text-[13px] font-semibold text-[#1C1C1C]', focusRing)}
+              onChange={(event) => {
+                setSortKey(event.target.value as SortKey);
+                setPage(1);
+              }}
+              className={cn(
+                'h-9 rounded-xl border border-[#E9E3DD] bg-white px-3 text-xs font-semibold text-[#1C1C1C] hover:border-[#CDC4BA] transition-colors',
+                focusRing,
+              )}
             >
               <option value="ready">Ready to pay first</option>
               <option value="latest">Latest paid</option>
@@ -382,56 +552,128 @@ export function PayablesDashboard() {
             <select
               aria-label="Rows per page"
               value={String(pageSize)}
-              onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}
-              className={cn('h-10 rounded-lg border border-[#E9E3DD] bg-white px-3 text-[13px] font-semibold text-[#1C1C1C]', focusRing)}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+              className={cn(
+                'h-9 rounded-xl border border-[#E9E3DD] bg-white px-3 text-xs font-semibold text-[#1C1C1C] hover:border-[#CDC4BA] transition-colors',
+                focusRing,
+              )}
             >
               <option value="20">20 per page</option>
               <option value="50">50 per page</option>
             </select>
           </div>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="text-[12px] text-[#667085]">From
-            <input type="date" aria-label="From" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} className={cn('mt-1 block h-10 rounded-lg border border-[#E9E3DD] bg-white px-3 text-[13px] text-[#1C1C1C]', focusRing)} />
-          </label>
-          <label className="text-[12px] text-[#667085]">To
-            <input type="date" aria-label="To" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} className={cn('mt-1 block h-10 rounded-lg border border-[#E9E3DD] bg-white px-3 text-[13px] text-[#1C1C1C]', focusRing)} />
-          </label>
-          <p className="pb-2 text-[12px] leading-4 text-[#667085]">
-            {datesInvalid ? 'The start date is after the end date.' : 'Dates change commission and already paid. To pay now stays the current balance.'}
+
+        {/* Date Filter Strip */}
+        <div className="flex flex-wrap items-center gap-3 border-t border-[#F2ECE6] pt-3 text-xs text-[#667085]">
+          <div className="flex items-center gap-2">
+            <label className="font-medium text-[#1C1C1C]">From:</label>
+            <input
+              type="date"
+              aria-label="From"
+              value={from}
+              onChange={(event) => {
+                setFrom(event.target.value);
+                setPage(1);
+              }}
+              className={cn(
+                'h-8 rounded-lg border border-[#E9E3DD] bg-white px-2.5 text-xs text-[#1C1C1C] hover:border-[#CDC4BA]',
+                focusRing,
+              )}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="font-medium text-[#1C1C1C]">To:</label>
+            <input
+              type="date"
+              aria-label="To"
+              value={to}
+              onChange={(event) => {
+                setTo(event.target.value);
+                setPage(1);
+              }}
+              className={cn(
+                'h-8 rounded-lg border border-[#E9E3DD] bg-white px-2.5 text-xs text-[#1C1C1C] hover:border-[#CDC4BA]',
+                focusRing,
+              )}
+            />
+          </div>
+          <p className="text-[11px] text-[#667085] ml-auto">
+            {datesInvalid
+              ? 'The start date is after the end date.'
+              : 'Dates change commission and already paid. To pay now stays the current balance.'}
           </p>
         </div>
       </div>
 
+      {/* Main Table / List Content */}
       {loading && rows.length === 0 ? (
-        <div className="flex items-center gap-2 py-16 text-[#6B1D2E]"><Loader2 className="animate-spin" size={18} /> Loading the ledger</div>
+        <div className="flex flex-col items-center justify-center py-20 text-[#6B1D2E] gap-3">
+          <Loader2 className="animate-spin" size={28} />
+          <p className="text-sm font-semibold tracking-wide">Loading the ledger…</p>
+        </div>
       ) : rows.length === 0 ? (
         error ? null : (
-          <p className="rounded-xl border border-dashed border-[#E9E3DD] bg-white px-4 py-12 text-center text-[15px] text-[#667085]">
-            No supplier matches. Clear the search to see everyone.
-          </p>
+          <div className="rounded-2xl border border-dashed border-[#E9E3DD] bg-white p-12 text-center shadow-xs">
+            <FileSpreadsheet className="mx-auto h-10 w-10 text-zinc-300 mb-3" />
+            <p className="text-sm font-medium text-[#667085]">
+              No supplier matches. Clear the search to see everyone.
+            </p>
+          </div>
         )
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl border border-[#E9E3DD] bg-white md:hidden" aria-busy={loading}>
+          {/* Mobile Card List (< 768px) */}
+          <div
+            className="overflow-hidden rounded-2xl border border-[#E9E3DD] bg-white shadow-xs md:hidden"
+            aria-busy={loading}
+          >
             <ul className="divide-y divide-[#E9E3DD]">
               {rows.map((row) => {
                 const state = rowState(row);
                 return (
-                  <li key={row.vendorId} onClick={(event) => openSupplier(event, row.vendorId)} className="cursor-pointer px-4 py-4">
+                  <li
+                    key={row.vendorId}
+                    onClick={(event) => openSupplier(event, row.vendorId)}
+                    className="cursor-pointer p-4 transition-colors hover:bg-[#FAF7F2]"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <SupplierIdentity row={row} state={state} />
-                      <p className={cn('text-right text-[16px] font-semibold tabular-nums', state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]')}>
-                        {toPayText(row, state)}
-                      </p>
+                      <div className="text-right">
+                        <span className="block text-[11px] font-medium text-[#667085]">To pay</span>
+                        <p
+                          className={cn(
+                            'text-base font-bold tabular-nums',
+                            state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]',
+                          )}
+                        >
+                          {toPayText(row, state)}
+                        </p>
+                      </div>
                     </div>
-                    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+
+                    <div className="mt-3.5 grid grid-cols-2 gap-2 rounded-xl bg-[#FAF7F2] p-3 text-xs">
                       <MoneyItem label="Customer paid" value={inr(row.eligibleSale)} />
                       <MoneyItem label="Razorpay fee" value={feeText(row)} />
-                      <MoneyItem label="Commission" value={row.ratePct == null ? '—' : inr(row.commission)} />
-                      <MoneyItem label="Rate" value={row.ratePct == null ? '—' : `${row.ratePct}%`} />
-                    </dl>
-                    <PayButton row={row} busy={busy} onPay={pay} className="mt-3 min-h-12 w-full" />
+                      <MoneyItem
+                        label="Commission"
+                        value={row.ratePct == null ? '—' : inr(row.commission)}
+                      />
+                      <MoneyItem
+                        label="Rate"
+                        value={row.ratePct == null ? '—' : `${row.ratePct}%`}
+                      />
+                    </div>
+
+                    <PayButton
+                      row={row}
+                      busy={busy}
+                      onPay={pay}
+                      className="mt-3.5 h-11 w-full justify-center"
+                    />
                   </li>
                 );
               })}
@@ -439,35 +681,72 @@ export function PayablesDashboard() {
             <ListFooter page={page} pageSize={pageSize} total={total} onPage={setPage} />
           </div>
 
-          <div className="hidden overflow-hidden rounded-xl border border-[#E9E3DD] bg-white md:block" aria-busy={loading}>
+          {/* Desktop Table (>= 768px) */}
+          <div
+            className="hidden overflow-hidden rounded-2xl border border-[#E9E3DD] bg-white shadow-xs md:block"
+            aria-busy={loading}
+          >
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[880px] text-left text-[13px]">
-                <thead className="bg-[#FAF7F2] text-[11px] font-semibold uppercase tracking-wide text-[#667085]">
+              <table className="w-full min-w-[880px] text-left text-xs">
+                <thead className="border-b border-[#E9E3DD] bg-[#FAF7F2]/80 text-[11px] font-bold uppercase tracking-wider text-[#667085]">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Supplier</th>
-                    <th className="px-3 py-3 text-right font-semibold">Rate</th>
-                    <th className="px-3 py-3 text-right font-semibold">Customer paid</th>
-                    <th className="px-3 py-3 text-right font-semibold">Razorpay fee</th>
-                    <th className="px-3 py-3 text-right font-semibold">Commission</th>
-                    <th className="px-3 py-3 text-right font-semibold">To pay</th>
-                    <th className="px-4 py-3 text-right font-semibold"><span className="sr-only">Pay</span></th>
+                    <th scope="col" className="px-5 py-3.5 font-bold">
+                      Supplier
+                    </th>
+                    <th scope="col" className="px-3.5 py-3.5 text-right font-bold">
+                      Rate
+                    </th>
+                    <th scope="col" className="px-3.5 py-3.5 text-right font-bold">
+                      Customer paid
+                    </th>
+                    <th scope="col" className="px-3.5 py-3.5 text-right font-bold">
+                      Razorpay fee
+                    </th>
+                    <th scope="col" className="px-3.5 py-3.5 text-right font-bold">
+                      Commission
+                    </th>
+                    <th scope="col" className="px-3.5 py-3.5 text-right font-bold">
+                      To pay
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 text-right font-bold">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E9E3DD]">
                   {rows.map((row) => {
                     const state = rowState(row);
                     return (
-                      <tr key={row.vendorId} onClick={(event) => openSupplier(event, row.vendorId)} className="cursor-pointer hover:bg-[#FAF7F2]">
-                        <td className="px-4 py-3"><SupplierIdentity row={row} state={state} /></td>
-                        <td className="px-3 py-3 text-right tabular-nums text-[#667085]">{row.ratePct == null ? '—' : `${row.ratePct}%`}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{inr(row.eligibleSale)}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{feeText(row)}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{row.ratePct == null ? '—' : inr(row.commission)}</td>
-                        <td className={cn('whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums', state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]')}>
+                      <tr
+                        key={row.vendorId}
+                        onClick={(event) => openSupplier(event, row.vendorId)}
+                        className="cursor-pointer transition-colors duration-100 hover:bg-[#FAF7F2]/70"
+                      >
+                        <td className="px-5 py-3.5">
+                          <SupplierIdentity row={row} state={state} />
+                        </td>
+                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums font-medium text-[#667085]">
+                          {row.ratePct == null ? '—' : `${row.ratePct}%`}
+                        </td>
+                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#1C1C1C]">
+                          {inr(row.eligibleSale)}
+                        </td>
+                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#667085]">
+                          {feeText(row)}
+                        </td>
+                        <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums text-[#667085]">
+                          {row.ratePct == null ? '—' : inr(row.commission)}
+                        </td>
+                        <td
+                          className={cn(
+                            'whitespace-nowrap px-3.5 py-3.5 text-right font-bold tabular-nums text-sm',
+                            state === 'ready' ? 'text-[#6B1D2E]' : 'text-[#1C1C1C]',
+                          )}
+                        >
                           {toPayText(row, state)}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <PayButton row={row} busy={busy} onPay={pay} className="h-10" />
+                        <td className="px-5 py-3.5 text-right">
+                          <PayButton row={row} busy={busy} onPay={pay} className="h-9" />
                         </td>
                       </tr>
                     );
@@ -480,49 +759,169 @@ export function PayablesDashboard() {
         </>
       )}
 
+      {/* Pay Supplier Modal Dialog */}
       {guide ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1C1C1C]/40 p-4 sm:items-center" role="presentation" onClick={() => setGuide(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-xs p-4 sm:items-center"
+          role="presentation"
+          onClick={() => setGuide(null)}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="pay-dialog-title"
-            className="w-full max-w-md rounded-2xl border border-[#E9E3DD] bg-white p-6 shadow-xl"
+            className="w-full max-w-lg rounded-2xl border border-[#E9E3DD] bg-white p-6 shadow-2xl transition-all duration-150 animate-in fade-in zoom-in-95"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#E9E3DD]">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6B1D2E]">Record a reference</p>
-                <h2 id="pay-dialog-title" className="mt-1 text-[22px] font-semibold tracking-tight">Pay {guide.supplier}</h2>
-                {guide.code ? <p className="mt-1 text-[13px] text-[#667085]">{guide.code}</p> : null}
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B1D2E]">
+                  Pay Supplier
+                </span>
+                <h2 id="pay-dialog-title" className="mt-0.5 text-xl font-bold tracking-tight text-[#1C1C1C]">
+                  Pay {guide.supplier}
+                </h2>
+                {guide.code ? (
+                  <p className="mt-0.5 text-xs text-[#667085]">Supplier code: {guide.code}</p>
+                ) : null}
               </div>
-              <p className="text-right">
-                <span className="block text-[12px] text-[#667085]">Amount</span>
-                <span className="mt-1 block text-[26px] font-semibold tabular-nums text-[#6B1D2E]">{inr(guide.net)}</span>
+              <button
+                type="button"
+                onClick={() => setGuide(null)}
+                className={cn('rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600', focusRing)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Amount Card */}
+            <div className="mt-4 rounded-xl border border-[#F3D7DE] bg-gradient-to-br from-[#FAF0F3] to-[#FDF6F8] p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-[#6B1D2E]/80">Amount to Transfer</p>
+                <p className="text-xs text-[#667085] mt-0.5">Recorded against eligible orders</p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-[#6B1D2E] tracking-tight">
+                {inr(guide.net)}
               </p>
             </div>
+
             {guide.paid ? (
-              <p className="mt-5 rounded-xl bg-[#F0FDF4] px-4 py-3 text-[15px] font-medium text-[#166534]">Paid. The reference is saved.</p>
-            ) : (
-              <div className="mt-5 flex flex-col gap-3">
-                <p className="text-[14px] leading-6 text-[#3F3F46]">We do not call the bank. This saves the reference you already used. It does not start or check a transfer.</p>
-                {guide.notice ? <p role="alert" className="text-[13px] text-[#DC2626]">{guide.notice}</p> : null}
-                <label className="text-[13px] text-[#667085]">Bank reference
-                  <input autoFocus aria-label="Bank reference" value={guide.utr} onChange={(event) => setGuide({ ...guide, utr: event.target.value })} placeholder="At least 6 characters" className={cn('mt-1 h-12 w-full rounded-lg border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]', focusRing)} />
-                </label>
-                <label className="text-[13px] text-[#667085]">Note
-                  <input aria-label="Payment note" value={guide.note} onChange={(event) => setGuide({ ...guide, note: event.target.value })} placeholder="At least 3 characters" className={cn('mt-1 h-12 w-full rounded-lg border border-[#E9E3DD] px-3 text-[16px] text-[#1C1C1C]', focusRing)} />
-                </label>
+              <div className="mt-5 space-y-4">
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+                  <Check className="h-5 w-5 shrink-0 text-emerald-600" />
+                  <p className="text-sm font-semibold">Paid. The reference is saved.</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => void markPaid()}
-                  disabled={busy === guide.vendorId || guide.utr.trim().length < 6 || guide.note.trim().length < 3}
-                  className={cn('h-12 rounded-lg bg-[#6B1D2E] text-[15px] font-semibold text-white hover:bg-[#5A1926] disabled:cursor-not-allowed disabled:bg-[#E9E3DD] disabled:text-[#6B7280]', focusRing)}
+                  onClick={() => setGuide(null)}
+                  className={cn(
+                    'h-11 w-full rounded-xl bg-[#6B1D2E] text-sm font-semibold text-white hover:bg-[#5A1926]',
+                    focusRing,
+                  )}
                 >
-                  {busy === guide.vendorId ? 'Saving…' : 'Mark paid'}
+                  Close
                 </button>
               </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                {/* Bank transfer disclaimer banner */}
+                <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 p-3.5 text-xs leading-relaxed text-blue-900">
+                  <Info className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
+                  <span>
+                    We do not call the bank. This saves the reference you already used. It does not
+                    start or check a bank transfer.
+                  </span>
+                </div>
+
+                {guide.notice ? (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs text-rose-700"
+                  >
+                    {guide.notice}
+                  </div>
+                ) : null}
+
+                {/* Form fields */}
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1C1C1C]">
+                      Bank reference <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      autoFocus
+                      aria-label="Bank reference"
+                      value={guide.utr}
+                      onChange={(event) => setGuide({ ...guide, utr: event.target.value })}
+                      placeholder="Enter bank reference (min 6 characters)"
+                      className={cn(
+                        'mt-1 h-11 w-full rounded-xl border border-[#E9E3DD] bg-white px-3.5 text-sm text-[#1C1C1C] placeholder:text-zinc-400 hover:border-[#CDC4BA]',
+                        focusRing,
+                      )}
+                    />
+                    <p className="mt-1 text-[11px] text-[#667085]">
+                      Must be at least 6 characters (e.g. UTR / NEFT / IMPS reference).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1C1C1C]">
+                      Note <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      aria-label="Payment note"
+                      value={guide.note}
+                      onChange={(event) => setGuide({ ...guide, note: event.target.value })}
+                      placeholder="Enter note (min 3 characters)"
+                      className={cn(
+                        'mt-1 h-11 w-full rounded-xl border border-[#E9E3DD] bg-white px-3.5 text-sm text-[#1C1C1C] placeholder:text-zinc-400 hover:border-[#CDC4BA]',
+                        focusRing,
+                      )}
+                    />
+                    <p className="mt-1 text-[11px] text-[#667085]">
+                      Internal reconciliation note (at least 3 characters).
+                    </p>
+                  </div>
+                </div>
+
+                {/* Modal Footer actions */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E9E3DD]">
+                  <button
+                    type="button"
+                    onClick={() => setGuide(null)}
+                    className={cn(
+                      'h-10 rounded-xl border border-[#E9E3DD] bg-white px-4 text-xs font-semibold text-[#667085] hover:bg-zinc-50 hover:text-[#1C1C1C]',
+                      focusRing,
+                    )}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void markPaid()}
+                    disabled={
+                      busy === guide.vendorId ||
+                      guide.utr.trim().length < 6 ||
+                      guide.note.trim().length < 3
+                    }
+                    className={cn(
+                      'inline-flex h-10 items-center justify-center rounded-xl bg-[#6B1D2E] px-5 text-xs font-semibold text-white shadow-xs hover:bg-[#5A1926] disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 transition-colors',
+                      focusRing,
+                    )}
+                  >
+                    {busy === guide.vendorId ? (
+                      <span className="flex items-center gap-1.5">
+                        <Loader2 className="animate-spin" size={14} />
+                        Saving…
+                      </span>
+                    ) : (
+                      'Mark paid'
+                    )}
+                  </button>
+                </div>
+              </div>
             )}
-            <button type="button" onClick={() => setGuide(null)} className={cn('mt-3 h-11 text-[14px] font-semibold text-[#6B1D2E]', focusRing)}>Close</button>
           </div>
         </div>
       ) : null}
@@ -530,26 +929,28 @@ export function PayablesDashboard() {
   );
 }
 
-function Quiet({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="border-b border-[#E9E3DD] px-5 py-4 last:border-b-0 sm:border-b-0 sm:border-l sm:first:border-l-0">
-      <p className="text-[12px] font-medium text-[#667085]">{label}</p>
-      <p className="mt-1 text-[clamp(1.05rem,1.2vw,1.35rem)] font-semibold tabular-nums text-[#1C1C1C]">{value}</p>
-      <p className="mt-1 text-[12px] leading-4 text-[#667085]">{hint}</p>
-    </div>
-  );
-}
-
 function SupplierIdentity({ row, state }: { row: Row; state: RowState }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <SupplierMark name={row.supplier} logoUrl={row.logoUrl} />
+      <SupplierMark name={row.supplier} logoUrl={row.logoUrl} size="md" />
       <div className="min-w-0">
-        <Link href={`/admin/finance/payables/${row.vendorId}`} className={cn('block truncate font-semibold text-[#1C1C1C] hover:text-[#6B1D2E]', focusRing)}>
+        <Link
+          href={`/admin/finance/payables/${row.vendorId}`}
+          className={cn(
+            'block truncate font-semibold text-sm text-[#1C1C1C] hover:text-[#6B1D2E] transition-colors',
+            focusRing,
+          )}
+        >
           {row.supplier}
         </Link>
-        {row.supplierCode ? <p className="truncate text-[12px] text-[#667085]">{row.supplierCode}</p> : null}
-        <StatusPill tone={STATE_TONE[state]}>{stateLabel(row, state)}</StatusPill>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          {row.supplierCode ? (
+            <span className="truncate text-[11px] font-mono text-[#667085]">
+              {row.supplierCode}
+            </span>
+          ) : null}
+          <StatusPill tone={STATE_TONE[state]}>{stateLabel(row, state)}</StatusPill>
+        </div>
       </div>
     </div>
   );
@@ -557,20 +958,36 @@ function SupplierIdentity({ row, state }: { row: Row; state: RowState }) {
 
 function MoneyItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-[12px] text-[#667085]">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
+    <div className="flex items-baseline justify-between gap-2">
+      <dt className="text-[11px] text-[#667085]">{label}</dt>
+      <dd className="font-semibold tabular-nums text-[#1C1C1C]">{value}</dd>
     </div>
   );
 }
 
-function PayButton({ row, busy, onPay, className }: { row: Row; busy: string; onPay: (row: Row) => void; className?: string }) {
+function PayButton({
+  row,
+  busy,
+  onPay,
+  className,
+}: {
+  row: Row;
+  busy: string;
+  onPay: (row: Row) => void;
+  className?: string;
+}) {
   const saving = busy === row.vendorId;
   const enabled = money(row.eligible) > 0 && !saving;
   if (!saving && settledClear(row)) {
     return (
-      <span onClick={(event) => event.stopPropagation()} className={cn('inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#F0FDF4] px-3 text-[13px] font-semibold text-[#16A34A]', className)}>
-        <Check size={14} aria-hidden />
+      <span
+        onClick={(event) => event.stopPropagation()}
+        className={cn(
+          'inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 select-none',
+          className,
+        )}
+      >
+        <Check size={13} aria-hidden />
         Paid
       </span>
     );
@@ -580,15 +997,27 @@ function PayButton({ row, busy, onPay, className }: { row: Row; busy: string; on
       type="button"
       disabled={!enabled}
       title={enabled ? undefined : payTitle(row)}
-      onClick={(event) => { event.stopPropagation(); if (enabled) onPay(row); }}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (enabled) onPay(row);
+      }}
       className={cn(
-        'rounded-lg px-4 text-[13px] font-semibold',
+        'inline-flex items-center justify-center rounded-xl px-4 py-1.5 text-xs font-semibold transition-all duration-150',
         focusRing,
-        enabled ? 'bg-[#6B1D2E] text-white hover:bg-[#5A1926]' : 'cursor-not-allowed bg-[#E9E3DD] text-[#6B7280]',
+        enabled
+          ? 'bg-[#6B1D2E] text-white shadow-xs hover:bg-[#5A1926] hover:shadow-sm'
+          : 'cursor-not-allowed bg-zinc-100 text-zinc-400 border border-zinc-200/60',
         className,
       )}
     >
-      {saving ? 'Saving…' : 'Pay'}
+      {saving ? (
+        <span className="flex items-center gap-1.5">
+          <Loader2 className="animate-spin" size={13} />
+          Saving…
+        </span>
+      ) : (
+        'Pay'
+      )}
     </button>
   );
 }
@@ -600,20 +1029,52 @@ function pageWindow(page: number, pages: number): number[] {
   return Array.from({ length: end - from + 1 }, (_, index) => from + index);
 }
 
-function ListFooter({ page, pageSize, total, onPage }: { page: number; pageSize: number; total: number; onPage: (page: number) => void }) {
+function ListFooter({
+  page,
+  pageSize,
+  total,
+  onPage,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
+}) {
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const showPager = total > pageSize;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E9E3DD] px-4 py-3 text-[13px] text-[#667085]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E9E3DD] bg-[#FAF7F2]/40 px-5 py-3 text-xs text-[#667085]">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span>Showing {start}–{end} of {total}</span>
-        <Link href="/admin/ledger" className={cn('font-semibold text-[#6B1D2E]', focusRing)}>Older wallet</Link>
+        <span>
+          Showing <span className="font-semibold text-[#1C1C1C]">{start}</span>–
+          <span className="font-semibold text-[#1C1C1C]">{end}</span> of{' '}
+          <span className="font-semibold text-[#1C1C1C]">{total}</span> suppliers
+        </span>
+        <Link
+          href="/admin/ledger"
+          className={cn(
+            'font-semibold text-[#6B1D2E] hover:underline flex items-center gap-1',
+            focusRing,
+          )}
+        >
+          <span>Go to Old Wallet</span>
+          <ArrowRight size={12} />
+        </Link>
       </div>
       {showPager ? (
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} className={cn('flex h-8 w-8 items-center justify-center rounded-lg border border-[#E9E3DD] bg-white disabled:opacity-40', focusRing)}>
+          <button
+            type="button"
+            aria-label="Previous page"
+            disabled={page <= 1}
+            onClick={() => onPage(page - 1)}
+            className={cn(
+              'flex h-8 w-8 items-center justify-center rounded-xl border border-[#E9E3DD] bg-white text-[#667085] hover:text-[#1C1C1C] disabled:opacity-40 shadow-xs',
+              focusRing,
+            )}
+          >
             <ChevronLeft size={15} />
           </button>
           {pageWindow(page, pages).map((number) => (
@@ -623,12 +1084,27 @@ function ListFooter({ page, pageSize, total, onPage }: { page: number; pageSize:
               aria-label={`Page ${number}`}
               aria-current={number === page ? 'page' : undefined}
               onClick={() => onPage(number)}
-              className={cn('h-8 min-w-8 rounded-lg px-2 text-[13px] font-semibold tabular-nums', focusRing, number === page ? 'bg-[#6B1D2E] text-white' : 'border border-[#E9E3DD] bg-white text-[#1C1C1C]')}
+              className={cn(
+                'h-8 min-w-8 rounded-xl px-2.5 text-xs font-semibold tabular-nums transition-colors',
+                focusRing,
+                number === page
+                  ? 'bg-[#6B1D2E] text-white shadow-xs'
+                  : 'border border-[#E9E3DD] bg-white text-[#1C1C1C] hover:bg-[#FAF7F2]',
+              )}
             >
               {number}
             </button>
           ))}
-          <button type="button" aria-label="Next page" disabled={page * pageSize >= total} onClick={() => onPage(page + 1)} className={cn('flex h-8 w-8 items-center justify-center rounded-lg border border-[#E9E3DD] bg-white disabled:opacity-40', focusRing)}>
+          <button
+            type="button"
+            aria-label="Next page"
+            disabled={page * pageSize >= total}
+            onClick={() => onPage(page + 1)}
+            className={cn(
+              'flex h-8 w-8 items-center justify-center rounded-xl border border-[#E9E3DD] bg-white text-[#667085] hover:text-[#1C1C1C] disabled:opacity-40 shadow-xs',
+              focusRing,
+            )}
+          >
             <ChevronRight size={15} />
           </button>
         </div>

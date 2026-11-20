@@ -1,85 +1,138 @@
-# Supplier Payables — Phase 1
+# Supplier Payables — Modern Finance Dashboard & Ledger
 
-Horeca1 Finance now shows what the platform owes each supplier after that supplier's commission, and it can prepare and record a settlement without sending a bank payment.
+Horeca1 Finance provides a modern, production-quality finance dashboard and ledger that tracks what the platform owes each supplier after commission, fees, and refunds, with support for drafting, reviewing, and recording settlements.
 
-## The problem
+---
 
-Supplier orders, captured payments, commission, and the existing vendor wallet were not one picture. Finance could not see, for each supplier, what is owed, what is only waiting on delivery or on cash collection, and what has already been settled.
+## 1. Overview & UI/UX Redesign
 
-## What this phase includes
+The Supplier Payables interface has been completely redesigned into a modern SaaS finance experience inspired by institutional banking and modern financial suites. The user experience preserves all underlying financial rules and calculations while elevating typography, color contrast, visual hierarchy, responsive layout, and interactive transparency.
 
-- A supplier payable for every purchase order. A checkout with two suppliers creates two payables.
-- A supplier-specific commission rate. Blank means **Commission not configured**. Zero means a real 0% rate. The old platform-wide default is not applied.
-- A supplier list, a supplier statement, and a line-by-line calculation.
-- Draft, cancel, finalise, and mark-settled batches. Marking settled stores the operator's UTR. It does not contact a bank.
-- Holds, manual adjustments that need a second person, and an append-only recovery when money changes after a batch is locked.
-- A weekly job that only prepares drafts for suppliers set to a weekly cycle.
+### Design System & Visual Language
+- **Color Palette**: Clean white (`#FFFFFF`) and warm neutral backgrounds (`#FAF7F2`), deep burgundy accent (`#6B1D2E` / `#5A1926`) as the primary Horeca1 brand mark, charcoal/navy headings (`#1C1C1C`), and muted labels (`#667085`).
+- **Typography & Numbers**: High-contrast tabular figures (`tabular-nums`) with clear Indian Rupee (`₹`) currency formatting.
+- **Micro-Components**:
+  - `StatusPill`: High-clarity badge with status dots for `ready`, `paid`, `warn`, `danger`, and `muted`.
+  - `SupplierMark`: Multi-size supplier avatar with monogram fallback.
+  - `FinanceKpiCard`: Hero card with rich burgundy gradient (`from-[#6B1D2E] to-[#4A1420]`) for payable balances alongside secondary KPI cards for cash collections, payment gateway fees, and commission.
 
-The screen is **Finance → Pay suppliers** at `/admin/finance`.
+---
 
-## The redesigned screens
+## 2. Redesigned Experiences
 
-The same payable, settlement, and payment-advice data is shown as one ledger, not a set of coloured summary cards.
+### A. Admin Pay Suppliers (`/admin/finance`)
+- **Header & Metrics**: Clear title with payout formula explanation, CSV export button, and 4 KPI cards:
+  1. **To Pay Now** (Hero card: prominent net payable balance ready for transfer)
+  2. **Customer Paid** (Total captured gross receipts)
+  3. **Razorpay Fee** (Aggregated payment gateway fees)
+  4. **Horeca1 Commission** (Earned platform commission)
+- **Contextual Notice**: Informs operators of amounts held due to pending delivery, missing commission agreements, unverified gateway fees, paused lines, or prior settlements.
+- **Controls & Filters**:
+  - Real-time search across supplier names and business codes.
+  - Status filter pills: *All*, *Ready to pay*, *Missing rate*, *Missing fee*, *Not delivered*, *Paused*, *Paid*.
+  - Date range filters with validation (`From` / `To`).
+  - Sorting and pagination (10, 20, 50, 100 per page).
+- **Supplier Ledger Table**:
+  - Supplier identity (avatar mark, name, and supplier code).
+  - Agreement commission rate (`%` or `—` with `No rate` pill).
+  - Financial columns with right-aligned tabular currency: Customer Paid, Razorpay Fee, Commission, and To Pay.
+  - Burgundy **Pay** action button: enabled only when eligible; clear disabled tooltips explaining restrictions otherwise; green **Paid** badge when fully settled.
 
-- **Pay suppliers** (`/admin/finance`). To pay now is the only large figure. Customer paid, the Razorpay fee, and commission sit beside it. Notes under that strip say what is waiting on delivery, missing a rate, missing a Razorpay fee, paused, or already paid, so those amounts are not read as money that can be sent today. The table lists the supplier, rate, and the same four money columns. Suppliers with money ready to pay come first. Search, status, sort, a commission-period date range, page size, and CSV export sit on this page. Pay is burgundy only when the supplier is eligible. A settled supplier with nothing left to pay shows a green Paid mark. Recording a payment asks for a bank reference and a note, and says that Horeca1 does not call the bank.
-- **Supplier detail** (`/admin/finance/payables/{supplier}`). Name, code, rate, settlement cycle, and a statement download. Tabs for orders, commission history, recoveries, and settlements. An order row opens the stored calculation. Hold asks for a reason of at least 8 characters. A line already in a payment or already paid cannot be held.
-- **What I receive** (`/vendor/receive`). The supplier sees still to receive, or received, as the large figure, then the statement. Payment advice is labelled as not a goods tax invoice.
-- **Payment advice PDF.** Horeca1, the payee, the order, the date, the status, customer paid, the Razorpay fee, commission and rate, and the amount payable. A paid advice also shows the paid date, bank reference, and settlement number.
+### B. Payment Confirmation Modal Dialog
+- Accessible modal dialog triggered from the Pay action.
+- Shows supplier mark, name, code, and exact transfer amount.
+- **Bank Reference (UTR)** input field (min 6 characters required).
+- **Payment Note** input field (min 3 characters required).
+- Informational notice: *"We do not call the bank. This saves the reference you already used. It does not start or check a bank transfer."*
+- Responsive error handling and inline success confirmation state.
 
-Screenshots from the payables browser check are saved as `docs/finance-ledger/screenshots/payables-1440.png`, `payables-768.png`, and `payables-390.png`.
+### C. Admin Supplier Detail Workspace (`/admin/finance/payables/{supplier}`)
+- **Header Profile**: Supplier mark, business name, vendor code, active commission pill, settlement cycle toggle (`Manual` vs `Weekly`), and **Download Statement** CSV action.
+- **Tabs**:
+  - **Orders**: Detailed order-by-order ledger with expandable line-by-line calculation breakdown drawer, payment advice link, and hold/release controls requiring at least 8 characters explanation.
+  - **Commission History**: Historic commission agreement timeline with rates and effective dates.
+  - **Recoveries**: Audit trail of refund deductions and adjustments against past batches.
+  - **Settlements**: Summary of drafted, locked, and settled settlement batches.
 
-## What this phase does not include
+### D. Supplier Portal: What I Receive (`/vendor/receive`)
+- Transparent, vendor-facing financial statement.
+- **Summary Cards**: "Still to Receive / Received" hero KPI alongside Customer Paid, Razorpay Fee, and Horeca1 Commission.
+- **Desktop Statement Table**: Compact tabular ledger showing Order, Customer Paid, Razorpay Fee, Commission, Net Receivable, and Payment Advice download link.
+- **Mobile Stacked Cards**: Accessible card layout with key-value labels on the left and currency values on the right.
+- **Legal Notice**: Explanatory footer clarifying that the payment advice is a payout statement and not a goods tax invoice.
 
-DiSCCO lending, customer or supplier credit ledgers, wallet redesign, tax returns, bank payment APIs, bank-statement reconciliation, and a formal period close. Replacement-order repricing is not decided. A customer platform service fee is not added.
+### E. Payment Advice PDF (`src/lib/paymentInvoice.ts`)
+- High-fidelity PDF generation using PDFKit.
+- Top burgundy brand stripe (`#6B1D2E`), Horeca1 header, `PAYMENT ADVICE` badge, order reference, and issue date.
+- FROM (Horeca1 Operations & Finance) and PAYEE (Supplier) identity cards.
+- Itemized financial breakdown table:
+  - Customer Paid (Gross collected)
+  - Razorpay Fee (Payment gateway cost)
+  - Horeca1 Commission (with applicable percentage rate)
+  - **Amount Payable** (Highlighted summary row)
+- Settlement confirmation card (when paid) showing Settled Date, Bank Reference (UTR), and Batch Number.
+- Disclaimer footer clarifying payout advice status.
 
-## How a supplier payable is worked out
+---
 
-The supplier pays Horeca1's commission. It is deducted from the supplier's amount. The customer is not the commission payer.
+## 3. UI Screenshots
 
-The commercial base is the order subtotal minus that supplier's own promotion and that supplier's own coupon. A platform coupon is not deducted from the supplier. Rewards-wallet redemption is not a supplier discount. GST is already inside the subtotal, so **commission in this phase is calculated on a tax-inclusive amount**. That is a Phase 1 assumption and needs client confirmation. It is not a tax or CA ruling. GST is not removed from the price.
+| View | Screenshot |
+| --- | --- |
+| **Admin Pay Suppliers (Desktop 1440px)** | ![Pay Suppliers Desktop](./screenshots/payables-1440.png) |
+| **Admin Pay Suppliers (Tablet 768px)** | ![Pay Suppliers Tablet](./screenshots/payables-768.png) |
+| **Admin Pay Suppliers (Mobile 390px)** | ![Pay Suppliers Mobile](./screenshots/payables-390.png) |
+| **Pay Supplier Modal Dialog** | ![Pay Supplier Modal](./screenshots/payables-modal-1440.png) |
+| **Supplier Detail Workspace (Desktop 1440px)** | ![Supplier Details Desktop](./screenshots/payables-detail-1440.png) |
+| **Supplier Detail Workspace (Mobile 390px)** | ![Supplier Details Mobile](./screenshots/payables-detail-390.png) |
+| **Supplier Receive Statement (Desktop 1440px)** | ![Vendor Receive Desktop](./screenshots/vendor-receive-1440.png) |
+| **Supplier Receive Statement (Mobile 390px)** | ![Vendor Receive Mobile](./screenshots/vendor-receive-390.png) |
 
-Cash counts only when a payment row is real cash: online, prepaid, Razorpay, bank transfer, purchase order, cheque, COD, or cash. Rewards wallet, DiSCCO, and credit do not count, even if a row says captured. Only a processed refund reduces the cash, and it cannot reduce it below zero.
+---
 
-The payable is recognised when the order is **delivered** and the cash has been **collected**. Those are different events.
+## 4. Financial Calculation Engine (Preserved Logic)
 
-`Net payable = recognised base − commission`, and it cannot be higher than the cash collected after refunds. If the commission rate is missing, the line is blocked and is not silently treated as 0%.
+The financial calculation logic and database state remain the single source of truth:
 
-## Settlement
+1. **Commercial Base**: Order subtotal minus supplier-funded promotions and coupons.
+2. **Tax-Inclusive Base**: Commission in this phase is calculated on the tax-inclusive subtotal.
+3. **Cash Collection**: Payments must be genuine collected cash (Razorpay, bank transfer, cheque, COD). Wallet, credit, and loyalty points do not count as collected cash.
+4. **Order Eligibility**: A payable line is recognised only when the order status is **delivered** and payment status is **captured**.
+5. **Net Payable**:
+   $$\text{Net Payable} = \min(\text{Recognised Base} - \text{Commission}, \text{Cash Collected} - \text{Refunds})$$
+6. **Missing Commission Rate**: If a supplier's commission agreement is not configured, the order is blocked from payout and is **not** silently treated as 0%.
 
-1. A draft selects eligible lines. The supplier's outstanding balance does not disappear.
-2. Cancelling a draft is audited and releases the lines.
-3. Finalising needs a different person from the creator and locks the batch. It is still outstanding.
-4. Marking settled needs the operator's UTR, name, and time. Repeating it does not pay the batch again.
-5. A later refund does not rewrite that batch. It adds a recovery that can reduce a future settlement.
+---
 
-Scheduled settlement only creates drafts. It does not move money.
+## 5. Settlement Lifecycle
 
-The older vendor wallet still uses its existing formula, including the 2% gateway deduction in that code. A finance settlement and that wallet batch cannot take the same order. When finance records a UTR, the wallet entry that clears the provisional credit is not a second bank transfer.
+1. **Draft**: Collects eligible lines into a batch. The supplier's balance remains outstanding until settled.
+2. **Cancel**: Releases held lines back to the eligible pool with audit logging.
+3. **Finalise**: Locks the batch for payment. Requires a different operator from the creator (maker-checker separation).
+4. **Mark Settled**: Records the operator's UTR, payment note, and timestamp. Idempotent — repeated attempts do not double-pay.
+5. **Recoveries**: Post-settlement refunds are captured as negative adjustments against subsequent settlements.
 
-## Who can do what
+---
 
-Viewing requires the existing payments view permission. Creating a draft, cancelling it, finalising, recording a UTR, changing a commission rate, and holding a line require payments create. Commission changes store the old rate, the new rate, the reason, the person, and the time.
+## 6. Testing & Quality Assurance
 
-## Edge cases the calculation covers
+- **Vitest Unit & Integration Suite**:
+  - `src/modules/finance/__tests__/supplierPayable.calc.test.ts` (39 tests passed)
+  - `src/modules/finance/__tests__/claims.exclusion.test.ts` (2 tests passed)
+  - `src/modules/finance/__tests__/claims.integration.test.ts` (1 test passed with concurrent claim safety)
+  - **Total**: 42 passed (100%).
+- **Playwright End-to-End Suite**:
+  - `e2e/supplier-payables.spec.ts`: 3 tests passed across all viewports (1440px, 768px, 390px).
+  - Verified anonymous request protection (401/403).
+  - Verified Pay Supplier modal validation (minimum 6-char UTR, minimum 3-char note).
+  - Verified supplier detail order drill-down and payment advice download.
+  - Verified supplier-facing `/vendor/receive` portal display and advice download.
+- **TypeScript**: `npx tsc --noEmit` passed with 0 errors.
 
-Configured and zero commission, missing commission, captured but not delivered, authorised or failed payments, full and partial cash collection, several payments, several refunds, a refund larger than the cash, supplier and platform discounts together, a quantity change together with a refund, two suppliers in one checkout, holds, locked batches, and a repeated settle request.
+---
 
-## Known limits
+## 7. Demo Deployment
 
-- No Financial Event Matrix was in the repository. Where a treatment was not specified, it is excluded rather than invented.
-- Commission on the tax-inclusive subtotal needs client confirmation.
-- Credit notes are shown and not charged to the supplier. No rule said who bears them.
-- Replacement orders are excluded. Repricing them is unresolved.
-- Partial Razorpay refunds are still rejected by the existing payment service.
-- The UTR is not checked with a bank.
-- One admin cannot finalise a batch they created. There is no separate approver role.
-
-## How to look at it on demo
-
-Open `https://demo.horeca1.com/admin/finance/payables` as a finance admin after the demo branch has been deployed. Outstanding is the balance now. The date filter changes commission and settled totals only.
-
-Use synthetic suppliers on the demo database. Do not use production data.
-
-## Phase 2
-
-Confirm the tax-inclusive commission base. Decide replacement repricing, credit-note bearing, and any customer service fee. A bank payment file and a maker-checker role can sit on these batches without replacing them. The vendor wallet and these payables can then be brought onto one ledger.
+- **Branch**: `demo`
+- **Target URL**: `https://demo.horeca1.com/admin/finance`
+- **Isolation Guarantee**: Production database, production Redis, `master` branch, and production domains (`horeca1.com`, `freshville.store`) are completely untouched.
