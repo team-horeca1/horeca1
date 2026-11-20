@@ -405,7 +405,7 @@ export function PayablesDashboard() {
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#667085]">
             The supplier comes first. Open the arrow to see the dates still to pay, and close it
-            when you are done. Each order is paid on its own row. Pay turns on after delivery.
+            when you are done. Each order has its own Pay. Pay together on the supplier pays every ready order.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
@@ -680,14 +680,12 @@ export function PayablesDashboard() {
                           </p>
                         </div>
                       </div>
-                      {dates.length === 0 ? (
-                        <PayButton
-                          row={row}
-                          busy={busy}
-                          onPay={pay}
-                          className="mt-3.5 h-11 w-full justify-center"
-                        />
-                      ) : null}
+                      <PayButton
+                        row={row}
+                        busy={busy}
+                        onPay={pay}
+                        className="mt-3.5 h-11 w-full justify-center"
+                      />
                     </div>
                     {open && dates.length > 0 ? (
                       <ul className="mt-3 space-y-2 border-l-2 border-[#F3D7DE] pl-3">
@@ -796,9 +794,7 @@ export function PayablesDashboard() {
                             {toPayText(row, state)}
                           </td>
                           <td className="px-5 py-3.5 text-right">
-                            {dates.length === 0 ? (
-                              <PayButton row={row} busy={busy} onPay={pay} className="h-9" />
-                            ) : null}
+                            <PayButton row={row} busy={busy} onPay={pay} className="h-9" />
                           </td>
                         </tr>
                         {open ? dates.map((day) => (
@@ -1151,7 +1147,19 @@ function PayButton({
   className?: string;
 }) {
   const saving = busy === row.vendorId;
+  const payableCount = (row.dates ?? []).filter((day) => day.payable).length;
   if (!saving && settledClear(row)) return <PaidMark className={className} />;
+  if (payableCount >= 2 && money(row.shownToPay) > 0) {
+    return (
+      <ActionButton
+        label="Pay together"
+        enabled
+        busy={saving}
+        onClick={() => onPay(row)}
+        className={className}
+      />
+    );
+  }
   if ((row.dates ?? []).length > 0 || money(row.shownToPay) === 0) return null;
   return (
     <ActionButton
