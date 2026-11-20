@@ -15,7 +15,18 @@ Supplier orders, captured payments, commission, and the existing vendor wallet w
 - Holds, manual adjustments that need a second person, and an append-only recovery when money changes after a batch is locked.
 - A weekly job that only prepares drafts for suppliers set to a weekly cycle.
 
-The screen is **Finance → Supplier Payables** at `/admin/finance/payables`.
+The screen is **Finance → Pay suppliers** at `/admin/finance`.
+
+## The redesigned screens
+
+The same payable, settlement, and payment-advice data is shown as one ledger, not a set of coloured summary cards.
+
+- **Pay suppliers** (`/admin/finance`). To pay now is the only large figure. Customer paid, the Razorpay fee, and commission sit beside it. Notes under that strip say what is waiting on delivery, missing a rate, missing a Razorpay fee, paused, or already paid, so those amounts are not read as money that can be sent today. The table lists the supplier, rate, and the same four money columns. Suppliers with money ready to pay come first. Search, status, sort, a commission-period date range, page size, and CSV export sit on this page. Pay is burgundy only when the supplier is eligible. A settled supplier with nothing left to pay shows a green Paid mark. Recording a payment asks for a bank reference and a note, and says that Horeca1 does not call the bank.
+- **Supplier detail** (`/admin/finance/payables/{supplier}`). Name, code, rate, settlement cycle, and a statement download. Tabs for orders, commission history, recoveries, and settlements. An order row opens the stored calculation. Hold asks for a reason of at least 8 characters. A line already in a payment or already paid cannot be held.
+- **What I receive** (`/vendor/receive`). The supplier sees still to receive, or received, as the large figure, then the statement. Payment advice is labelled as not a goods tax invoice.
+- **Payment advice PDF.** Horeca1, the payee, the order, the date, the status, customer paid, the Razorpay fee, commission and rate, and the amount payable. A paid advice also shows the paid date, bank reference, and settlement number.
+
+Screenshots from the payables browser check are saved as `docs/finance-ledger/screenshots/payables-1440.png`, `payables-768.png`, and `payables-390.png`.
 
 ## What this phase does not include
 

@@ -126,52 +126,57 @@ export async function generatePaymentInvoicePdf(
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const left = 40;
-    const right = doc.page.width - 40;
+    const left = 48;
+    const right = doc.page.width - 48;
     const width = right - left;
     const logo = logoBuffer();
 
-    doc.rect(0, 0, doc.page.width, 8).fill('#6B1D2E');
+    doc.rect(0, 0, doc.page.width, 12).fill('#6B1D2E');
 
     if (logo) {
-      doc.image(logo, left, 28, { height: 34 });
+      doc.image(logo, left, 32, { height: 32 });
     } else {
-      doc.font('Helvetica-Bold').fontSize(16).fillColor('#6B1D2E').text('Horeca1', left, 34);
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#6B1D2E').text('Horeca1', left, 38, { lineBreak: false });
     }
 
     doc.font('Helvetica-Bold').fontSize(16).fillColor('#1C1C1C');
-    doc.text('PAYMENT ADVICE', left, 28, { width, align: 'right', lineBreak: false });
+    doc.text('PAYMENT ADVICE', left, 30, { width, align: 'right', lineBreak: false });
     doc.font('Helvetica').fontSize(10).fillColor('#667085');
-    doc.text(order.orderNumber, left, 50, { width, align: 'right', lineBreak: false });
-    doc.text(formatDate(adviceDate), left, 64, { width, align: 'right', lineBreak: false });
+    doc.text(`Order  ${order.orderNumber}`, left, 52, { width, align: 'right', lineBreak: false });
+    doc.text(`Date  ${formatDate(adviceDate)}`, left, 66, { width, align: 'right', lineBreak: false });
     doc.font('Helvetica-Bold').fontSize(10).fillColor(line.status === 'settled' ? '#16A34A' : '#6B1D2E');
-    doc.text(statusLabel.toUpperCase(), left, 80, { width, align: 'right', lineBreak: false });
+    doc.text(statusLabel, left, 82, { width, align: 'right', lineBreak: false });
 
     doc.moveTo(left, 108).lineTo(right, 108).strokeColor('#E9E3DD').stroke();
 
     const boxTop = 124;
-    const boxH = 88;
+    const boxH = 104;
     const gap = 16;
     const boxW = (width - gap) / 2;
-    doc.rect(left, boxTop, boxW, boxH).strokeColor('#E9E3DD').stroke();
-    doc.rect(left + boxW + gap, boxTop, boxW, boxH).stroke();
+    doc.save();
+    doc.rect(left, boxTop, boxW, boxH).fill('#FAF7F2');
+    doc.rect(left + boxW + gap, boxTop, boxW, boxH).fill('#FAF7F2');
+    doc.restore();
 
-    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('FROM', left + 12, boxTop + 10, { lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#1C1C1C').text('Horeca1', left + 12, boxTop + 26, { lineBreak: false });
-    doc.font('Helvetica').fontSize(10).fillColor('#667085').text('Marketplace payout', left + 12, boxTop + 46, { lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('FROM', left + 14, boxTop + 12, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(13).fillColor('#1C1C1C').text('Horeca1', left + 14, boxTop + 30, { lineBreak: false });
+    doc.font('Helvetica').fontSize(10).fillColor('#667085').text('Marketplace payout', left + 14, boxTop + 50, { lineBreak: false });
+    doc.text('Does not start a bank transfer', left + 14, boxTop + 66, { width: boxW - 28, lineBreak: false });
 
-    const payeeX = left + boxW + gap + 12;
-    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('PAYEE', payeeX, boxTop + 10, { lineBreak: false });
+    const payeeX = left + boxW + gap + 14;
+    doc.font('Helvetica').fontSize(9).fillColor('#667085').text('PAYEE', payeeX, boxTop + 12, { lineBreak: false });
     payeeLines.slice(0, 4).forEach((part, index) => {
-      doc.font(index === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(index === 0 ? 12 : 10).fillColor('#1C1C1C');
-      doc.text(part, payeeX, boxTop + 26 + index * 14, { width: boxW - 24, height: 14, ellipsis: true, lineBreak: false });
+      doc.font(index === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(index === 0 ? 13 : 10).fillColor(index === 0 ? '#1C1C1C' : '#667085');
+      doc.text(part, payeeX, boxTop + 30 + index * 16, { width: boxW - 28, height: 16, ellipsis: true, lineBreak: false });
     });
 
     let y = boxTop + boxH + 28;
+    doc.save();
     doc.rect(left, y, width, 28).fill('#FAF7F2');
+    doc.restore();
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#667085');
-    doc.text('DESCRIPTION', left + 12, y + 9);
-    doc.text('AMOUNT', left, y + 9, { width: width - 12, align: 'right' });
+    doc.text('DESCRIPTION', left + 14, y + 9);
+    doc.text('AMOUNT', left, y + 9, { width: width - 14, align: 'right' });
     y += 28;
 
     const rows: Array<{ label: string; value: string; total?: boolean }> = [
@@ -182,32 +187,39 @@ export async function generatePaymentInvoicePdf(
     ];
 
     for (const row of rows) {
-      const rowH = row.total ? 40 : 32;
-      if (row.total) doc.rect(left, y, width, rowH).fill('#F8E8EC');
+      const rowH = row.total ? 42 : 32;
+      if (row.total) {
+        doc.save();
+        doc.rect(left, y, width, rowH).fill('#F8E8EC');
+        doc.restore();
+      }
       doc.moveTo(left, y + rowH).lineTo(right, y + rowH).strokeColor('#E9E3DD').stroke();
       doc.font(row.total ? 'Helvetica-Bold' : 'Helvetica').fontSize(row.total ? 12 : 11);
       doc.fillColor(row.total ? '#6B1D2E' : '#1C1C1C');
-      doc.text(row.label, left + 12, y + (row.total ? 13 : 9), { width: width * 0.62, lineBreak: false });
-      doc.text(row.value, left, y + (row.total ? 13 : 9), { width: width - 12, align: 'right', lineBreak: false });
+      doc.text(row.label, left + 14, y + (row.total ? 14 : 10), { width: width * 0.62, lineBreak: false });
+      doc.text(row.value, left, y + (row.total ? 14 : 10), { width: width - 14, align: 'right', lineBreak: false });
       y += rowH;
     }
 
+    const paidFacts = [
+      line.status === 'settled' && line.batch?.settledAt ? `Paid date  ${formatDate(line.batch.settledAt)}` : '',
+      line.batch?.bankReference ? `Bank reference  ${line.batch.bankReference}` : '',
+      line.batch?.batchNumber ? `Settlement  ${line.batch.batchNumber}` : '',
+    ].filter((fact) => fact.length > 0);
+
     y += 22;
-    doc.font('Helvetica').fontSize(10).fillColor('#1C1C1C');
-    if (line.status === 'settled' && line.batch?.settledAt) {
-      doc.text(`Paid on ${formatDate(line.batch.settledAt)}`, left, y);
-      y += 16;
-    }
-    if (line.batch?.bankReference) {
-      doc.text(`Bank reference  ${line.batch.bankReference}`, left, y);
-      y += 16;
-    }
-    if (line.batch?.batchNumber) {
-      doc.text(`Settlement  ${line.batch.batchNumber}`, left, y);
-      y += 16;
+    if (paidFacts.length > 0) {
+      const box = 18 + paidFacts.length * 16;
+      doc.save();
+      doc.rect(left, y, width, box).fill('#F0FDF4');
+      doc.restore();
+      doc.font('Helvetica').fontSize(10).fillColor('#166534');
+      paidFacts.forEach((fact, index) => {
+        doc.text(fact, left + 14, y + 10 + index * 16, { width: width - 28, lineBreak: false });
+      });
+      y += box + 16;
     }
 
-    y += 10;
     doc.font('Helvetica').fontSize(9).fillColor('#667085');
     doc.text(
       'This payment advice is the amount Horeca1 transfers to the supplier. It is not a tax invoice for goods, and it does not move money by itself.',

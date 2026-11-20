@@ -20,6 +20,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       to: url.searchParams.get('to') ?? undefined,
       sort: url.searchParams.get('sort') ?? undefined,
       page: Number(url.searchParams.get('page') ?? '1'),
+      pageSize: Number(url.searchParams.get('pageSize') ?? '20'),
     });
     return NextResponse.json({
       success: true,

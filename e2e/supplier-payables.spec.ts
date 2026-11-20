@@ -37,7 +37,7 @@ test.describe('Supplier payables', () => {
     await expect(page.getByRole('heading', { name: 'Pay suppliers' })).toBeVisible();
     await expect(page.getByText('We do not call the bank.')).toBeVisible();
     await expect(page.getByText('To pay').first()).toBeVisible();
-    await expect(page.getByText('Razorpay cut').first()).toBeVisible();
+    await expect(page.getByText('Razorpay fee').first()).toBeVisible();
 
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
@@ -90,7 +90,7 @@ test.describe('Supplier payables', () => {
 
     await ready.getByRole('link', { name: 'Fee Example Supply' }).click();
     await expect(page.getByRole('heading', { name: 'Fee Example Supply' })).toBeVisible();
-    await expect(page.getByRole('row', { name: /PO-FEE-100/ }).getByRole('link', { name: 'Payment invoice' })).toBeVisible();
+    await expect(page.getByRole('row', { name: /PO-FEE-100/ }).getByRole('link', { name: 'Payment advice' })).toBeVisible();
     await page.goto('/admin/finance');
 
     const invoice = await page.request.get(`/api/v1/admin/orders/${FEE_ORDER}/invoice`);

@@ -434,6 +434,7 @@ export async function listSupplierPayables(query: PayableListQuery) {
       businessName: true,
       displayName: true,
       vendorCode: true,
+      logoUrl: true,
       platformFeePct: true,
       settlementCycle: true,
     },
@@ -495,14 +496,18 @@ export async function listSupplierPayables(query: PayableListQuery) {
         netPaise: sum.netPaise + quote.netPaise,
       };
     }, { feePaise: 0, feeUnknown: false, commissionPaise: 0, netPaise: 0 });
-    const latestSettled = batches.find((batch) => batch.vendorId === vendor.id && batch.status === 'settled');
-    const settledPaise = batches
-      .filter((batch) => batch.vendorId === vendor.id && batch.status === 'settled')
-      .reduce((sum, batch) => sum + rupeesToPaise(batch.netAmount.toString()), 0);
+    const settledBatches = batches.filter((batch) => batch.vendorId === vendor.id && batch.status === 'settled');
+    const latestSettled = settledBatches.reduce<(typeof settledBatches)[number] | undefined>((latest, batch) => {
+      if (!batch.settledAt) return latest;
+      if (!latest?.settledAt || batch.settledAt.getTime() > latest.settledAt.getTime()) return batch;
+      return latest;
+    }, undefined);
+    const settledPaise = settledBatches.reduce((sum, batch) => sum + rupeesToPaise(batch.netAmount.toString()), 0);
     return {
       vendorId: vendor.id,
       supplier: (vendor.displayName?.trim() || vendor.businessName).trim(),
       supplierCode: vendor.vendorCode,
+      logoUrl: vendor.logoUrl,
       ratePct: vendor.platformFeePct == null ? null : vendor.platformFeePct.toString(),
       commissionConfigured: vendor.platformFeePct != null,
       settlementCycle: vendor.settlementCycle,
@@ -539,14 +544,23 @@ export async function listSupplierPayables(query: PayableListQuery) {
     const attention = (row: { shownToPayPaise: number; eligibleSalePaise: number }) => (
       row.shownToPayPaise > 0 ? row.shownToPayPaise : row.eligibleSalePaise
     );
+    const settledAt = (iso: string | null) => {
+      if (!iso) return 0;
+      const ms = Date.parse(iso);
+      return Number.isFinite(ms) ? ms : 0;
+    };
     const map: Record<string, number> = {
       supplier: a.supplier.localeCompare(b.supplier),
       outstanding: attention(a) - attention(b),
       eligible: a.eligiblePaise - b.eligiblePaise,
       commission: a.commissionPaise - b.commissionPaise,
       settled: a.settledPaise - b.settledPaise,
+      latest: settledAt(a.latestSettlement) - settledAt(b.latestSettlement),
+      ready: (a.eligiblePaise > 0 ? 1 : 0) - (b.eligiblePaise > 0 ? 1 : 0),
     };
-    return (map[key] ?? a.outstandingPaise - b.outstandingPaise) * (key === 'supplier' ? 1 : dir);
+    const primary = (map[key] ?? a.outstandingPaise - b.outstandingPaise) * (key === 'supplier' ? 1 : dir);
+    if (primary !== 0) return primary;
+    return attention(b) - attention(a);
   });
 
   const outstanding = filtered.reduce((sum, row) => sum + row.outstandingPaise, 0);
@@ -624,6 +638,7 @@ export async function getSupplierPayableDetail(vendorId: string) {
       vendorCode: true,
       platformFeePct: true,
       settlementCycle: true,
+      logoUrl: true,
     },
   });
   if (!vendor) throw Errors.notFound('Supplier');
