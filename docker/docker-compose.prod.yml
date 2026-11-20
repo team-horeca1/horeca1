@@ -101,7 +101,9 @@ services:
       retries: 5
 
   nginx:
-    image: nginx:alpine
+    # Pinned: 1.30.7 fixes CVE-2026-123633 and CVE-2026-123007.
+    # nginx:alpine on this droplet was the vulnerable 1.29.7 build.
+    image: nginx:1.30.7-alpine
     container_name: horeca1-nginx
     restart: unless-stopped
     ports:
