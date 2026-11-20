@@ -173,6 +173,25 @@ export function liabilityBucket(status: PayableStatus): LiabilityBucket | null {
   }
 }
 
+/** Null when this recovery cannot be taken from the room left on the batch. A zero amount still fits. */
+export function roomAfterRecovery(roomPaise: number, amountPaise: number): number | null {
+  if (roomPaise <= 0 || amountPaise > roomPaise) return null;
+  return roomPaise - amountPaise;
+}
+
+/** Same fit rule as a settlement batch: skip a recovery that is larger than the room left, in list order. */
+export function appliedRecoveryPaise(amountsPaise: number[], lineNetPaise: number): number {
+  let room = Math.max(0, lineNetPaise);
+  let applied = 0;
+  for (const amount of amountsPaise) {
+    const next = roomAfterRecovery(room, amount);
+    if (next == null) continue;
+    applied += room - next;
+    room = next;
+  }
+  return applied;
+}
+
 export function outstandingPaise(
   rows: Array<{ status: PayableStatus; netPayablePaise: number }>,
   unappliedRecoveryPaise = 0,

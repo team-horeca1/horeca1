@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
 import { paiseToRupees, rupeesToPaise } from '@/modules/finance/money';
+import { roomAfterRecovery } from '@/modules/finance/supplierPayable.calc';
 import { claimOrders, releaseFinanceClaims, sweepOrphanFinanceClaims } from '@/modules/finance/claims';
 import { refreshSupplierPayable, recomputeDraftBatch } from '@/modules/finance/supplierPayable.service';
 import {
@@ -50,14 +51,14 @@ async function applyOpenRecovery(tx: Prisma.TransactionClient, vendorId: string,
   });
   let room = Math.max(0, lineNetPaise);
   for (const event of open) {
-    if (room <= 0) break;
     const amount = rupeesToPaise(event.amount.toString());
-    if (amount > room) continue;
+    const next = roomAfterRecovery(room, amount);
+    if (next == null) continue;
     await tx.supplierPayableEvent.update({
       where: { id: event.id },
       data: { appliedBatchId: batchId },
     });
-    room -= amount;
+    room = next;
   }
 }
 
@@ -356,22 +357,22 @@ export async function paySupplierNow(input: {
   actorId: string;
   utr: string;
   note: string;
+  expectedNet?: string;
 }) {
   const note = input.note.trim();
   if (note.length < 3) throw Errors.badRequest('Add a short note');
-  const open = await prisma.financeSettlementBatch.findFirst({
-    where: { vendorId: input.vendorId, status: { in: ['draft', 'in_review', 'finalised'] } },
-    orderBy: { createdAt: 'desc' },
-  });
-  let batchId = open?.id;
-  let status = open?.status;
-  if (!batchId) {
-    const draft = await createFinanceDraft({ vendorId: input.vendorId, actorId: input.actorId });
-    batchId = draft.batch.id;
-    status = 'draft';
+  // Pay the lines that are eligible now. An older open batch is a separate
+  // settlement and must not be marked paid in place of those lines.
+  const draft = await createFinanceDraft({ vendorId: input.vendorId, actorId: input.actorId });
+  const batchId = draft.batch.id;
+  if (input.expectedNet != null) {
+    const expected = rupeesToPaise(input.expectedNet);
+    const actual = rupeesToPaise(draft.batch.netAmount.toString());
+    if (expected !== actual) {
+      await cancelFinanceDraft(batchId, input.actorId, 'Amount changed before the payment was recorded');
+      throw Errors.badRequest('The amount changed. Reload the page and confirm the new amount.');
+    }
   }
-  if (status === 'draft' || status === 'in_review') {
-    await finaliseFinanceBatch(batchId, input.actorId);
-  }
+  await finaliseFinanceBatch(batchId, input.actorId);
   return markFinanceBatchSettled(batchId, input.actorId, input.utr, note);
 }

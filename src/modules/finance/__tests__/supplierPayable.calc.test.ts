@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commissionPaise, paiseToRupees, rupeesToPaise } from '@/modules/finance/money';
 import {
+  appliedRecoveryPaise,
   assessPayable,
   assertSingleBucket,
   grossCashPaise,
@@ -392,6 +393,12 @@ describe('reconciliation invariants', () => {
     expect(outstandingPaise(drafted)).toBe(200);
     const settled = drafted.map((row) => row.id === 'a' ? { ...row, status: 'settled' as const } : row);
     expect(outstandingPaise(settled)).toBe(100);
+  });
+
+  it('skips a recovery that is larger than the room and keeps the rest', () => {
+    expect(appliedRecoveryPaise([20_000, 50_000, 10_000], 40_000)).toBe(30_000);
+    expect(appliedRecoveryPaise([50_000], 40_000)).toBe(0);
+    expect(appliedRecoveryPaise([], 40_000)).toBe(0);
   });
 
   it('subtracts an open recovery without copying the settled liability', () => {

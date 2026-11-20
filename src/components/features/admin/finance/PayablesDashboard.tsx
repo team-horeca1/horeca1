@@ -89,8 +89,7 @@ function feeText(row: Row): string {
 
 function toPayText(row: Row, state: RowState): string {
   if (state === 'paid') return inr(row.settled);
-  if (money(row.shownToPay) > 0) return inr(row.shownToPay);
-  if (state === 'ready') return inr(row.eligible);
+  if (state === 'ready' || money(row.shownToPay) > 0) return inr(row.shownToPay);
   return '—';
 }
 
@@ -209,7 +208,12 @@ export function PayablesDashboard() {
       const res = await fetch('/api/v1/admin/finance/payables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId: guide.vendorId, utr: guide.utr.trim(), note: guide.note.trim() }),
+        body: JSON.stringify({
+          vendorId: guide.vendorId,
+          utr: guide.utr.trim(),
+          note: guide.note.trim(),
+          amount: guide.net,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? 'Could not mark this paid');
@@ -217,6 +221,12 @@ export function PayablesDashboard() {
       await load();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not mark this paid';
+      if (/amount changed/i.test(message)) {
+        setGuide(null);
+        await load();
+        setError('The amount changed. Check the new To pay figure, then pay again.');
+        return;
+      }
       setGuide((current) => current ? { ...current, notice: message } : current);
     } finally {
       setBusy('');
@@ -276,7 +286,7 @@ export function PayablesDashboard() {
       supplier: row.supplier,
       code: row.supplierCode,
       vendorId: row.vendorId,
-      net: row.eligible,
+      net: row.shownToPay,
       utr: '',
       note: '',
       notice: '',

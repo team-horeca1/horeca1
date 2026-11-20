@@ -15,6 +15,15 @@ import {
 import { allocatePaise, rupeesToPaise } from '@/modules/finance/money';
 import crypto from 'crypto';
 
+async function refreshPayables(orderIds: string[]) {
+  const ids = [...new Set(orderIds)];
+  if (ids.length === 0) return;
+  const { refreshSupplierPayable } = await import('@/modules/finance/supplierPayable.service');
+  for (const orderId of ids) {
+    await refreshSupplierPayable(orderId);
+  }
+}
+
 function timingSafeEqHex(expectedHex?: string | null, providedHex?: string | null): boolean {
   if (!expectedHex || !providedHex || expectedHex.length !== providedHex.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expectedHex, 'utf8'), Buffer.from(providedHex, 'utf8'));
@@ -288,6 +297,7 @@ export class PaymentService {
 
     const open = payments.filter((p) => p.status !== 'captured' && p.status !== 'refunded');
     if (open.length === 0) {
+      await refreshPayables(payments.map((payment) => payment.orderId));
       return {
         success: true as const,
         payment_status: 'captured' as const,
@@ -346,6 +356,7 @@ export class PaymentService {
       console.error('[Payment] Program issuance after capture failed:', err);
     }
 
+    await refreshPayables(open.map((payment) => payment.orderId));
     return { success: true as const, payment_status: 'captured' as const, orders_paid: open.length };
   }
 
@@ -451,6 +462,7 @@ export class PaymentService {
       });
     }
 
+    await refreshPayables(finished.map((payment) => payment.orderId));
     return { processed: true as const, orderIds: finished.map((p) => p.orderId) };
   }
 

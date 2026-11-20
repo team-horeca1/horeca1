@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
 import { paiseToRupees, rupeesToPaise } from '@/modules/finance/money';
 import {
+  appliedRecoveryPaise,
   assessPayable,
   isCashMethod,
   outstandingPaise,
@@ -363,7 +364,7 @@ export async function setSupplierCommission(input: {
   if (input.ratePct != null && (!Number.isFinite(input.ratePct) || input.ratePct < 0 || input.ratePct > 100)) {
     throw Errors.badRequest('Commission rate must be between 0 and 100, or empty when it is not configured');
   }
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const vendor = await tx.vendor.findUnique({
       where: { id: input.vendorId },
       select: { platformFeePct: true },
@@ -392,6 +393,8 @@ export async function setSupplierCommission(input: {
     });
     return { previous, next: input.ratePct == null ? null : input.ratePct.toFixed(2) };
   });
+  await refreshVendorPayables(input.vendorId);
+  return result;
 }
 
 export async function refreshVendorPayables(vendorId: string) {
@@ -440,9 +443,6 @@ export async function listSupplierPayables(query: PayableListQuery) {
     },
     take: 300,
   });
-  for (const vendor of vendors) {
-    await refreshVendorPayables(vendor.id);
-  }
 
   const from = query.from ? new Date(query.from) : null;
   const to = query.to ? new Date(query.to) : null;
@@ -468,14 +468,24 @@ export async function listSupplierPayables(query: PayableListQuery) {
     ? []
     : await prisma.supplierPayableEvent.findMany({
       where: { vendorId: { in: vendorIds }, eventType: 'recovery', appliedBatchId: null },
-      select: { vendorId: true, amount: true },
+      select: { vendorId: true, amount: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
     });
+
+  const recoveryPaiseByVendor = new Map<string, number[]>();
+  for (const row of recoveries) {
+    const amounts = recoveryPaiseByVendor.get(row.vendorId) ?? [];
+    amounts.push(rupeesToPaise(row.amount.toString()));
+    recoveryPaiseByVendor.set(row.vendorId, amounts);
+  }
 
   const rows = vendors.map((vendor) => {
     const own = lines.filter((line) => line.vendorId === vendor.id);
-    const recovery = recoveries
-      .filter((row) => row.vendorId === vendor.id)
-      .reduce((sum, row) => sum + rupeesToPaise(row.amount.toString()), 0);
+    const openRecoveryPaise = recoveryPaiseByVendor.get(vendor.id) ?? [];
+    const recovery = openRecoveryPaise.reduce((sum, amount) => sum + amount, 0);
+    const eligibleNetPaise = own
+      .filter((line) => line.status === 'eligible')
+      .reduce((sum, line) => sum + rupeesToPaise(line.netPayable.toString()), 0);
     const openBatches = batches.filter((batch) => batch.vendorId === vendor.id && OPEN_BATCH.has(batch.status));
     const parts = [
       ...own.filter((line) => line.status === 'eligible' || line.status === 'on_hold').map((line) => ({
@@ -515,11 +525,11 @@ export async function listSupplierPayables(query: PayableListQuery) {
       razorpayFeePaise: own.reduce((sum, line) => sum + (line.razorpayFee == null ? 0 : rupeesToPaise(line.razorpayFee.toString())), 0) + preview.feePaise,
       razorpayFeeUnknown: own.some((line) => line.razorpayFeeUnknown) || preview.feeUnknown,
       commissionPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.commissionAmount.toString()), 0) + preview.commissionPaise,
-      shownToPayPaise: own.filter((line) => line.status === 'eligible').reduce((sum, line) => sum + rupeesToPaise(line.netPayable.toString()), 0) + preview.netPaise,
+      shownToPayPaise: Math.max(0, eligibleNetPaise - appliedRecoveryPaise(openRecoveryPaise, eligibleNetPaise)),
       waitingDelivery: own.some((line) => line.status === 'awaiting_completion'),
       adjustmentPaise: own.reduce((sum, line) => sum + rupeesToPaise(line.aboveCash.toString()), 0),
       outstandingPaise: outstandingPaise(parts, recovery),
-      eligiblePaise: own.filter((line) => line.status === 'eligible').reduce((sum, line) => sum + rupeesToPaise(line.netPayable.toString()), 0),
+      eligiblePaise: eligibleNetPaise,
       onHoldPaise: own.filter((line) => line.status === 'on_hold').reduce((sum, line) => sum + rupeesToPaise(line.netPayable.toString()), 0),
       settledPaise,
       latestSettlement: latestSettled?.settledAt?.toISOString() ?? null,
@@ -564,7 +574,7 @@ export async function listSupplierPayables(query: PayableListQuery) {
   });
 
   const outstanding = filtered.reduce((sum, row) => sum + row.outstandingPaise, 0);
-  const eligible = filtered.reduce((sum, row) => sum + row.eligiblePaise, 0);
+  const eligible = filtered.reduce((sum, row) => sum + row.shownToPayPaise, 0);
   const onHold = filtered.reduce((sum, row) => sum + row.onHoldPaise, 0);
   const pendingCapture = lines
     .filter((line) => line.status === 'pending_capture')

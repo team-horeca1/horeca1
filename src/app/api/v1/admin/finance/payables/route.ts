@@ -67,6 +67,7 @@ const draftSchema = z.object({
   idempotencyKey: z.string().min(8).max(80).optional(),
   utr: z.string().min(6).optional(),
   note: z.string().min(3).max(500).optional(),
+  amount: z.string().min(1).max(20).optional(),
 });
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
@@ -79,6 +80,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         actorId: ctx.userId,
         utr: body.utr,
         note: body.note,
+        expectedNet: body.amount,
       });
       void logAction(ctx, req, {
         action: AUDIT_ACTIONS.supplierSettlementSettle,
