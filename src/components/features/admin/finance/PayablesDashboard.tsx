@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -16,7 +17,6 @@ import {
   Search,
   Info,
   AlertCircle,
-  Clock,
   ArrowRight,
   SlidersHorizontal,
   X,
@@ -194,24 +194,6 @@ function activeSort(status: string, sortKey: SortKey): Exclude<SortKey, ''> {
   return 'ready';
 }
 
-function contextNotes(kpis: Kpis, ranged: boolean): string[] {
-  const notes: string[] = [];
-  const waiting = money(kpis.quotedNet) > 0 ? kpis.quotedNet : kpis.awaitingCompletion;
-  if (money(waiting) > 0)
-    notes.push(`Waiting for delivery. ${inr(waiting)} is captured and is not payable yet.`);
-  if (money(kpis.blockedSale) > 0)
-    notes.push(
-      `Missing commission rate. ${inr(kpis.blockedSale)} stays unpaid until a rate is set. A blank rate is not 0%.`,
-    );
-  if (kpis.razorpayFeeUnknown)
-    notes.push('Missing Razorpay fee. Pay stays off for those orders until the fee arrives.');
-  if (money(kpis.onHold) > 0)
-    notes.push(`Paused. ${inr(kpis.onHold)} is held and is not in To pay now.`);
-  if (money(kpis.settledPeriod) > 0)
-    notes.push(`Already paid ${inr(kpis.settledPeriod)}${ranged ? ' in this period' : ''}.`);
-  return notes;
-}
-
 function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
@@ -232,6 +214,7 @@ export function PayablesDashboard() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [openSuppliers, setOpenSuppliers] = useState<Record<string, boolean>>({});
   const [guide, setGuide] = useState<{
     supplier: string;
     code: string | null;
@@ -384,6 +367,10 @@ export function PayablesDashboard() {
     }
   }
 
+  function toggleSupplier(vendorId: string) {
+    setOpenSuppliers((current) => ({ ...current, [vendorId]: !current[vendorId] }));
+  }
+
   function openSupplier(event: React.MouseEvent, vendorId: string) {
     if ((event.target as HTMLElement).closest('a, button')) return;
     router.push(`/admin/finance/payables/${vendorId}`);
@@ -406,7 +393,6 @@ export function PayablesDashboard() {
     });
   }
 
-  const notes = kpis ? contextNotes(kpis, Boolean(from || to)) : [];
   const sortValue = activeSort(status, sortKey);
 
   return (
@@ -427,8 +413,8 @@ export function PayablesDashboard() {
             Pay suppliers
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#667085]">
-            The supplier comes first. Dates underneath are what is still to pay. Pay is visible
-            before delivery and turns on after delivery. Pay together settles every ready order.
+            The supplier comes first. Open the arrow to see the dates still to pay, and close it
+            when you are done. Pay turns on after delivery. Pay together settles every ready date.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
@@ -499,22 +485,6 @@ export function PayablesDashboard() {
               iconTone="purple"
             />
           </section>
-
-          {notes.length > 0 ? (
-            <div className="rounded-xl border border-[#F3E7CA] bg-gradient-to-r from-[#FFFDF8] via-[#FFFBF2] to-[#FFFDF8] p-4 text-xs text-[#8A5A1F] shadow-xs">
-              <div className="flex items-center gap-2 font-semibold text-[#6E4717] mb-2">
-                <Info size={15} className="shrink-0 text-[#9E6520]" />
-                <span>Non-payable amounts & contextual notes:</span>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 list-disc list-inside text-[#7C511B]">
-                {notes.map((note) => (
-                  <li key={note} className="leading-relaxed">
-                    {note}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -691,6 +661,7 @@ export function PayablesDashboard() {
               {rows.map((row) => {
                 const state = rowState(row);
                 const dates = row.dates ?? [];
+                const open = openSuppliers[row.vendorId] === true;
                 return (
                   <li key={row.vendorId} className="p-4">
                     <div
@@ -698,7 +669,14 @@ export function PayablesDashboard() {
                       className="cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <SupplierIdentity row={row} state={state} />
+                        <div className="flex min-w-0 items-start gap-2">
+                          <HierarchyToggle
+                            count={dates.length}
+                            open={open}
+                            onToggle={() => toggleSupplier(row.vendorId)}
+                          />
+                          <SupplierIdentity row={row} state={state} />
+                        </div>
                         <div className="text-right">
                           <span className="block text-[11px] font-medium text-[#667085]">To pay</span>
                           <p
@@ -719,7 +697,7 @@ export function PayablesDashboard() {
                         className="mt-3.5 h-11 w-full justify-center"
                       />
                     </div>
-                    {dates.length > 0 ? (
+                    {open && dates.length > 0 ? (
                       <ul className="mt-3 space-y-2 border-l-2 border-[#F3D7DE] pl-3">
                         {dates.map((day) => (
                           <li key={`${day.date}-${day.waitingDelivery}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F2] px-3 py-2.5">
@@ -788,6 +766,7 @@ export function PayablesDashboard() {
                   {rows.map((row) => {
                     const state = rowState(row);
                     const dates = row.dates ?? [];
+                    const open = openSuppliers[row.vendorId] === true;
                     return (
                       <React.Fragment key={row.vendorId}>
                         <tr
@@ -795,7 +774,14 @@ export function PayablesDashboard() {
                           className="cursor-pointer border-t border-[#E9E3DD] transition-colors duration-100 hover:bg-[#FAF7F2]/70"
                         >
                           <td className="px-5 py-3.5">
-                            <SupplierIdentity row={row} state={state} />
+                            <div className="flex items-center gap-2">
+                              <HierarchyToggle
+                                count={dates.length}
+                                open={open}
+                                onToggle={() => toggleSupplier(row.vendorId)}
+                              />
+                              <SupplierIdentity row={row} state={state} />
+                            </div>
                           </td>
                           <td className="whitespace-nowrap px-3.5 py-3.5 text-right tabular-nums font-medium text-[#667085]">
                             {row.ratePct == null ? '—' : `${row.ratePct}%`}
@@ -827,7 +813,7 @@ export function PayablesDashboard() {
                             />
                           </td>
                         </tr>
-                        {dates.map((day) => (
+                        {open ? dates.map((day) => (
                           <tr key={`${row.vendorId}-${day.date}-${day.waitingDelivery}`} className="bg-[#FAF7F2]/70">
                             <td className="border-l-2 border-[#F3D7DE] py-2.5 pl-12 pr-5">
                               <p className="font-semibold text-[#1C1C1C]">{formatPayDate(day.date)}</p>
@@ -852,7 +838,7 @@ export function PayablesDashboard() {
                               />
                             </td>
                           </tr>
-                        ))}
+                        )) : null}
                       </React.Fragment>
                     );
                   })}
@@ -1031,6 +1017,40 @@ export function PayablesDashboard() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function HierarchyToggle({
+  count,
+  open,
+  onToggle,
+}: {
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (count === 0) return <span className="inline-block w-8" aria-hidden />;
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? 'Hide dates' : 'Show dates'}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+      className={cn(
+        'inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-[#E9E3DD] bg-white px-1.5 text-[11px] font-semibold text-[#6B1D2E] hover:bg-[#F8E8EC]',
+        focusRing,
+      )}
+    >
+      <ChevronDown
+        size={14}
+        aria-hidden
+        className={cn('transition-transform duration-150', open ? 'rotate-0' : '-rotate-90')}
+      />
+      <span className="pr-1 tabular-nums">{count}</span>
+    </button>
   );
 }
 
