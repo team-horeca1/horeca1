@@ -35,9 +35,15 @@ export default function JournalPage() {
           <h1 className="text-[clamp(1.4rem,2vw+0.8rem,2rem)] font-semibold">Journal</h1>
           <p className="text-[13px] text-[#667085]">Shadow totals next to the books that still move money. LEDGER_LIVE is off.</p>
         </div>
-        <a href="/api/v1/admin/journal/differences?format=csv" className="min-h-12 rounded-xl border border-[#E9E3DD] bg-white px-4 text-[13px] font-semibold leading-[3rem]">
+        <button
+          type="button"
+          onClick={() => {
+            window.location.assign('/api/v1/admin/journal/differences?format=csv');
+          }}
+          className="min-h-12 rounded-xl border border-[#E9E3DD] bg-white px-4 text-[13px] font-semibold leading-[3rem]"
+        >
           Download CSV
-        </a>
+        </button>
       </header>
       <form
         className="grid gap-3 rounded-2xl border border-[#E9E3DD] bg-white p-4 sm:grid-cols-2"

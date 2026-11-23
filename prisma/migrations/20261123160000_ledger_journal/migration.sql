@@ -22,7 +22,7 @@ CREATE TABLE "ledger_accounts" (
   CONSTRAINT "ledger_accounts_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX "ledger_accounts_code_key" ON "ledger_accounts"("code");
-CREATE INDEX "ledger_accounts_owner_idx" ON "ledger_accounts"("owner_type", "owner_id");
+CREATE INDEX "ledger_accounts_owner_type_owner_id_idx" ON "ledger_accounts"("owner_type", "owner_id");
 
 CREATE TABLE "journal_entries" (
   "id" UUID NOT NULL,
@@ -39,7 +39,8 @@ CREATE TABLE "journal_entries" (
   CONSTRAINT "journal_entries_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX "journal_entries_idempotency_key_key" ON "journal_entries"("idempotency_key");
-CREATE INDEX "journal_entries_ref_idx" ON "journal_entries"("event_ref_type", "event_ref_id");
+CREATE INDEX "journal_entries_event_ref_type_event_ref_id_idx" ON "journal_entries"("event_ref_type", "event_ref_id");
+CREATE INDEX "journal_entries_event_type_occurred_at_idx" ON "journal_entries"("event_type", "occurred_at");
 
 ALTER TABLE "journal_entries" ADD CONSTRAINT "journal_entries_approver_differs"
   CHECK (
@@ -63,10 +64,10 @@ CREATE INDEX "journal_lines_entry_id_idx" ON "journal_lines"("entry_id");
 CREATE INDEX "journal_lines_account_id_idx" ON "journal_lines"("account_id");
 
 ALTER TABLE "journal_lines"
-  ADD CONSTRAINT "journal_lines_entry_fkey"
+  ADD CONSTRAINT "journal_lines_entry_id_fkey"
   FOREIGN KEY ("entry_id") REFERENCES "journal_entries"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "journal_lines"
-  ADD CONSTRAINT "journal_lines_account_fkey"
+  ADD CONSTRAINT "journal_lines_account_id_fkey"
   FOREIGN KEY ("account_id") REFERENCES "ledger_accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "journal_lines"
   ADD CONSTRAINT "journal_lines_one_side"
@@ -82,7 +83,7 @@ CREATE TABLE "account_balances" (
   CONSTRAINT "account_balances_pkey" PRIMARY KEY ("account_id")
 );
 ALTER TABLE "account_balances"
-  ADD CONSTRAINT "account_balances_account_fkey"
+  ADD CONSTRAINT "account_balances_account_id_fkey"
   FOREIGN KEY ("account_id") REFERENCES "ledger_accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE TABLE "ledger_settings" (
