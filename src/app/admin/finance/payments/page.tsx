@@ -84,7 +84,7 @@ export default function FinancePage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <p className="text-[13px] font-semibold text-[#6B1D2E]"><Link href="/admin/finance" className="hover:underline">Back to Pay suppliers</Link></p>
+                    <p className="text-[13px] font-semibold text-[#6B1D2E]"><Link href="/admin/finance" className="hover:underline">Back to Payouts</Link></p>
                     <h1 className="text-[clamp(1.5rem,3vw+0.75rem,1.75rem)] font-[900] tracking-tight">Customer payments</h1>
                     <p className="text-[#7C7C7C] font-medium mt-1 text-[clamp(12px,1.5vw,14px)]">Money customers paid Horeca1. This is not the list of what we owe suppliers.</p>
                 </div>

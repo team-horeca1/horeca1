@@ -465,7 +465,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                             )}
                                         >
                                             <CreditCard size={21} strokeWidth={pathname?.startsWith('/wallet') ? 2 : 1.5} />
-                                            <span className="text-[10px] font-medium leading-none">DiSCCO</span>
+                                            <span className="text-[10px] font-medium leading-none">Credit</span>
                                         </Link>
                                     </>
                                 ) : null}

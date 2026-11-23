@@ -160,7 +160,7 @@ export default function DisccoCreditDetailPage() {
       if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
         throw new Error('Invalid repayment amount from server');
       }
-      const title = (wallet.vendor ? storeDisplayName(wallet.vendor) : null) ?? 'Horeca1 Credit';
+      const title = wallet.vendor ? storeDisplayName(wallet.vendor) : 'DiSCCO';
 
       const rzp = new RazorpayCtor({
         key: keyId,
@@ -168,7 +168,7 @@ export default function DisccoCreditDetailPage() {
         amount: amountPaise,
         currency,
         name: 'Horeca1',
-        description: `DiSCCO · ${title}`,
+        description: `${wallet.vendor ? 'Supplier credit' : 'DiSCCO'} · ${title}`,
         handler: async (resp: RazorpayHandlerResponse) => {
           try {
             const v = await fetch('/api/v1/wallet/verify-repayment', {
@@ -220,14 +220,15 @@ export default function DisccoCreditDetailPage() {
       <div className="max-w-2xl mx-auto px-[clamp(1rem,3vw,2rem)] py-12 text-center space-y-3">
         <AlertCircle className="mx-auto text-rose-500" size={28} />
         <p className="text-[15px] font-semibold text-[#181725]">{error || 'Credit not found'}</p>
-        <Link href="/wallet" className="text-[13px] font-semibold text-primary hover:underline">Back to DiSCCO</Link>
+        <Link href="/wallet" className="text-[13px] font-semibold text-primary hover:underline">Back to Credit</Link>
       </div>
     );
   }
 
   const outstanding = Number(wallet.outstandingAmount);
   const due = dueLabel(wallet.currentDueDate, outstanding);
-  const title = (wallet.vendor ? storeDisplayName(wallet.vendor) : null) ?? 'Horeca1 Credit';
+  const title = wallet.vendor ? storeDisplayName(wallet.vendor) : 'DiSCCO';
+  const kind = wallet.vendor ? 'Supplier credit' : 'DiSCCO';
   const terms = wallet.terms;
   const dueClass =
     due.tone === 'overdue' ? 'text-rose-600'
@@ -237,12 +238,12 @@ export default function DisccoCreditDetailPage() {
   return (
     <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)] space-y-6">
       <Link href="/wallet" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-500 hover:text-primary">
-        <ArrowLeft size={14} /> DiSCCO
+        <ArrowLeft size={14} /> Credit
       </Link>
 
       <header>
-        <p className="text-[12px] font-semibold text-gray-400 uppercase tracking-wide">Buy Now, Pay Later</p>
-        <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-bold text-[#181725] mt-1">{title}</h1>
+        <p className="text-[12px] font-semibold text-[#667085]">{kind}</p>
+        <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-semibold text-[#1C1C1C] mt-1">{title}</h1>
         <p className="text-[clamp(1.6rem,2.5vw+0.8rem,2.2rem)] font-bold text-[#181725] mt-3 tracking-tight">
           {inr(wallet.availableCredit)}
         </p>

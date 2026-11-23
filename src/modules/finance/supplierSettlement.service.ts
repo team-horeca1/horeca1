@@ -12,6 +12,8 @@ import {
   SettlementTransitionError,
   type BatchRecord,
 } from '@/modules/finance/supplierSettlement.state';
+import { shadowPost } from '@/modules/ledger/shadow';
+import { supplierPayout } from '@/modules/ledger/rules';
 
 function asRecord(batch: {
   status: BatchRecord['status'];
@@ -304,6 +306,14 @@ export async function markFinanceBatchSettled(batchId: string, actorId: string, 
           ...(await clearProvisionalWalletCredit(tx, line.orderId, line.vendorId, batchId)),
         });
       }
+      await shadowPost(tx, {
+        eventType: 'payout',
+        eventRefType: 'batch',
+        eventRefId: batchId,
+        idempotencyKey: `batch:${batchId}:settle`,
+        postedBy: actorId,
+        lines: supplierPayout(batch.vendorId, rupeesToPaise(batch.netAmount.toString())),
+      });
       await tx.financeSettlementEvent.create({
         data: {
           batchId,

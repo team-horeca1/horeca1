@@ -13,6 +13,10 @@ import {
   razorpayOrderOfferFields,
 } from '@/lib/razorpayCapture';
 import { allocatePaise, rupeesToPaise } from '@/modules/finance/money';
+import { ledgerShadowEnabled } from '@/modules/ledger/flags';
+import { shadowPost } from '@/modules/ledger/shadow';
+import { liveRestoreWalletAfterRefund } from '@/modules/ledger/live';
+import { gatewayFee, gatewayRefund, onlineCapture } from '@/modules/ledger/rules';
 import crypto from 'crypto';
 
 async function refreshPayables(orderIds: string[]) {
@@ -334,6 +338,30 @@ export class PaymentService {
       }),
     ]);
 
+    if (ledgerShadowEnabled()) {
+      await prisma.$transaction(async (tx) => {
+        for (const payment of open) {
+          await shadowPost(tx, {
+            eventType: 'online_capture',
+            eventRefType: 'order',
+            eventRefId: payment.orderId,
+            idempotencyKey: `payment:${opts.razorpayPaymentId ?? payment.id}:capture`,
+            lines: onlineCapture(payment.orderId, rupeesToPaise(payment.amount.toString())),
+          });
+          const share = feeShares[open.indexOf(payment)];
+          if (share != null && share > 0) {
+            await shadowPost(tx, {
+              eventType: 'gateway_fee',
+              eventRefType: 'order',
+              eventRefId: payment.orderId,
+              idempotencyKey: `order:${payment.orderId}:gateway_fee`,
+              lines: gatewayFee(payment.vendorId, share),
+            });
+          }
+        }
+      });
+    }
+
     for (const payment of open) {
       emitEvent('PaymentReceived', {
         orderId: payment.orderId,
@@ -417,6 +445,19 @@ export class PaymentService {
         data: { paymentStatus: 'refunded' },
       });
     }
+
+    await prisma.$transaction(async (tx) => {
+      for (const payment of finished) {
+        await shadowPost(tx, {
+          eventType: 'gateway_refund',
+          eventRefType: 'payment',
+          eventRefId: payment.id,
+          idempotencyKey: `payment:${payment.id}:refund`,
+          lines: gatewayRefund(payment.orderId, rupeesToPaise(payment.amount)),
+        });
+        await liveRestoreWalletAfterRefund(tx, payment.orderId);
+      }
+    });
 
     const orders = await prisma.order.findMany({
       where: { id: { in: finished.map((p) => p.orderId) } },

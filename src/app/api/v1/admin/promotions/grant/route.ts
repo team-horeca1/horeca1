@@ -6,16 +6,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminOnly } from '@/middleware/rbac';
-import { errorResponse } from '@/middleware/errorHandler';
+import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { promotionService } from '@/modules/promotion/promotion.service';
 import { directGrantSchema } from '@/modules/promotion/promotion.validator';
+import { ledgerLiveEnabled } from '@/modules/ledger/flags';
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'promotions.create');
     const body = directGrantSchema.parse(await req.json());
+    const idempotencyKey = req.headers.get('idempotency-key')?.trim() || null;
+    if (ledgerLiveEnabled() && !idempotencyKey) {
+      throw Errors.badRequest('Idempotency-Key is required');
+    }
 
     const entry = await promotionService.grantDirectIncentive({
       adminId: ctx.userId,
@@ -23,6 +28,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       amount: body.amount,
       destination: body.destination,
       notes: body.notes,
+      idempotencyKey,
     });
 
     logAction(ctx, req, {

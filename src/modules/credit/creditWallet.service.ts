@@ -1,6 +1,9 @@
 import { Prisma, CreditRepaymentMode, BillingModelType, CreditWalletStatus, CreditWorkflowStatus, CreditSource } from '@prisma/client';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
+import { shadowPost } from '@/modules/ledger/shadow';
+import { repaymentCash, creditRelease, interestOrPenalty } from '@/modules/ledger/rules';
+import { commissionPaise, rupeesToPaise } from '@/modules/ledger/money';
 import { Errors } from '@/middleware/errorHandler';
 import {
   CapturePendingError,
@@ -1003,6 +1006,52 @@ export class CreditWalletService {
             : `Repayment via ${method}: ₹${amount}`,
         },
       });
+      const creditVendorId = wallet.vendorId;
+      await shadowPost(tx, {
+        eventType: 'credit_repay',
+        eventRefType: 'repayment',
+        eventRefId: repayment.id,
+        idempotencyKey: `repay:${repayment.id}:cash`,
+        lines: repaymentCash(wallet.userId, creditVendorId, rupeesToPaise(amount)),
+      });
+      const orders = await tx.order.findMany({
+        where: {
+          userId: wallet.userId,
+          ...(creditVendorId ? { vendorId: creditVendorId, paymentMethod: { in: ['credit', 'vendor_credit', 'discco'] } } : { paymentMethod: { in: ['wallet', 'h1_wallet'] } }),
+          status: 'delivered',
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, vendorId: true, subtotal: true, vendor: { select: { platformFeePct: true } } },
+      });
+      let left = rupeesToPaise(amount);
+      for (const order of orders) {
+        if (left <= 0) break;
+        const rate = order.vendor.platformFeePct == null ? null : Number(order.vendor.platformFeePct);
+        if (rate == null) continue;
+        const subtotal = rupeesToPaise(order.subtotal);
+        const net = subtotal - commissionPaise(subtotal, rate);
+        const prior = await tx.journalLine.aggregate({
+          where: {
+            entry: { eventType: 'credit_release', eventRefId: order.id },
+            account: { code: `PAYABLE:${order.vendorId}` },
+          },
+          _sum: { creditPaise: true },
+        });
+        const already = Number(prior._sum.creditPaise ?? 0);
+        const room = Math.max(0, net - already);
+        if (room <= 0 || net <= 0) continue;
+        const maxCash = Math.round((room * subtotal) / net);
+        const collected = Math.min(left, maxCash);
+        if (collected <= 0) continue;
+        await shadowPost(tx, {
+          eventType: 'credit_release',
+          eventRefType: 'order',
+          eventRefId: order.id,
+          idempotencyKey: `repay:${repayment.id}:order:${order.id}`,
+          lines: creditRelease(order.vendorId, subtotal, rate, collected),
+        });
+        left -= collected;
+      }
       return updated;
     });
   }
@@ -1210,6 +1259,21 @@ export class CreditWalletService {
       await tx.creditWalletTxn.create({
         data: { walletId, type: 'PENALTY', amount: add, balanceAfterTxn: newAvailable, referenceId: penalty.id, note },
       });
+      const w2 = await tx.creditWallet.findUnique({ where: { id: walletId }, select: { userId: true, vendorId: true } });
+      if (w2) {
+        await shadowPost(tx, {
+          eventType: type === 'INTEREST' ? 'interest' : 'penalty',
+          eventRefType: 'penalty',
+          eventRefId: penalty.id,
+          idempotencyKey: `penalty:${penalty.id}`,
+          lines: interestOrPenalty(
+            w2.userId,
+            w2.vendorId,
+            rupeesToPaise(amount),
+            type === 'INTEREST' ? 'interest' : 'penalty',
+          ),
+        });
+      }
     } catch (e) {
       // Unique violation = already accrued for this wallet/type/day → no-op.
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return;

@@ -62,8 +62,13 @@ export default function WhatIReceivePage() {
   const [rate, setRate] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [journal, setJournal] = useState({ held: '0.00', payable: '0.00', paidThisMonth: '0.00', onHold: '0.00' });
 
   useEffect(() => {
+    fetch('/api/v1/vendor/ledger/summary')
+      .then((res) => res.json())
+      .then((json) => { if (json.success) setJournal(json.data); })
+      .catch(() => {});
     fetch('/api/v1/vendor/payables')
       .then((res) => res.json())
       .then((json) => {
@@ -132,19 +137,32 @@ export default function WhatIReceivePage() {
           Finance
         </Link>
         <span className="text-zinc-300">/</span>
-        <span className="text-[#1C1C1C] font-semibold">Vendor Receive</span>
+        <span className="text-[#1C1C1C] font-semibold">Payout</span>
       </nav>
 
       {/* Header section */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#1C1C1C] sm:text-3xl">
-            What I receive
+            Payout
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#667085]">
             Customer paid, minus the Razorpay fee, minus Horeca1 commission
-            {rate == null ? '' : ` (${rate}%)`}. What is left is what Horeca1 pays you.
+            {rate == null ? '' : ` (${rate}%)`}.
           </p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {([
+              ['Held', journal.held],
+              ['Payable now', journal.payable],
+              ['Paid this month', journal.paidThisMonth],
+              ['On hold', journal.onHold],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-[#E9E3DD] bg-white px-3 py-3">
+                <p className="text-[12px] text-[#667085]">{label}</p>
+                <p className="mt-1 text-[15px] font-semibold tabular-nums">₹{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
         {lines.length > 0 && (
           <button

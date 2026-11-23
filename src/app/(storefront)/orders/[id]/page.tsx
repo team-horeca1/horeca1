@@ -782,8 +782,8 @@ export default function OrderDetailPage() {
                                                 {order.paymentMethod === 'razorpay' || order.paymentMethod === 'online' ? 'Razorpay'
                                                   : order.paymentMethod === 'bank_transfer' ? 'Bank Transfer'
                                                   : order.paymentMethod === 'po_number' ? 'PO Number'
-                                                  : order.paymentMethod === 'credit' ? 'DiSCCO'
-                                                  : order.paymentMethod === 'wallet' || order.paymentMethod === 'h1_wallet' ? 'Horeca1 Credit'
+                                                  : order.paymentMethod === 'credit' || order.paymentMethod === 'vendor_credit' || order.paymentMethod === 'discco' ? 'Supplier credit'
+                                                  : order.paymentMethod === 'wallet' || order.paymentMethod === 'h1_wallet' ? 'DiSCCO'
                                                   : order.paymentMethod || '—'}
                                             </p>
                                             {order.customerPoNumber && (
@@ -828,7 +828,7 @@ export default function OrderDetailPage() {
                                             >
                                                 <span className="flex items-center gap-2 text-[13px] font-bold text-[#181725]">
                                                     {payingMethod === 'credit' ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
-                                                    DiSCCO credit
+                                                    Supplier credit
                                                 </span>
                                                 <span className="text-[11px] font-medium text-gray-500">
                                                     ₹{Number(vendorCredit?.availableCredit ?? 0).toLocaleString('en-IN')} available
@@ -844,7 +844,7 @@ export default function OrderDetailPage() {
                                             >
                                                 <span className="flex items-center gap-2 text-[13px] font-bold text-[#181725]">
                                                     {payingMethod === 'wallet' ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />}
-                                                    Horeca1 Credit
+                                                    DiSCCO
                                                 </span>
                                                 <span className="text-[11px] font-medium text-gray-500">
                                                     ₹{Number(platformCredit?.availableCredit ?? 0).toLocaleString('en-IN')} available

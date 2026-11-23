@@ -187,7 +187,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
             <label className={labelCls}>Wallet type</label>
             {isEdit && editing ? (
               <div className="rounded-[10px] border border-[#EEEEEE] bg-[#F8F8F8] px-3 py-2.5 text-[13px] font-semibold text-[#181725]">
-                {editing.vendorId ? (storeDisplayName(editing.vendor ?? {}) || editing.vendor?.businessName || 'Vendor wallet') : 'H1 Platform Wallet'}
+                {editing.vendorId ? `Supplier credit · ${storeDisplayName(editing.vendor ?? {}) || editing.vendor?.businessName || 'Supplier'}` : 'DiSCCO'}
               </div>
             ) : (
               <EntityPicker

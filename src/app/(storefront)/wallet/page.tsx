@@ -3,9 +3,10 @@
 // Customer DiSCCO — Buy Now, Pay Later. Separate from H1 Wallet (/rewards).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronRight, CreditCard, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dueLabel } from '@/lib/creditDueLabel';
+import { JournalStatement, type StatementRow } from '@/components/features/ledger/JournalStatement';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface Txn {
@@ -53,7 +54,11 @@ function loadRazorpay(): Promise<boolean> {
 }
 
 function lineTitle(w: CreditWallet) {
-  return (w.vendor ? storeDisplayName(w.vendor) : null) ?? 'Horeca1 Credit';
+  return w.vendor ? storeDisplayName(w.vendor) : 'DiSCCO';
+}
+
+function isDiscco(w: CreditWallet) {
+  return !w.vendor;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -104,7 +109,7 @@ async function startRepayment(
       amount: amountPaise,
       currency,
       name: 'Horeca1',
-      description: 'DiSCCO repayment',
+      description: 'Credit repayment',
       handler: async (resp: RazorpayHandlerResponse) => {
         try {
           const v = await fetch('/api/v1/wallet/verify-repayment', {
@@ -147,12 +152,22 @@ export default function DisccoCreditPage() {
   const [wallets, setWallets] = useState<CreditWallet[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [journalRows, setJournalRows] = useState<StatementRow[]>([]);
+  const [journalSplit, setJournalSplit] = useState({ horeca1: '0.00', suppliers: '0.00' });
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch('/api/v1/wallet')
-      .then((r) => r.json())
-      .then((j) => { if (j.success) setWallets(j.data); })
+    Promise.all([
+      fetch('/api/v1/wallet').then((r) => r.json()),
+      fetch('/api/v1/ledger/me').then((r) => r.json()).catch(() => null),
+    ])
+      .then(([j, ledger]) => {
+        if (j.success) setWallets(j.data);
+        if (ledger?.success && ledger.data?.credit) {
+          setJournalSplit({ horeca1: ledger.data.credit.horeca1, suppliers: ledger.data.credit.suppliers });
+          setJournalRows(ledger.data.credit.rows ?? []);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -177,88 +192,123 @@ export default function DisccoCreditPage() {
     );
   }
 
+  const discco = lines.filter(isDiscco);
+  const supplier = lines.filter((w) => !isDiscco(w));
+  const youOwe = lines.reduce((sum, w) => sum + Number(w.outstandingAmount), 0);
+
   return (
-    <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)] space-y-6">
-      <header>
-        <div className="flex items-center gap-2.5">
-          <CreditCard className="text-primary" size={22} strokeWidth={1.75} />
-          <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-bold text-[#181725]">DiSCCO</h1>
+    <div className="min-h-screen bg-[#FAF7F2]">
+      <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] pt-[clamp(1.5rem,4vw,3rem)] pb-28 lg:pb-[clamp(1.5rem,4vw,3rem)] space-y-8">
+        <header className="flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-[clamp(1.6rem,2vw+0.8rem,2.1rem)] font-semibold tracking-tight text-[#1C1C1C]">DiSCCO</h1>
+          </div>
+          <Link href="/rewards" className="text-[13px] font-semibold text-primary shrink-0">Wallet</Link>
+        </header>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-white border border-[#E9E3DD] px-4 py-4">
+            <p className="text-[12px] font-medium text-[#667085]">You owe</p>
+            <p className="mt-1 text-[clamp(1.35rem,2vw+0.5rem,1.75rem)] font-semibold tabular-nums text-[#1C1C1C]">{inr(youOwe)}</p>
+          </div>
+          <div className="rounded-2xl bg-[#6B1D2E] px-4 py-4 text-white">
+            <p className="text-[12px] font-medium text-white/75">Lines</p>
+            <p className="mt-1 text-[clamp(1.35rem,2vw+0.5rem,1.75rem)] font-semibold tabular-nums">{lines.length}</p>
+          </div>
         </div>
-        <p className="text-[14px] text-gray-500 font-medium mt-1">Buy Now, Pay Later</p>
+
+        <p className="text-[13px] text-[#667085]">Journal outstanding · From Horeca1 ₹{journalSplit.horeca1} · From suppliers ₹{journalSplit.suppliers}. Repayment goes to Horeca1.</p>
+        <JournalStatement title="Credit statement" rows={journalRows} empty="No credit journal lines yet. The totals above are still the live credit balances." />
+
         {overdueCount > 0 && (
-          <p className="text-[13px] text-rose-600 font-semibold mt-2">
-            {overdueCount} line{overdueCount === 1 ? '' : 's'} overdue
-          </p>
+          <p className="text-[13px] font-semibold text-rose-700">{overdueCount === 1 ? '1 payment is late.' : `${overdueCount} payments are late.`}</p>
         )}
-      </header>
 
-      {lines.length === 0 && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center">
-          <p className="text-[15px] font-semibold text-[#181725]">No DiSCCO credit yet</p>
-          <p className="text-[13px] text-gray-500 mt-1">Ask your supplier to enable Buy Now, Pay Later for your account.</p>
-        </div>
-      )}
+        {lines.length === 0 && (
+          <div className="rounded-2xl border border-[#E9E3DD] bg-white px-6 py-10 text-center">
+            <p className="text-[16px] font-semibold text-[#1C1C1C]">No credit yet</p>
+            <p className="mt-1 text-[13px] text-[#667085]">A supplier or Horeca1 has to give you a limit first.</p>
+          </div>
+        )}
 
-      <div className="space-y-3">
-        {lines.map((w) => {
-          const outstanding = Number(w.outstandingAmount);
-          const reserved = Number(w.reservedAmount ?? 0);
-          const due = dueLabel(w.currentDueDate, outstanding);
-          const dueClass =
-            due.tone === 'overdue' ? 'text-rose-600'
-              : due.tone === 'soon' ? 'text-amber-700'
-                : 'text-gray-500';
-
-          return (
-            <div key={w.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[16px] font-bold text-[#181725] truncate">{lineTitle(w)}</h2>
-                    <StatusBadge status={w.status} />
-                  </div>
-                  <p className="text-[clamp(1.35rem,2vw+0.6rem,1.75rem)] font-bold text-[#181725] mt-2 tracking-tight">
-                    {inr(w.availableCredit)}{' '}
-                    <span className="text-[13px] font-medium text-gray-400">available</span>
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-                    {outstanding > 0 ? (
-                      <span className="font-semibold text-rose-600">{inr(outstanding)} outstanding</span>
-                    ) : reserved > 0 ? (
-                      <span className="font-semibold text-amber-700">{inr(reserved)} on open orders</span>
-                    ) : (
-                      <span className="text-gray-500">No outstanding</span>
-                    )}
-                    <span className={`font-medium ${dueClass}`}>
-                      {outstanding > 0 ? due.text : reserved > 0 ? 'Repay after delivery' : due.text}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  {outstanding > 0 && (
-                    <button
-                      type="button"
-                      disabled={payingId === w.id}
-                      onClick={() => {
-                        void startRepayment(w.id, outstanding, load, (busy) => setPayingId(busy ? w.id : null));
-                      }}
-                      className="bg-primary text-white text-[13px] font-bold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                    >
-                      {payingId === w.id ? 'Opening…' : 'Repay'}
-                    </button>
-                  )}
-                  <Link
-                    href={`/wallet/${w.id}`}
-                    className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-primary hover:underline"
-                  >
-                    View Credit <ChevronRight size={14} />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        <CreditGroup title="From Horeca1" hint="You repay Horeca1" lines={discco} payingId={payingId} onRepay={(w, amount) => {
+          void startRepayment(w.id, amount, load, (busy) => setPayingId(busy ? w.id : null));
+        }} />
+        <CreditGroup title="From suppliers" hint="You repay Horeca1. The supplier is paid after that cash arrives." lines={supplier} payingId={payingId} onRepay={(w, amount) => {
+          void startRepayment(w.id, amount, load, (busy) => setPayingId(busy ? w.id : null));
+        }} />
       </div>
     </div>
+  );
+}
+
+function CreditGroup({
+  title,
+  hint,
+  lines,
+  payingId,
+  onRepay,
+}: {
+  title: string;
+  hint: string;
+  lines: CreditWallet[];
+  payingId: string | null;
+  onRepay: (w: CreditWallet, amount: number) => void;
+}) {
+  if (lines.length === 0) return null;
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-[15px] font-semibold text-[#1C1C1C]">{title}</h2>
+        <p className="text-[12px] text-[#667085]">{hint}</p>
+      </div>
+      {lines.map((w) => {
+        const outstanding = Number(w.outstandingAmount);
+        const reserved = Number(w.reservedAmount ?? 0);
+        const due = dueLabel(w.currentDueDate, outstanding);
+        const dueClass = due.tone === 'overdue' ? 'text-rose-600' : due.tone === 'soon' ? 'text-amber-700' : 'text-[#667085]';
+        return (
+          <article key={w.id} className="rounded-2xl border border-[#E9E3DD] bg-white p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate text-[16px] font-semibold text-[#1C1C1C]">{lineTitle(w)}</h3>
+                  <StatusBadge status={w.status} />
+                </div>
+                <p className="mt-3 text-[12px] font-medium text-[#667085]">You can order</p>
+                <p className="text-[clamp(1.4rem,2vw+0.5rem,1.8rem)] font-semibold tabular-nums tracking-tight text-[#1C1C1C]">{inr(w.availableCredit)}</p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+                  {outstanding > 0 ? (
+                    <span className="font-semibold text-rose-600 tabular-nums">You owe {inr(outstanding)}</span>
+                  ) : reserved > 0 ? (
+                    <span className="font-semibold text-amber-700 tabular-nums">{inr(reserved)} on open orders</span>
+                  ) : (
+                    <span className="text-[#667085]">Nothing owed</span>
+                  )}
+                  <span className={`font-medium ${dueClass}`}>
+                    {outstanding > 0 ? due.text : reserved > 0 ? 'Pay after delivery' : ''}
+                  </span>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {outstanding > 0 && (
+                  <button
+                    type="button"
+                    disabled={payingId === w.id}
+                    onClick={() => onRepay(w, outstanding)}
+                    className="min-h-12 rounded-xl bg-primary px-4 text-[13px] font-semibold text-white hover:bg-[#5A1926] disabled:opacity-40"
+                  >
+                    {payingId === w.id ? 'Opening…' : 'Pay'}
+                  </button>
+                )}
+                <Link href={`/wallet/${w.id}`} className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-primary">
+                  Details <ChevronRight size={14} />
+                </Link>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </section>
   );
 }

@@ -761,11 +761,11 @@ function formatPaymentMethodName(method: string | null | undefined): string {
     case 'bank_transfer': return 'Bank Transfer / NEFT';
     case 'po_number': return 'Purchase Order (PO)';
     case 'cheque': return 'Cheque';
-    case 'credit': return 'Credit Terms';
-    case 'vendor_credit': return 'Vendor Credit';
+    case 'credit':
+    case 'vendor_credit':
+    case 'discco': return 'Supplier credit';
     case 'wallet':
-    case 'h1_wallet': return 'H1 Wallet';
-    case 'discco': return 'DiSCCO Credit';
+    case 'h1_wallet': return 'Horeca1 credit';
     default: return method.replace(/_/g, ' ').toUpperCase();
   }
 }

@@ -10,6 +10,9 @@ import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { uniquePayoutTrackingKey } from '@/lib/payoutTrackingKey';
+import { shadowPost } from '@/modules/ledger/shadow';
+import { rewardIssue } from '@/modules/ledger/rules';
+import { rupeesToPaise } from '@/modules/ledger/money';
 
 interface DraftForMov {
   subtotal: number;
@@ -112,7 +115,16 @@ async function creditRewardsWallet(
       referenceId,
       referenceType,
       notes,
+      source: 'reward',
+      funderType: 'platform',
     },
+  });
+  await shadowPost(db, {
+    eventType: 'reward_issue',
+    eventRefType: referenceType,
+    eventRefId: referenceId,
+    idempotencyKey: `reward:${referenceType}:${referenceId}`,
+    lines: rewardIssue(userId, rupeesToPaise(amount)),
   });
   return txn.id;
 }
@@ -308,7 +320,7 @@ export async function issueWelcomeForUser(userId: string): Promise<void> {
         notifyTitle: 'Welcome to Horeca1 🎁',
         notifyBody:
           offer.rewardType === 'wallet_credit' || offer.rewardType === 'cashback'
-            ? `₹${Number(offer.rewardValue).toLocaleString('en-IN')} has been credited to your H1 Wallet.`
+            ? `₹${Number(offer.rewardValue).toLocaleString('en-IN')} has been credited to your Wallet.`
             : offer.rewardType === 'free_delivery'
               ? 'Your welcome free-delivery entitlement is ready for your first paid shipment.'
               : 'Your welcome coupon is ready.',
@@ -519,7 +531,7 @@ async function issueFirstOrderPostSuccess(
     couponName: 'First order offer',
     notes: 'First order offer',
     notifyTitle: 'First order reward 🎁',
-    notifyBody: `₹${Number(offer.rewardValue).toLocaleString('en-IN')} has been credited to your H1 Wallet.`,
+    notifyBody: `₹${Number(offer.rewardValue).toLocaleString('en-IN')} has been credited to your Wallet.`,
   });
 
   await db.firstOrderGrant.update({
@@ -656,7 +668,7 @@ async function issueReferralSide(
     notifyTitle: 'Referral reward 🎁',
     notifyBody:
       args.rewardType === 'wallet_credit' || args.rewardType === 'cashback'
-        ? `₹${args.rewardValue.toLocaleString('en-IN')} has been credited to your H1 Wallet.`
+        ? `₹${args.rewardValue.toLocaleString('en-IN')} has been credited to your Wallet.`
         : 'Your referral coupon is ready.',
   });
 

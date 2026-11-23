@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
 import { paiseToRupees, rupeesToPaise } from '@/modules/finance/money';
+import { ledgerLiveEnabled } from '@/modules/ledger/flags';
 import {
   appliedRecoveryPaise,
   assessPayable,
@@ -152,6 +153,9 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
     },
   });
   if (!order || order.status === 'draft') return null;
+  const ledgerFields = ledgerLiveEnabled()
+    ? { ledgerRules: true as const, walletFundedPaise: rupeesToPaise(order.walletApplied.toString()) }
+    : {};
 
   const existing = order.payableLine;
   const locked = existing?.batch?.status === 'finalised' || existing?.batch?.status === 'settled' || existing?.status === 'settled';
@@ -185,6 +189,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
       inOpenBatch: false,
       manualCreditPaise: manual.credit,
       manualDebitPaise: manual.debit,
+      ...ledgerFields,
     }, existing.breakdown);
     return db.supplierPayableLine.findUnique({ where: { id: existing.id } });
   }
@@ -204,6 +209,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
     inOpenBatch: false,
     manualCreditPaise: manual.credit,
     manualDebitPaise: manual.debit,
+    ...ledgerFields,
   });
   const keepInDraft = batchOpen && wouldBe.status === 'eligible';
   const assessed = keepInDraft
@@ -222,6 +228,7 @@ export async function refreshSupplierPayable(orderId: string, db: Db = prisma) {
       inOpenBatch: true,
       manualCreditPaise: manual.credit,
       manualDebitPaise: manual.debit,
+      ...ledgerFields,
     })
     : wouldBe;
 

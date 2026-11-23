@@ -34,10 +34,10 @@ export function CreditStatusStrip() {
       <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
         <Link
           href="/wallet"
-          className="flex items-center justify-between gap-3 rounded-xl bg-[#EEF3ED] border border-[#D5E3D7] px-3.5 py-3 hover:border-primary/25 transition-colors"
+          className="flex items-center justify-between gap-3 rounded-xl bg-[#F8E8EC] border border-[#E9C9D0] px-3.5 py-3 hover:border-primary/40 transition-colors"
         >
-          <p className="text-[12px] md:text-[13px] text-[#2A4A2E] leading-snug min-w-0">
-            <span className="font-bold">DiSCCO Credit:</span>{' '}
+          <p className="text-[12px] md:text-[13px] text-[#4A141F] leading-snug min-w-0">
+            <span className="font-bold">Credit</span>{' '}
             <span className="font-semibold tabular-nums">{formatInr(summary.availableCredit)} available</span>
             {due && (
               <>

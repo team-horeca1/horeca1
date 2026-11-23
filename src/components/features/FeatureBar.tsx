@@ -19,7 +19,7 @@ const FEATURES = [
     kind: 'feature' as const,
     icon: CreditCard,
     title: 'Up to 90 Days Credit',
-    description: 'DiSCCO vendor-backed terms',
+    description: 'Supplier credit and DiSCCO',
   },
   {
     kind: 'feature' as const,

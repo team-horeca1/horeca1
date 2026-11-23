@@ -19,6 +19,9 @@
 // payment instrument, not a discount, so it does NOT reduce the cashback base).
 
 import { prisma } from '@/lib/prisma';
+import { shadowPost } from '@/modules/ledger/shadow';
+import { rewardIssue } from '@/modules/ledger/rules';
+import { rupeesToPaise } from '@/modules/ledger/money';
 import type { Prisma, Coupon, CashbackEntry } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
 import { storeDisplayName } from '@/lib/storeDisplayName';
@@ -1002,7 +1005,7 @@ async function buildOfferChoicesForCheckout(
       cashbacks.push({
         ...baseRow,
         eligible: false,
-        reason: 'Does not stack with H1 Wallet',
+        reason: 'Does not stack with Wallet',
         estimatedAmount: null,
         isWinning: false,
       });
@@ -1390,11 +1393,18 @@ export const promotionService = {
         where: { id: entry.id },
         data: { amount, status: 'credited', walletTxnId: walletTxn.id, creditedAt: new Date() },
       });
+      await shadowPost(tx, {
+        eventType: 'reward_issue',
+        eventRefType: 'cashback',
+        eventRefId: entry.id,
+        idempotencyKey: `cashback:${entry.id}:issue`,
+        lines: rewardIssue(entry.userId, rupeesToPaise(amount)),
+      });
       await notifyInApp(
         tx,
         entry.userId,
         'Cashback credited 🎉',
-        `₹${amount.toLocaleString('en-IN')} cashback has been credited to your H1 Wallet.`,
+        `₹${amount.toLocaleString('en-IN')} cashback is in your Wallet.`,
         entry.id,
         'cashback',
       );
@@ -1501,7 +1511,7 @@ export const promotionService = {
         amount: row.amount,
         referenceId: row.orderId,
         referenceType: 'order_redemption',
-        notes: 'H1 Wallet applied at checkout',
+        notes: 'Spent at checkout',
       })),
     });
   },
@@ -1528,7 +1538,7 @@ export const promotionService = {
         amount: order.walletApplied,
         referenceId: order.id,
         referenceType: 'order_redemption_refund',
-        notes: 'H1 Wallet refund — order cancelled',
+        notes: 'Returned from a cancelled order',
       },
     });
   },
@@ -1975,7 +1985,7 @@ export const promotionService = {
     });
     if (!entry) throw Errors.notFound('Cashback entry');
     if (entry.destination !== 'upi') {
-      throw Errors.badRequest('This cashback is credited to your H1 Wallet — no UPI ID needed');
+      throw Errors.badRequest('This cashback is already in your Wallet.');
     }
     if (entry.status !== 'pending' && entry.status !== 'approved') {
       throw Errors.badRequest('This cashback can no longer be claimed');
@@ -1999,9 +2009,17 @@ export const promotionService = {
     amount: number;
     destination: 'wallet' | 'upi';
     notes?: string | null;
+    idempotencyKey?: string | null;
   }): Promise<CashbackEntry> {
     const amount = r2(args.amount);
+    const idem = args.idempotencyKey?.trim() || null;
     return prisma.$transaction(async (tx) => {
+      if (idem) {
+        const prior = await tx.cashbackEntry.findFirst({
+          where: { userId: args.userId, source: 'direct_grant', notes: { startsWith: `idem:${idem}|` } },
+        });
+        if (prior) return prior;
+      }
       const user = await tx.user.findUnique({ where: { id: args.userId }, select: { id: true } });
       if (!user) throw Errors.notFound('User');
 
@@ -2012,7 +2030,7 @@ export const promotionService = {
           amount,
           destination: args.destination,
           status: args.destination === 'wallet' ? 'credited' : 'approved',
-          notes: args.notes ?? null,
+          notes: idem ? `idem:${idem}|${args.notes ?? ''}` : (args.notes ?? null),
           trackingKey: await uniquePayoutTrackingKey(tx),
           createdById: args.adminId,
           creditedAt: args.destination === 'wallet' ? new Date() : null,
@@ -2039,11 +2057,19 @@ export const promotionService = {
           where: { id: entry.id },
           data: { walletTxnId: walletTxn.id },
         });
+        await shadowPost(tx, {
+          eventType: 'reward_issue',
+          eventRefType: 'cashback',
+          eventRefId: entry.id,
+          idempotencyKey: idem ? `grant-key:${idem}` : `grant:${entry.id}:issue`,
+          postedBy: args.adminId,
+          lines: rewardIssue(args.userId, rupeesToPaise(amount)),
+        });
         await notifyInApp(
           tx,
           args.userId,
           'You received an incentive 🎁',
-          `₹${amount.toLocaleString('en-IN')} has been credited to your H1 Wallet.`,
+          `₹${amount.toLocaleString('en-IN')} is in your Wallet.`,
           entry.id,
           'cashback',
         );

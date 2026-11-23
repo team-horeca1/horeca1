@@ -322,7 +322,7 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-primary" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
-                        Can be clubbed with H1 Wallet
+                        Can be clubbed with Wallet
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-primary" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
@@ -427,7 +427,7 @@ export function VendorCashbackTab() {
                                     <td className={cn(tdCls, 'font-bold text-[#181725]')}>{c.name}</td>
                                     <td className={tdCls}>{c.cashbackType === 'flat' ? inr(c.cashbackValue) : `${Number(c.cashbackValue)}%${c.maxCashback ? ` (max ${inr(c.maxCashback)})` : ''}`}</td>
                                     <td className={tdCls}>{c.minOrderValue ? inr(c.minOrderValue) : '—'}</td>
-                                    <td className={tdCls}>{c.destination === 'wallet' ? 'H1 Wallet' : 'UPI (legacy)'}</td>
+                                    <td className={tdCls}>{c.destination === 'wallet' ? 'Wallet' : 'UPI (legacy)'}</td>
                                     <td className={tdCls}>{c.totalBudget ? `${inr(c.usedAmount)} / ${inr(c.totalBudget)}` : inr(c.usedAmount)}</td>
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>
@@ -562,7 +562,7 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                         <input className={inputCls} type="number" min="1" value={form.perUserLimit} onChange={(e) => set({ perUserLimit: e.target.value })} placeholder="Unlimited" />
                     </div>
                 </div>
-                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s H1 Wallet after delivery.</p>
+                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s Wallet after delivery.</p>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-primary" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
@@ -570,7 +570,7 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-primary" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
-                        Can be clubbed with H1 Wallet payment
+                        Can be clubbed with Wallet payment
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-primary" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />

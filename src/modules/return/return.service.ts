@@ -11,6 +11,9 @@ import { getRazorpay } from '@/lib/razorpay';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { debitVendorOnRefund } from '@/modules/vendor/vendorSettlement.service';
 import { refreshSupplierPayable } from '@/modules/finance/supplierPayable.service';
+import { shadowPost } from '@/modules/ledger/shadow';
+import { creditNoteIssue } from '@/modules/ledger/rules';
+import { rupeesToPaise } from '@/modules/ledger/money';
 import { promotionService } from '@/modules/promotion/promotion.service';
 import { orderService } from '@/modules/order/order.service';
 import type { OrderService } from '@/modules/order/order.service';
@@ -420,8 +423,27 @@ async function creditPrepaidWalletForCreditNote(
       referenceId: input.returnId,
       referenceType: RETURN_CN_WALLET_REF,
       notes: `Credit note ${input.creditNoteNumber}`,
+      source: 'credit_note',
+      funderType: 'supplier',
+      funderId: (await db.returnRequest.findUnique({
+        where: { id: input.returnId },
+        select: { order: { select: { vendorId: true } } },
+      }))?.order.vendorId ?? null,
     },
   });
+  const ret = await db.returnRequest.findUnique({
+    where: { id: input.returnId },
+    select: { order: { select: { vendorId: true } } },
+  });
+  if (ret?.order.vendorId) {
+    await shadowPost(db, {
+      eventType: 'credit_note',
+      eventRefType: 'return',
+      eventRefId: input.returnId,
+      idempotencyKey: `return:${input.returnId}:credit_note`,
+      lines: creditNoteIssue(input.userId, ret.order.vendorId, rupeesToPaise(input.amount)),
+    });
+  }
 }
 
 function approvedLinesNeedDisposition(

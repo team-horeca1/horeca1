@@ -9,7 +9,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import { Gift, Wallet, Loader2, CheckCircle2, Clock, XCircle, IndianRupee, ArrowDownLeft, ArrowUpRight, Copy, Share2, Users } from 'lucide-react';
+import { Gift, Loader2, CheckCircle2, Clock, XCircle, IndianRupee, ArrowDownLeft, ArrowUpRight, Copy, Share2, Users } from 'lucide-react';
+import { JournalStatement, type StatementRow } from '@/components/features/ledger/JournalStatement';
 
 interface CashbackEntryRow {
     id: string;
@@ -63,12 +64,28 @@ function publicInviteUrl(referral: ReferralData): string {
 function formatProgramReward(type: string, value: string | number) {
     const n = Number(value);
     const inr = `₹${n.toLocaleString('en-IN')}`;
-    if (type === 'wallet_credit') return `${inr} H1 Wallet credit`;
+    if (type === 'wallet_credit') return `${inr} Wallet`;
     if (type === 'cashback') return `${inr} cashback`;
     if (type === 'coupon_flat') return `${inr} coupon`;
     if (type === 'coupon_percentage') return `${n}% coupon`;
     if (type === 'free_delivery') return 'Free delivery';
     return inr;
+}
+
+function movementLabel(t: WalletTxnRow): string {
+    switch (t.referenceType) {
+        case 'cashback': return 'Cashback added';
+        case 'cashback_reversal': return 'Cashback removed';
+        case 'order_redemption': return 'Spent at checkout';
+        case 'order_redemption_refund': return 'Returned from a cancelled order';
+        case 'return_credit_note': return 'Credit note';
+        case 'direct_grant': return 'Added by Horeca1';
+        case 'welcome': return 'Welcome credit';
+        case 'first_order': return 'First order credit';
+        case 'referral': return 'Referral credit';
+        case 'payout_invite': return 'Reward added';
+        default: return t.notes || (t.type === 'credit' ? 'Added' : 'Spent');
+    }
 }
 
 const STATUS_META: Record<CashbackEntryRow['status'], { label: string; cls: string }> = {
@@ -83,6 +100,9 @@ export default function RewardsPage() {
     const { status: sessionStatus } = useSession();
     const [loading, setLoading] = useState(true);
     const [balance, setBalance] = useState(0);
+    const [journalReward, setJournalReward] = useState('0.00');
+    const [journalCreditNote, setJournalCreditNote] = useState('0.00');
+    const [journalRows, setJournalRows] = useState<StatementRow[]>([]);
     const [entries, setEntries] = useState<CashbackEntryRow[]>([]);
     const [txns, setTxns] = useState<WalletTxnRow[]>([]);
     const [referral, setReferral] = useState<ReferralData | null>(null);
@@ -97,10 +117,12 @@ export default function RewardsPage() {
         Promise.all([
             fetch('/api/v1/promotions/rewards').then((r) => r.json()),
             fetch('/api/v1/promotions/referral').then((r) => r.json()).catch(() => null),
+            fetch('/api/v1/ledger/me').then((r) => r.json()).catch(() => null),
         ])
-            .then(([rewardsJson, referralJson]: [
+            .then(([rewardsJson, referralJson, ledgerJson]: [
                 { success?: boolean; data?: { walletBalance: number; entries: CashbackEntryRow[]; walletTransactions: WalletTxnRow[] } },
                 { success?: boolean; data?: ReferralData } | null,
+                { success?: boolean; data?: { wallet?: { reward: string; creditNote: string; rows: StatementRow[] } } } | null,
             ]) => {
                 if (rewardsJson?.success && rewardsJson.data) {
                     setBalance(Number(rewardsJson.data.walletBalance) || 0);
@@ -109,6 +131,11 @@ export default function RewardsPage() {
                 }
                 if (referralJson?.success && referralJson.data) {
                     setReferral(referralJson.data);
+                }
+                if (ledgerJson?.success && ledgerJson.data?.wallet) {
+                    setJournalReward(ledgerJson.data.wallet.reward);
+                    setJournalCreditNote(ledgerJson.data.wallet.creditNote);
+                    setJournalRows(ledgerJson.data.wallet.rows ?? []);
                 }
             })
             .catch(() => {})
@@ -146,7 +173,7 @@ export default function RewardsPage() {
             <div className="min-h-screen flex items-center justify-center bg-gray-50/50 px-4">
                 <div className="text-center">
                     <Gift size={40} className="text-primary mx-auto mb-3" strokeWidth={1.5} />
-                    <p className="text-[18px] font-bold text-gray-800 mb-2">Sign in to see your rewards</p>
+                    <p className="text-[18px] font-bold text-gray-800 mb-2">Sign in to see your Wallet</p>
                     <Link href="/login" className="text-[14px] text-primary font-semibold hover:underline">Sign in</Link>
                 </div>
             </div>
@@ -154,19 +181,23 @@ export default function RewardsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50/50">
-            <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)]">
-                <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-bold text-[#181725] mb-1">H1 Wallet</h1>
+        <div className="min-h-screen bg-[#FAF7F2]">
+            <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] pt-[clamp(1.5rem,4vw,3rem)] pb-28 lg:pb-[clamp(1.5rem,4vw,3rem)]">
+                <div className="mb-4 flex items-end justify-between gap-4">
+                    <h1 className="text-[clamp(1.6rem,2vw+0.8rem,2.1rem)] font-semibold tracking-tight text-[#1C1C1C]">Wallet</h1>
+                    <p className="mt-1 text-[13px] text-[#667085]">This is your money. It never needs repaying.</p>
+                    <Link href="/wallet" className="text-[13px] font-semibold text-primary shrink-0">Credit</Link>
+                </div>
 
-                {/* Wallet balance card */}
-                <div className="bg-[#181725] rounded-2xl p-6 mb-6 text-white relative overflow-hidden">
-                    <div className="flex items-center gap-2 text-white/60 text-[12px] font-bold uppercase tracking-wider mb-2">
-                        <Wallet size={14} strokeWidth={1.5} /> H1 Wallet
-                    </div>
-                    <p className="text-[clamp(1.8rem,3vw+1rem,2.6rem)] font-black tracking-tight">
+                <div className="mb-6 rounded-2xl bg-[#6B1D2E] p-6 text-white">
+                    <p className="text-[12px] font-medium text-white/75">You can spend</p>
+                    <p className="mt-1 text-[clamp(2rem,3vw+1rem,2.75rem)] font-semibold tabular-nums tracking-tight">
                         ₹{balance.toLocaleString('en-IN')}
                     </p>
-                    <p className="text-[13px] text-white/55 font-medium mt-1">Available to spend</p>
+                    <p className="mt-3 text-[12px] text-white/80">Horeca1 rewards ₹{journalReward} · Returns credit notes ₹{journalCreditNote}</p>
+                </div>
+                <div className="mb-6">
+                    <JournalStatement title="Statement" rows={journalRows} empty="No journal lines yet. The balance above is still the Wallet you can spend." />
                 </div>
 
                 {referral && (
@@ -176,7 +207,7 @@ export default function RewardsPage() {
                             <h2 className="text-[15px] font-bold text-[#181725]">Invite friends</h2>
                         </div>
                         <p className="text-[12px] text-gray-400 font-medium mb-3">
-                            Share your unique link. Rewards credit to your H1 Wallet.
+                            Share your link. Rewards land in this Wallet.
                         </p>
                         <div className="flex gap-2">
                             <input
@@ -323,7 +354,7 @@ export default function RewardsPage() {
                         )}
 
                         {/* Wallet ledger */}
-                        <h2 className="text-[15px] font-bold text-[#181725] mb-3">Wallet Activity</h2>
+                        <h2 className="text-[15px] font-semibold text-[#1C1C1C] mb-3">Activity</h2>
                         {txns.length === 0 ? (
                             <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
                                 <p className="text-[13px] text-gray-400 font-medium">No wallet activity yet.</p>
@@ -339,7 +370,7 @@ export default function RewardsPage() {
                                                     : <ArrowUpRight size={14} className="text-red-500" strokeWidth={1.5} />}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[13px] font-bold text-[#181725] truncate">{t.notes || (t.type === 'credit' ? 'Credit' : 'Debit')}</p>
+                                                <p className="text-[13px] font-semibold text-[#1C1C1C] truncate">{movementLabel(t)}</p>
                                                 <p className="text-[11px] text-gray-400 font-medium">
                                                     {new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                 </p>

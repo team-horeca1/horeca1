@@ -63,7 +63,7 @@ const emptyReferral: ReferralForm = {
 };
 
 const WELCOME_TYPES: Array<{ id: WelcomeReward; label: string }> = [
-    { id: 'wallet_credit', label: 'H1 Wallet credit' },
+    { id: 'wallet_credit', label: 'Wallet credit' },
     { id: 'coupon_flat', label: 'Personal coupon (₹)' },
     { id: 'coupon_percentage', label: 'Personal coupon (%)' },
     { id: 'free_delivery', label: 'Free delivery (once)' },

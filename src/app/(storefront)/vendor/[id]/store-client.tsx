@@ -443,12 +443,12 @@ export default function VendorStorePage({
 
             {vendorCredit && vendorCredit.limit > 0 && (
                 <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pt-3">
-                    <div className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
-                        <CreditCard size={18} className="text-purple-600 shrink-0" />
+                    <div className="flex items-center gap-3 bg-[#F8E8EC] border border-[#E9C9D0] rounded-xl px-4 py-3">
+                        <CreditCard size={18} className="text-primary shrink-0" />
                         <div className="min-w-0">
-                            <p className="text-[13px] font-bold text-purple-900">DiSCCO · {vendor.name}</p>
-                            <p className="text-[12px] text-purple-700">
-                                ₹{vendorCredit.available.toLocaleString('en-IN')} available · Buy Now, Pay Later
+                            <p className="text-[13px] font-semibold text-[#4A141F]">Supplier credit · {vendor.name}</p>
+                            <p className="text-[12px] text-[#6B1D2E]/80 tabular-nums">
+                                ₹{vendorCredit.available.toLocaleString('en-IN')} you can order
                             </p>
                         </div>
                     </div>

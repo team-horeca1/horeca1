@@ -284,7 +284,7 @@ export function SupplierPayableDetail({ vendorId }: { vendorId: string }) {
           )}
         >
           <ArrowLeft size={14} />
-          <span>Back to Pay suppliers</span>
+          <span>Back to Payouts</span>
         </Link>
       </div>
 

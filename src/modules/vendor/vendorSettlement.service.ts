@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { claimOrders } from '@/modules/finance/claims';
+import { ledgerLiveEnabled } from '@/modules/ledger/flags';
 
 export const GATEWAY_FEE_PCT = 2;
-const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet'];
+const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet', 'discco'];
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
@@ -71,6 +72,7 @@ export async function creditVendorOnDelivery(
   orderId: string,
   tx: Prisma.TransactionClient,
 ): Promise<void> {
+  if (ledgerLiveEnabled()) return;
   const existing = await tx.vendorWalletTxn.findFirst({
     where: {
       referenceId: orderId,
@@ -180,6 +182,35 @@ export async function debitVendorOnRefund(
       },
     });
     if (existing) return;
+
+    if (ledgerLiveEnabled()) {
+      const credit = await client.vendorWalletTxn.findFirst({
+        where: { referenceId: orderId, referenceType: 'order', type: 'order_credit' },
+      });
+      if (!credit) return;
+      const already = Number(credit.netAmount ?? credit.amount);
+      const capped = roundMoney(Math.min(refundAmount, already, Number((await ensureWallet(vendorId, client)).balance)));
+      if (capped <= 0) return;
+      const wallet = await ensureWallet(vendorId, client);
+      const newBalance = roundMoney(Number(wallet.balance) - capped);
+      await client.vendorWalletTxn.create({
+        data: {
+          walletId: wallet.id,
+          type: 'refund_debit',
+          amount: capped,
+          balanceAfter: newBalance,
+          referenceId: orderId,
+          referenceType: 'order_refund',
+          netAmount: capped,
+          notes: note,
+        },
+      });
+      await client.vendorWallet.update({
+        where: { id: wallet.id },
+        data: { balance: newBalance, pendingAmount: { decrement: capped } },
+      });
+      return;
+    }
 
     const wallet = await ensureWallet(vendorId, client);
     const debit = roundMoney(Math.min(debitTarget, Number(wallet.balance)));
@@ -406,6 +437,9 @@ export async function requestInstantPayout(vendorId: string): Promise<{
   netAmount: number;
   orderCount: number;
 } | null> {
+  if (ledgerLiveEnabled()) {
+    throw new Error('Instant payout is closed. Use Payouts and a real bank reference.');
+  }
   const oldestCredit = await prisma.vendorWalletTxn.findFirst({
     where: {
       type: 'order_credit',
@@ -431,6 +465,7 @@ export async function runWeeklySettlements(): Promise<{
   vendorsProcessed: number;
   settlementsCreated: number;
 }> {
+  if (ledgerLiveEnabled()) return { vendorsProcessed: 0, settlementsCreated: 0 };
   const periodEnd = new Date();
   const periodStart = new Date(periodEnd.getTime() - 7 * 86400000);
 

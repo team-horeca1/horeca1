@@ -60,10 +60,10 @@ export default function AdminLedgerPage() {
     <div className="max-w-[1400px] mx-auto space-y-6 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-[13px] font-semibold text-[#6B1D2E]"><Link href="/admin/finance" className="hover:underline">Back to Pay suppliers</Link></p>
+          <p className="text-[13px] font-semibold text-[#6B1D2E]"><Link href="/admin/finance" className="hover:underline">Back to Payouts</Link></p>
           <h1 className="text-[clamp(1.25rem,2vw+0.75rem,1.75rem)] font-bold text-[#181725]">Older supplier wallet</h1>
           <p className="text-[clamp(11px,1.5vw,12px)] text-[#7C7C7C] mt-1">
-            This is the previous wallet record. Paying a supplier is done on Pay suppliers.
+            This is the previous record. Payouts are on the Payouts screen.
           </p>
         </div>
         <button

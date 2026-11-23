@@ -2245,17 +2245,17 @@ function FinancialDetailDrawer({
     isOpen,
     onClose,
     initialTab,
-    onPayoutSuccess
+    onPayoutSuccess: _onPayoutSuccess,
 }: {
     isOpen: boolean;
     onClose: () => void;
     initialTab: 'wallet' | 'pending_settlement' | 'completed_settlement' | 'fees';
     onPayoutSuccess: () => void;
 }) {
+    void _onPayoutSuccess;
     const [tab, setTab] = useState(initialTab);
     const [financeData, setFinanceData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const [payoutLoading, setPayoutLoading] = useState(false);
 
     useEffect(() => {
         setTab(initialTab);
@@ -2282,35 +2282,16 @@ function FinancialDetailDrawer({
         }
     }, [fetchWalletData, isOpen]);
 
-    const handleRequestInstantPayout = async () => {
-        setPayoutLoading(true);
-        try {
-            const res = await fetch('/api/v1/vendor/wallet/payout', { method: 'POST' });
-            const json = await res.json();
-            if (!json.success) {
-                toast.error(json.error?.message ?? json.error ?? 'Payout request failed');
-                return;
-            }
-            toast.success(json.data?.message ?? 'Payout initiated successfully');
-            onPayoutSuccess();
-            fetchWalletData();
-        } catch {
-            toast.error('Payout request failed');
-        } finally {
-            setPayoutLoading(false);
-        }
-    };
-
     return (
         <Drawer
             isOpen={isOpen}
             onClose={onClose}
-            title="Financial Treasury & Ledger"
-            subtitle="Track accrued wallet values, platform commissions, and bank payouts."
+            title="Earnings"
+            subtitle="Recorded balance"
         >
             <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar shrink-0">
                 {[
-                    { id: 'wallet', label: 'Wallet Balance' },
+                    { id: 'wallet', label: 'Balance' },
                     { id: 'pending_settlement', label: 'Pending Payouts' },
                     { id: 'completed_settlement', label: 'Payout History' },
                     { id: 'fees', label: 'Platform Fees' },
@@ -2337,29 +2318,12 @@ function FinancialDetailDrawer({
                 </div>
             ) : financeData ? (
                 <div className="space-y-5">
-                    <div className="bg-gradient-to-br from-success to-primary-dark rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-                        <div className="absolute right-0 bottom-0 opacity-10 text-[100px] leading-none select-none">🏦</div>
-                        <span className="text-[10px] text-primary-light font-bold uppercase tracking-wider block">Available Balance</span>
+                    <div className="bg-[#6B1D2E] rounded-2xl p-5 text-white relative overflow-hidden">
+                        <span className="text-[12px] text-white/75 font-medium block">Recorded balance</span>
                         <span className="text-[28px] font-black block mt-1">{formatINR(financeData.wallet?.balance || 0)}</span>
-                        <p className="text-[11px] text-primary-light/80 font-medium mt-1">Next auto-settlement date: {financeData.wallet?.nextSettlementDate || 'Monday'}</p>
-
-                        {tab === 'pending_settlement' && financeData.pendingPayout > 0 && (
-                            <div className="mt-4 pt-4 border-t border-white/20 flex items-center justify-between">
-                                <div>
-                                    <span className="text-[10px] text-primary-light uppercase block">Pending Settlement</span>
-                                    <span className="text-[15px] font-black">{formatINR(financeData.pendingPayout)}</span>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleRequestInstantPayout}
-                                    disabled={payoutLoading}
-                                    className="bg-white text-success px-4 py-2 rounded-xl text-[12px] font-bold hover:bg-success-light transition-all shadow-sm flex items-center gap-1.5"
-                                >
-                                    {payoutLoading && <Loader2 size={12} className="animate-spin" />}
-                                    Request Payout
-                                </button>
-                            </div>
-                        )}
+                        <Link href="/vendor/receive" className="inline-block mt-3 text-[13px] font-semibold text-white underline underline-offset-2">
+                            Open Payout
+                        </Link>
                     </div>
 
                     {tab === 'wallet' && (

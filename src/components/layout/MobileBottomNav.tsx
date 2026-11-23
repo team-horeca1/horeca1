@@ -250,14 +250,14 @@ export function MobileBottomNav({
       {popup === 'credit' && (
         <NavPopup anchorLabel="Credit" onClose={() => setPopup(null)}>
           {!isAuthenticated ? (
-            <PopupRow href="/login" onClick={() => setPopup(null)} icon={CreditCard} title="Log in to see credit" subtitle="DiSCCO credit lines" />
+            <PopupRow href="/login" onClick={() => setPopup(null)} icon={CreditCard} title="Log in to see credit" subtitle="Supplier credit and DiSCCO" />
           ) : (
             <>
               <PopupRow
                 href="/wallet"
                 onClick={() => setPopup(null)}
                 icon={CreditCard}
-                title="DiSCCO Credit Line"
+                title="Credit"
                 subtitle={
                   creditSummary
                     ? `${formatInr(creditSummary.availableCredit)} available`
@@ -273,7 +273,7 @@ export function MobileBottomNav({
                   subtitle={`${formatInr(creditSummary.outstandingAmount)} outstanding`}
                 />
               )}
-              <PopupRow href="/wallet" onClick={() => setPopup(null)} icon={Wallet} title="Transaction Ledger" subtitle="All credit activity" />
+              <PopupRow href="/rewards" onClick={() => setPopup(null)} icon={Wallet} title="Wallet" subtitle="Money you can spend" />
             </>
           )}
         </NavPopup>

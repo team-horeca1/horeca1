@@ -52,6 +52,9 @@ export function finaliseBatch(batch: BatchRecord, actorId: string): BatchRecord 
   if (batch.status !== 'draft' && batch.status !== 'in_review') {
     throw new SettlementTransitionError('Only a draft batch can be finalised');
   }
+  if ((process.env.LEDGER_LIVE === '1' || process.env.LEDGER_LIVE === 'true') && actorId === batch.createdById) {
+    throw new SettlementTransitionError('The person who created the batch cannot finalise it');
+  }
   return { ...batch, status: 'finalised', finalisedById: actorId };
 }
 

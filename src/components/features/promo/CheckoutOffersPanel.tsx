@@ -476,10 +476,10 @@ export function CheckoutOffersPanel({
         {rewardsBalance > 0 && (
           <label className={`flex items-center justify-between gap-3 bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2.5 ${couponBlocksWallet ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-[#181725]">Use H1 Wallet</p>
+              <p className="text-[13px] font-bold text-[#181725]">Use Wallet</p>
               <p className="text-[11px] text-gray-500">
                 {couponBlocksWallet
-                  ? 'This coupon cannot be clubbed with H1 Wallet'
+                  ? 'This coupon cannot be used with Wallet'
                   : `Balance ₹${rewardsBalance.toLocaleString('en-IN')}${useRewardsWallet && walletUseEst > 0 ? ` — applying ₹${walletUseEst.toLocaleString('en-IN')}` : ''}`}
               </p>
             </div>

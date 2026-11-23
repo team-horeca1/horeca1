@@ -400,7 +400,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         { id: 'payment', label: 'Payment Management', desc: 'Cards, UPI & banking', icon: CreditCard, onClick: () => setIsPaymentOpen(true) },
         {
             id: 'credit-wallet',
-            label: 'DiSCCO Credit',
+            label: 'Credit',
             desc: creditSummary
                 ? creditSummary.hasWallets
                     ? creditSummary.totalOutstanding > 0
@@ -416,8 +416,8 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         },
         {
             id: 'h1-wallet',
-            label: 'H1 Wallet',
-            desc: 'Available to spend at checkout',
+            label: 'Wallet',
+            desc: 'Money you can spend',
             icon: CreditCard,
             onClick: () => {
                 onClose();
@@ -712,10 +712,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     </div>
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">DiSCCO</p>
-                                            <h3 className="text-[20px] font-black mt-1 text-white">Buy Now, Pay Later</h3>
+                                            <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">Credit</p>
+                                            <h3 className="text-[20px] font-semibold mt-1 text-white tabular-nums">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')} owed</h3>
                                             <p className="text-[10px] text-rose-100/80 mt-0.5">
-                                                {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
+                                                {creditSummary.lineCount} line{creditSummary.lineCount === 1 ? '' : 's'}
                                             </p>
                                         </div>
                                         {creditSummary.totalOutstanding > 0 && (
@@ -1107,10 +1107,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                         <CreditCard size={20} />
                                                     </span>
                                                     <div>
-                                                        <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">DiSCCO</p>
-                                                        <h3 className="text-[22px] font-black leading-tight mt-0.5 text-white">Buy Now, Pay Later</h3>
+                                                        <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">Credit</p>
+                                                        <h3 className="text-[22px] font-semibold leading-tight mt-0.5 text-white tabular-nums">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')} owed</h3>
                                                         <p className="text-[11px] text-rose-100/80 mt-0.5">
-                                                            {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
+                                                            {creditSummary.lineCount} line{creditSummary.lineCount === 1 ? '' : 's'}
                                                         </p>
                                                     </div>
                                                 </div>

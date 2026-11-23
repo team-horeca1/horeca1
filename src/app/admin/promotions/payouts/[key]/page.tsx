@@ -151,7 +151,7 @@ export default function AdminPayoutDetailPage() {
               >
                 {data.trackingKey}
               </button>
-              <p className="text-[12px] text-gray-400">{inr(data.amount)} · {data.destination === 'wallet' ? 'H1 Wallet' : 'UPI'}</p>
+              <p className="text-[12px] text-gray-400">{inr(data.amount)} · {data.destination === 'wallet' ? 'Wallet' : 'UPI'}</p>
             </div>
             <span className={cn(
               'shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold',

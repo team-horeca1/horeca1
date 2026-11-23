@@ -1291,6 +1291,10 @@ model WalletTransaction {
   referenceId   String?       @map("reference_id") @db.Uuid
   referenceType String?       @map("reference_type") @db.VarChar(30)
   notes         String?       @db.Text
+  /// reward | credit_note | redemption | reversal. Null until backfilled.
+  source        String?       @db.VarChar(40)
+  funderType    String?       @map("funder_type") @db.VarChar(30)
+  funderId      String?       @map("funder_id") @db.Uuid
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   wallet Wallet @relation(fields: [walletId], references: [id])
@@ -4071,4 +4075,87 @@ model PlatformHoliday {
   @@unique([holidayDate, scope])
   @@index([holidayDate])
   @@map("platform_holidays")
+}
+
+// ═══ LEDGER JOURNAL (shadow, append-only) ════════════
+
+model LedgerAccount {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(180)
+  name      String   @db.VarChar(255)
+  /// asset | liability | income | expense
+  type      String   @db.VarChar(20)
+  ownerType String?  @map("owner_type") @db.VarChar(30)
+  ownerId   String?  @map("owner_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  lines   JournalLine[]
+  balance AccountBalance?
+
+  @@index([ownerType, ownerId])
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id              String   @id @default(uuid()) @db.Uuid
+  eventType       String   @map("event_type") @db.VarChar(60)
+  eventRefType    String   @map("event_ref_type") @db.VarChar(40)
+  eventRefId      String   @map("event_ref_id") @db.VarChar(80)
+  idempotencyKey  String   @unique @map("idempotency_key") @db.VarChar(180)
+  occurredAt      DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  postedBy        String?  @map("posted_by") @db.VarChar(80)
+  approvedBy      String?  @map("approved_by") @db.VarChar(80)
+  reasonCode      String?  @map("reason_code") @db.VarChar(60)
+  remarks         String?  @db.Text
+  reversesEntryId String?  @map("reverses_entry_id") @db.Uuid
+
+  lines JournalLine[]
+
+  @@index([eventRefType, eventRefId])
+  @@index([eventType, occurredAt])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id         String  @id @default(uuid()) @db.Uuid
+  entryId    String  @map("entry_id") @db.Uuid
+  accountId  String  @map("account_id") @db.Uuid
+  debitPaise Int     @default(0) @map("debit_paise")
+  creditPaise Int    @default(0) @map("credit_paise")
+  sourceTag  String? @map("source_tag") @db.VarChar(40)
+  funderType String? @map("funder_type") @db.VarChar(30)
+  funderId   String? @map("funder_id") @db.Uuid
+  memo       String? @db.Text
+
+  entry   JournalEntry  @relation(fields: [entryId], references: [id])
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+model AccountBalance {
+  accountId    String   @id @map("account_id") @db.Uuid
+  balancePaise Int      @default(0) @map("balance_paise")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@map("account_balances")
+}
+
+model LedgerSetting {
+  id         String @id @default("default") @db.VarChar(20)
+  lossBearer String @default("pending") @map("loss_bearer") @db.VarChar(20)
+
+  @@map("ledger_settings")
+}
+
+model LedgerOrderFlag {
+  orderId   String   @id @map("order_id") @db.Uuid
+  flag      String   @db.VarChar(60)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("ledger_order_flags")
 }

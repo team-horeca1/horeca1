@@ -25,7 +25,7 @@ export const MODULES = {
   deliveries:     ['view', 'edit', 'approve'],
   payments:       ['view', 'create', 'approve'],
   wallet:         ['view', 'create', 'approve'],
-  ledger:         ['view'],
+  ledger:         ['view', 'adjust', 'approve'],
   creditLine:     ['view', 'approve'],
   customers:      ['view', 'create', 'edit', 'delete'],
   vendors:        ['view', 'create', 'edit', 'delete', 'approve'],

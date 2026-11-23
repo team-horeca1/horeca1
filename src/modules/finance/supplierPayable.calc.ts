@@ -70,6 +70,10 @@ export interface PayableAssessmentInput {
   inOpenBatch: boolean;
   manualCreditPaise?: number;
   manualDebitPaise?: number;
+  /** Set only when LEDGER_LIVE is on. Pays the funded order, not only the captured cash. */
+  ledgerRules?: boolean;
+  /** Customer wallet spent on this order, in paise. Counts as funded when ledgerRules is set. */
+  walletFundedPaise?: number;
 }
 
 export interface PayableAssessment {
@@ -326,6 +330,44 @@ export function assessPayable(input: PayableAssessmentInput): PayableAssessment 
       blockedSalePaise: cashCappedBase,
       razorpayFeePaise: fee.unknown ? 0 : fee.feePaise,
       razorpayFeeUnknown: fee.unknown,
+    };
+  }
+
+  if (input.ledgerRules) {
+    const method = (input.paymentMethod ?? '').toLowerCase();
+    if (method === 'cod') return { ...empty, status: 'closed' };
+    if (NON_CASH_METHODS.has(method)) return { ...empty, status: 'pending_capture' };
+    const fundedPaise = Math.min(
+      commercialBasePaise,
+      netCollectedPaise + Math.max(0, input.walletFundedPaise ?? 0),
+    );
+    if (fundedPaise <= 0) return { ...empty, status: 'pending_capture' };
+    const fee = razorpayFeeFromPayments(input.payments);
+    const commission = commissionPaise(fundedPaise, input.ratePct);
+    if (fee.unknown && netCollectedPaise > 0) {
+      return {
+        ...empty,
+        status: 'fee_unknown',
+        recognisedBasePaise: fundedPaise,
+        commissionPaise: commission,
+        razorpayFeeUnknown: true,
+        netPayablePaise: 0,
+      };
+    }
+    const netPayablePaise = fundedPaise - (fee.unknown ? 0 : fee.feePaise) - commission
+      + (input.manualCreditPaise ?? 0) - (input.manualDebitPaise ?? 0);
+    let status: PayableStatus = netPayablePaise > 0 ? 'eligible' : 'closed';
+    if (status === 'eligible' && input.onHold) status = 'on_hold';
+    else if (status === 'eligible' && input.inOpenBatch) status = 'in_batch';
+    return {
+      ...empty,
+      status,
+      bucket: liabilityBucket(status),
+      recognisedBasePaise: fundedPaise,
+      commissionPaise: commission,
+      razorpayFeePaise: fee.unknown ? 0 : fee.feePaise,
+      netPayablePaise: status === 'closed' ? 0 : netPayablePaise,
+      provisionalCommissionPaise: 0,
     };
   }
 

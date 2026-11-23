@@ -144,19 +144,19 @@ const PAYMENT_OPTIONS = [
   },
   {
     id: 'credit',
-    name: 'DiSCCO',
-    desc: 'Buy Now, Pay Later',
+    name: 'Supplier credit',
+    desc: 'Pay this supplier later',
     icon: CreditCard,
-    badgeBg: 'bg-purple-50',
-    badgeText: 'text-purple-600',
+    badgeBg: 'bg-[#F8E8EC]',
+    badgeText: 'text-primary',
   },
   {
     id: 'wallet',
-    name: 'Horeca1 Credit',
-    desc: 'Buy Now, Pay Later',
+    name: 'Horeca1 credit',
+    desc: 'Pay Horeca1 later',
     icon: CreditCard,
-    badgeBg: 'bg-yellow-50',
-    badgeText: 'text-yellow-600',
+    badgeBg: 'bg-[#F8E8EC]',
+    badgeText: 'text-primary',
   },
   {
     id: 'bank_transfer',
@@ -627,7 +627,7 @@ function CheckoutPageContent() {
                 blocked,
                 ok: !!wallet && !blocked && available >= group.subtotal,
                 reason: !wallet
-                    ? 'No DiSCCO credit with this supplier.'
+                    ? 'No supplier credit with this supplier.'
                     : blocked
                         ? `This credit line is ${wallet.status.toLowerCase()}.`
                         : insufficient
@@ -839,9 +839,9 @@ function CheckoutPageContent() {
     const promoLabel = autoPromos.length === 1 ? autoPromos[0].promotionName : undefined;
 
     const walletEligibility = useMemo(() => {
-        if (!creditWalletsLoaded) return { ok: false, loading: true, reason: 'Loading Horeca1 platform credit…' };
+        if (!creditWalletsLoaded) return { ok: false, loading: true, reason: 'Loading DiSCCO…' };
         if (!platformWallet) {
-            return { ok: false, reason: 'Horeca1 Credit is not available for this account.' };
+            return { ok: false, reason: 'DiSCCO is not on this account.' };
         }
         const available = Number(platformWallet.availableCredit) || 0;
         const blocked = platformWallet.status === 'BLACKLISTED' || platformWallet.status === 'BLOCKED'
@@ -855,9 +855,9 @@ function CheckoutPageContent() {
             blocked,
             ok: !blocked && available >= selectedTotal,
             reason: blocked
-                ? `Horeca1 platform credit is ${platformWallet.status.toLowerCase()}.`
+                ? `DiSCCO is ${platformWallet.status.toLowerCase()}.`
                 : insufficient
-                    ? 'Available platform credit is less than the total order amount.'
+                    ? 'DiSCCO available is less than this order.'
                     : null,
         };
     }, [platformWallet, selectedTotal, creditWalletsLoaded]);
@@ -1536,31 +1536,31 @@ function CheckoutPageContent() {
                             {selectedPayment === 'credit' && creditWalletsLoaded && (
                                 <div className="space-y-3">
                                     {creditEligibility.map(({ group, wallet, available, remaining, ok, reason }) => (
-                                        <div key={group.vendorId} className="bg-purple-50 rounded-2xl p-4 border border-purple-100 text-left shadow-sm">
+                                        <div key={group.vendorId} className="bg-[#F8E8EC] rounded-2xl p-4 border border-[#E9C9D0] text-left shadow-sm">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <CreditCard size={15} className="text-purple-600" />
-                                                <span className="text-[13px] font-bold text-purple-800 truncate">
+                                                <CreditCard size={15} className="text-primary" />
+                                                <span className="text-[13px] font-bold text-[#4A141F] truncate">
                                                     {(wallet?.vendor ? storeDisplayName(wallet.vendor) : null) ?? group.vendorName}
                                                 </span>
                                             </div>
                                             <div className="space-y-1 text-[12px]">
                                                 <div className="flex justify-between">
-                                                    <span className="text-purple-600">Available</span>
-                                                    <span className="font-bold text-purple-800">{wallet ? `₹${available.toLocaleString('en-IN')}` : '—'}</span>
+                                                    <span className="text-[#6B1D2E]/70">Available</span>
+                                                    <span className="font-bold text-[#4A141F] tabular-nums">{wallet ? `₹${available.toLocaleString('en-IN')}` : '—'}</span>
                                                 </div>
                                                 {wallet && Number(wallet.outstandingAmount) > 0 && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-purple-600">Outstanding</span>
+                                                        <span className="text-[#6B1D2E]/70">You owe</span>
                                                         <span className="font-bold text-rose-600">₹{Number(wallet.outstandingAmount).toLocaleString('en-IN')}</span>
                                                     </div>
                                                 )}
                                                 <div className="flex justify-between">
-                                                    <span className="text-purple-600">This order</span>
-                                                    <span className="font-bold text-purple-800">₹{group.subtotal.toLocaleString('en-IN')}</span>
+                                                    <span className="text-[#6B1D2E]/70">This order</span>
+                                                    <span className="font-bold text-[#4A141F] tabular-nums">₹{group.subtotal.toLocaleString('en-IN')}</span>
                                                 </div>
-                                                <div className="flex justify-between border-t border-purple-100/50 pt-1 mt-1">
-                                                    <span className="text-purple-600">After this order</span>
-                                                    <span className={`font-bold ${remaining < 0 ? 'text-red-600' : 'text-purple-800'}`}>
+                                                <div className="flex justify-between border-t border-[#E9C9D0] pt-1 mt-1">
+                                                    <span className="text-[#6B1D2E]/70">Left after this order</span>
+                                                    <span className={`font-bold tabular-nums ${remaining < 0 ? 'text-red-600' : 'text-[#4A141F]'}`}>
                                                         {wallet ? `₹${remaining.toLocaleString('en-IN')}` : '—'}
                                                     </span>
                                                 </div>
@@ -1575,32 +1575,32 @@ function CheckoutPageContent() {
                                     ))}
                                     {!creditAllSelectionsValid && (
                                         <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl p-3 text-left">
-                                            DiSCCO requires a credit line with each supplier in this order.
+                                            Supplier credit needs a line with each supplier in this order.
                                         </div>
                                     )}
                                 </div>
                             )}
 
                             {selectedPayment === 'wallet' && creditWalletsLoaded && platformWallet && (
-                                <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-100 text-left shadow-sm">
+                                <div className="bg-[#F8E8EC] rounded-2xl p-4 border border-[#E9C9D0] text-left shadow-sm">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <CreditCard size={15} className="text-yellow-600" />
-                                        <span className="text-[13px] font-bold text-yellow-800">Horeca1 Credit</span>
+                                        <CreditCard size={15} className="text-primary" />
+                                        <span className="text-[13px] font-bold text-[#4A141F]">Horeca1 credit</span>
                                     </div>
                                     <div className="space-y-1 text-[12px]">
                                         <div className="flex justify-between">
-                                            <span className="text-yellow-600">Available</span>
-                                            <span className="font-bold text-yellow-800">₹{walletBalance?.toLocaleString('en-IN') ?? '—'}</span>
+                                            <span className="text-[#6B1D2E]/70">Available</span>
+                                            <span className="font-bold text-[#4A141F] tabular-nums">₹{walletBalance?.toLocaleString('en-IN') ?? '—'}</span>
                                         </div>
                                         {Number(platformWallet.outstandingAmount) > 0 && (
                                             <div className="flex justify-between">
-                                                <span className="text-yellow-600">Outstanding</span>
+                                                <span className="text-[#6B1D2E]/70">You owe Horeca1</span>
                                                 <span className="font-bold text-rose-600">₹{Number(platformWallet.outstandingAmount).toLocaleString('en-IN')}</span>
                                             </div>
                                         )}
-                                        <div className="flex justify-between border-t border-yellow-200/50 pt-1 mt-1">
-                                            <span className="text-yellow-600">This order</span>
-                                            <span className="font-bold text-yellow-800">₹{selectedTotal.toLocaleString('en-IN')}</span>
+                                        <div className="flex justify-between border-t border-[#E9C9D0] pt-1 mt-1">
+                                            <span className="text-[#6B1D2E]/70">This order</span>
+                                            <span className="font-bold text-[#4A141F] tabular-nums">₹{selectedTotal.toLocaleString('en-IN')}</span>
                                         </div>
                                     </div>
                                     {!walletEligibility.ok && walletEligibility.reason && (
@@ -1662,7 +1662,7 @@ function CheckoutPageContent() {
                                     )}
                                     {walletUseEst > 0 && (
                                         <div className="flex justify-between items-center text-[13px]">
-                                            <span className="text-gray-500 font-medium">H1 Wallet</span>
+                                            <span className="text-gray-500 font-medium">Wallet</span>
                                             <span className={`font-bold text-primary ${billAmountClass}`}>−₹{walletUseEst.toLocaleString('en-IN')}</span>
                                         </div>
                                     )}

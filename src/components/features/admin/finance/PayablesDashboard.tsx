@@ -394,30 +394,20 @@ export function PayablesDashboard() {
           Finance
         </Link>
         <span className="text-zinc-300">/</span>
-        <span className="text-[#1C1C1C] font-semibold">Pay Suppliers</span>
+        <span className="text-[#1C1C1C] font-semibold">Payouts</span>
       </nav>
 
       {/* Header section */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#1C1C1C] sm:text-3xl">
-            Pay suppliers
+            Payouts
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#667085]">
-            The supplier comes first. Open the arrow to see the dates still to pay, and close it
-            when you are done. Each order has its own Pay. Pay together on the supplier pays every ready order.
+            What Horeca1 still has to send each supplier.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
-          <Link
-            href="/admin/ledger"
-            className={cn(
-              'inline-flex h-10 items-center justify-center rounded-xl border border-[#E9E3DD] bg-white px-3.5 text-xs font-semibold text-[#667085] hover:bg-[#FAF7F2] hover:text-[#1C1C1C] shadow-xs transition-colors',
-              focusRing,
-            )}
-          >
-            Older wallet
-          </Link>
           <button
             type="button"
             onClick={() => void exportCsv()}

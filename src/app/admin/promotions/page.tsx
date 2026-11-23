@@ -255,7 +255,7 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
-                        Can be clubbed with H1 Wallet
+                        Can be clubbed with Wallet
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#6B1D2E]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
@@ -399,7 +399,7 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                         <input className={inputCls} type="number" min="1" value={form.perUserLimit} onChange={(e) => set({ perUserLimit: e.target.value })} placeholder="Unlimited" />
                     </div>
                 </div>
-                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s H1 Wallet after delivery.</p>
+                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s Wallet after delivery.</p>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
@@ -407,7 +407,7 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
-                        Can be clubbed with H1 Wallet payment
+                        Can be clubbed with Wallet payment
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#6B1D2E]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
@@ -467,7 +467,7 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
             const json = await res.json();
             if (!res.ok) throw new Error(json?.error?.message || 'Grant failed');
             const key = typeof json?.data?.trackingKey === 'string' ? json.data.trackingKey : null;
-            toast.success(key ? `Incentive credited to H1 Wallet · ${key}` : 'Incentive credited to H1 Wallet');
+            toast.success(key ? `Incentive credited to Wallet · ${key}` : 'Incentive credited to Wallet');
             onSaved();
             onClose();
         } catch (err) {
@@ -481,7 +481,7 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
             <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-5">
-                    <h3 className="text-[16px] font-bold text-[#181725]">Instant H1 Wallet grant</h3>
+                    <h3 className="text-[16px] font-bold text-[#181725]">Instant Wallet grant</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={18} /></button>
                 </div>
 
@@ -527,13 +527,13 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
                         <input className={inputCls} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. loyalty reward — June campaign" />
                     </div>
                 </div>
-                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits H1 Wallet immediately. For UPI, create a payout link instead.</p>
+                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits Wallet immediately. For UPI, create a payout link instead.</p>
                 <button
                     onClick={submit}
                     disabled={saving || !selected}
                     className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                    {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Credit H1 Wallet'}
+                    {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Credit Wallet'}
                 </button>
             </div>
         </div>
@@ -634,7 +634,7 @@ export default function AdminPromotionsPage() {
                     {tab === 'cashback' && (
                         <>
                             <button onClick={() => setGrantOpen(true)} className="inline-flex items-center justify-center gap-1.5 min-h-12 px-4 rounded-xl border border-gray-200 text-[#181725] text-[13px] font-semibold hover:bg-gray-50 transition-colors cursor-pointer">
-                                Instant H1 Wallet grant
+                                Instant Wallet grant
                             </button>
                             <button onClick={() => setCampaignModal({ open: true, editing: null })} className="inline-flex items-center justify-center gap-1.5 min-h-12 px-4 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-semibold hover:bg-[#5A1926] transition-colors cursor-pointer">
                                 <Plus size={14} /> New Campaign
@@ -708,7 +708,7 @@ export default function AdminPromotionsPage() {
                                         {' · '}
                                         <span title="Clubs with cashback" className={c.stacksWithCashback ? 'text-[#6B1D2E]' : 'text-gray-300'}>C</span>
                                         {' · '}
-                                        <span title="Clubs with H1 Wallet" className={c.stacksWithWallet ? 'text-[#6B1D2E]' : 'text-gray-300'}>W</span>
+                                        <span title="Clubs with Wallet" className={c.stacksWithWallet ? 'text-[#6B1D2E]' : 'text-gray-300'}>W</span>
                                     </td>
                                     <td className={tdCls}>
                                         <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-success-light text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
@@ -753,7 +753,7 @@ export default function AdminPromotionsPage() {
                                         {c.cashbackType === 'flat' ? inr(c.cashbackValue) : `${Number(c.cashbackValue)}%${c.maxCashback ? ` (max ${inr(c.maxCashback)})` : ''}`}
                                     </td>
                                     <td className={tdCls}>{c.minOrderValue ? inr(c.minOrderValue) : '—'}</td>
-                                    <td className={tdCls}>{c.destination === 'wallet' ? 'H1 Wallet' : 'UPI (legacy)'}</td>
+                                    <td className={tdCls}>{c.destination === 'wallet' ? 'Wallet' : 'UPI (legacy)'}</td>
                                     <td className={tdCls}>{c.totalBudget ? `${inr(c.usedAmount)} / ${inr(c.totalBudget)}` : inr(c.usedAmount)}</td>
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>

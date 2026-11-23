@@ -9,14 +9,13 @@ import {
   Users,
   Store,
   CheckSquare,
-  Wallet,
   BarChart3,
   Settings,
   Package,
   Tag,
   Sparkles,
-  BookOpen,
   Receipt,
+  BookOpen,
   RotateCcw,
   CreditCard,
   Gift,
@@ -78,14 +77,16 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Finance',
     links: [
-      { name: 'Pay suppliers', icon: Receipt, href: '/admin/finance', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Payouts', icon: Receipt, href: '/admin/finance', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Wallets', icon: CreditCard, href: '/admin/wallets', feature: 'ledger', requiredPerm: 'ledger.view' },
+      { name: 'Journal', icon: BookOpen, href: '/admin/journal', feature: 'ledger', requiredPerm: 'ledger.view' },
       { name: 'Sales reports', icon: BarChart3, href: '/admin/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
     ],
   },
   {
     label: 'Credit',
     links: [
-      { name: 'Credit & Collections', icon: CreditCard, href: '/admin/credit', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Credit', icon: CreditCard, href: '/admin/credit', feature: 'payments', requiredPerm: 'payments.view' },
     ],
   },
   {
@@ -120,7 +121,7 @@ export const SUPPLIER_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Finance',
     links: [
-      { name: 'What I receive', icon: Receipt, href: '/vendor/receive', feature: 'wallet', requiredPerm: 'wallet.view' },
+      { name: 'Payout', icon: Receipt, href: '/vendor/receive', feature: 'wallet', requiredPerm: 'wallet.view' },
     ],
   },
 ];
@@ -161,10 +162,8 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Finance',
     links: [
-      { name: 'Credit & Collections', icon: CreditCard, href: '/vendor/credit', feature: 'creditLine', requiredPerm: ['creditLine.view', 'creditLine.approve'] },
-      { name: 'What I receive', icon: Receipt, href: '/vendor/receive', feature: 'wallet', requiredPerm: 'wallet.view' },
-      { name: 'Wallet', icon: Wallet, href: '/vendor/wallet', feature: 'wallet', requiredPerm: 'wallet.view' },
-      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'ledger', requiredPerm: 'ledger.view' },
+      { name: 'Customer credit', icon: CreditCard, href: '/vendor/credit', feature: 'creditLine', requiredPerm: ['creditLine.view', 'creditLine.approve'] },
+      { name: 'Payout', icon: Receipt, href: '/vendor/receive', feature: 'wallet', requiredPerm: 'wallet.view' },
       { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
     ],
   },

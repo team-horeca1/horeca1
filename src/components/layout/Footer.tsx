@@ -35,7 +35,7 @@ const FOOTER_LINKS: Record<string, Array<{ label: string; href: string }>> = {
         { label: 'Order History', href: '/orders' },
         { label: 'Shopping Cart', href: '/cart' },
         { label: 'Wallet', href: '/rewards' },
-        { label: 'DiSCCO Credit', href: '/wallet' },
+        { label: 'Credit', href: '/wallet' },
     ],
     groceries: [
         { label: 'Fresh Produce', href: '/category/fresh-produce' },

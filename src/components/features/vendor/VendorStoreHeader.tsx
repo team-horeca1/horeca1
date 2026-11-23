@@ -115,8 +115,8 @@ function StoreBannerIdentity({
                         </span>
                     ) : null}
                     {vendor.creditEnabled ? (
-                        <span className="flex items-center gap-1 rounded-full border border-purple-300/40 bg-purple-500/25 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-purple-200">
-                            <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
+                        <span className="flex items-center gap-1 rounded-full border border-white/30 bg-white/15 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-white">
+                            <CreditCard size={11} strokeWidth={2} /> Supplier credit
                         </span>
                     ) : null}
                 </div>

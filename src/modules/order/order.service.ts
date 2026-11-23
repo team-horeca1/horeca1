@@ -19,6 +19,8 @@ import { CartService, type CartContext } from '@/modules/cart/cart.service';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.service';
 import { refreshSupplierPayable } from '@/modules/finance/supplierPayable.service';
+import { shadowOrder } from '@/modules/ledger/shadowOrder';
+import { assertLiveQuantityKeepsWallet, livePartialReversal } from '@/modules/ledger/live';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
@@ -874,6 +876,9 @@ export class OrderService {
       if (walletRows.length > 0) {
         await promotionService.debitWalletForCheckout(tx, { userId, rows: walletRows });
       }
+      for (const order of orders) {
+        await shadowOrder(tx, order.id, 'place');
+      }
 
       // 7. Clear only cart lines for vendors that were placed (partial checkout
       // must not wipe unselected vendor groups).
@@ -1037,6 +1042,7 @@ export class OrderService {
         toStatus: order.status,
         payload: { reason },
       });
+      await shadowOrder(tx, orderId, 'abandon');
       return { abandoned: true as const };
     });
   }
@@ -1355,6 +1361,10 @@ export class OrderService {
       }
 
       if (subtotal <= 0) throw Errors.badRequest('Order would have no items left. Cancel the order instead.');
+      assertLiveQuantityKeepsWallet(
+        Number(order.walletApplied),
+        subtotal - Number(order.promoDiscount) - Number(order.couponDiscount),
+      );
       // MOV is a customer placement-time gate (enforced in createOrder + submitDraft).
       // It is intentionally NOT re-enforced here: once an order is accepted, ops/vendor
       // edits (quantity adjustments, partial fulfilment) must not be blocked because the
@@ -1372,12 +1382,14 @@ export class OrderService {
         await this.inventoryService.releaseStock(releaseDeltas, fulfillOutlet, tx);
       }
 
-      return tx.order.update({
+      const updated = await tx.order.update({
         where: { id: orderId },
         // Coupon + wallet amounts stay fixed when ops edit quantities; the
         // payable just shrinks/grows around them (clamped at 0).
         data: { subtotal, totalAmount: Math.max(0, subtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied)) },
       });
+      await shadowOrder(tx, orderId, 'place');
+      return updated;
     }, { isolationLevel: 'Serializable' });
   }
 
@@ -2122,6 +2134,7 @@ export class OrderService {
       }
 
       await applyCreditLedgerForStatus(tx, order, toStatus);
+      if (toStatus === 'delivered') await shadowOrder(tx, orderId, 'deliver');
 
       return updated;
     });
@@ -2231,6 +2244,13 @@ export class OrderService {
       );
 
       await applyCreditLedgerForStatus(tx, order, toStatus);
+      if (toStatus === 'cancelled') await shadowOrder(tx, orderId, 'cancel');
+      else {
+        const cancelledValue = cancelRows.reduce((sum, row) => sum + row.cancelQty * Number(row.item.unitPrice), 0);
+        const base = Number(order.subtotal);
+        if (base > 0) await livePartialReversal(tx, orderId, cancelledValue / base);
+      }
+      if (toStatus === 'delivered') await shadowOrder(tx, orderId, 'deliver');
 
       return updated;
     });
@@ -2475,6 +2495,9 @@ export class OrderService {
         await promotionService.cancelCashbackForOrder(tx, orderId);
       }
       await refreshSupplierPayable(orderId, tx);
+      if (status === 'delivered' || status === 'cancelled') {
+        await shadowOrder(tx, orderId, status === 'delivered' ? 'deliver' : 'cancel');
+      }
 
       // V2.2 Phase 1 — Commission accrual hook.
       //
@@ -2880,6 +2903,7 @@ export class OrderService {
           },
         },
       ]);
+      await shadowOrder(tx, order.id, 'pay');
 
       return next;
     });
@@ -2955,6 +2979,7 @@ export class OrderService {
           },
         },
       ]);
+      await shadowOrder(tx, order.id, 'pay');
 
       return { order: next, paymentId: payment.id };
     });
