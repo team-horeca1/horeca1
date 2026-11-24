@@ -19,7 +19,7 @@ export default function AdminCreditPage() {
   return (
     <div className="space-y-5 pb-10">
       <div>
-        <h1 className="text-[24px] font-semibold text-[#1C1C1C] leading-none mb-1">Credit</h1>
+        <h1 className="text-[24px] font-semibold text-[#1C1C1C] leading-none mb-1">DiSCCO Credit</h1>
         <p className="text-[13px] text-[#667085]">
           Supplier credit and DiSCCO
         </p>

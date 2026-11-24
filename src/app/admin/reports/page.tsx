@@ -61,7 +61,7 @@ export default function AdminReportsPage() {
     <div className="space-y-6 pb-12 text-[#1C1C1C]">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Sales reports</h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Sales</h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#667085]">
             Delivered sales for the period. This page is not used to pay suppliers.
           </p>

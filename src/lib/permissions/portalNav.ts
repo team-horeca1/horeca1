@@ -79,10 +79,10 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Finance',
     links: [
       { name: 'Payouts', icon: Receipt, href: '/admin/finance', feature: 'payments', requiredPerm: 'payments.view' },
-      { name: 'Wallets', icon: CreditCard, href: '/admin/wallets', feature: 'ledger', requiredPerm: 'ledger.view' },
+      { name: 'H1 Wallet', icon: CreditCard, href: '/admin/wallets', feature: 'ledger', requiredPerm: 'ledger.view' },
       { name: 'Journal', icon: BookOpen, href: '/admin/journal', feature: 'ledger', requiredPerm: 'ledger.view' },
-      { name: 'Sales reports', icon: BarChart3, href: '/admin/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
-      { name: 'Credit', icon: Landmark, href: '/admin/credit', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Sales', icon: BarChart3, href: '/admin/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
+      { name: 'DiSCCO Credit', icon: Landmark, href: '/admin/credit', feature: 'payments', requiredPerm: 'payments.view' },
     ],
   },
   {

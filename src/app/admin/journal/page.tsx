@@ -198,7 +198,7 @@ export default function JournalPage() {
           </p>
         </div>
         <Link href="/admin/wallets" className="min-h-12 rounded-xl border border-[#E9E3DD] bg-white px-4 text-[13px] font-semibold leading-[3rem]">
-          Wallets
+          H1 Wallet
         </Link>
       </header>
 

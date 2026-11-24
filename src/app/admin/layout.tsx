@@ -78,16 +78,17 @@ function AdminNavLinks({
                                     onClick={onNavigate}
                                     title={collapsed ? (badge > 0 ? `${link.name} (${badgeLabel} pending)` : link.name) : undefined}
                                     className={cn(
-                                        'relative flex items-center rounded-[12px] text-[14px] font-semibold overflow-hidden leading-none min-h-12',
-                                        collapsed ? 'justify-center px-0' : 'gap-3 px-4',
+                                        'relative flex w-full items-center rounded-[12px] text-[14px] font-semibold leading-none min-h-12',
+                                        collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                                         isActive
                                             ? 'bg-primary text-white shadow-sm'
                                             : 'text-[#1C1C1C] hover:bg-primary-light active:bg-primary-light',
                                     )}
                                 >
-                                    <span className="relative shrink-0">
+                                    <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
                                         <link.icon
-                                            size={22}
+                                            size={20}
+                                            strokeWidth={1.75}
                                             className={cn(isActive ? 'text-white' : 'text-[#1C1C1C]')}
                                         />
                                         {collapsed && badge > 0 && (
@@ -96,7 +97,7 @@ function AdminNavLinks({
                                     </span>
                                     {!collapsed && (
                                         <>
-                                            <span className="whitespace-nowrap flex-1">{link.name}</span>
+                                            <span className="min-w-0 flex-1 truncate text-left">{link.name}</span>
                                             {badge > 0 && (
                                                 <span
                                                     className={cn(

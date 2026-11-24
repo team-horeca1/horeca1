@@ -61,7 +61,7 @@ export default function AdminWalletsPage() {
     <div className="space-y-6 pb-16 text-[#1C1C1C]">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[clamp(1.4rem,2vw+0.8rem,2rem)] font-semibold">Wallets</h1>
+          <h1 className="text-[clamp(1.4rem,2vw+0.8rem,2rem)] font-semibold">H1 Wallet</h1>
           <p className="mt-1 max-w-2xl text-[13px] text-[#667085]">
             H1 Wallet is the customer&apos;s spendable money. Rewards and cashback are a Horeca1 platform expense.
             When a customer pays with Wallet, Horeca1 still owes the supplier the full order minus commission.
