@@ -356,4 +356,127 @@ export async function listJournalEntries(opts?: {
   });
 }
 
+export interface LedgerBookAccount {
+  code: string;
+  name: string;
+  role: string;
+  party: string | null;
+  balance: string;
+}
+
+export interface LedgerBook {
+  id: 'asset' | 'liability' | 'income' | 'expense';
+  title: string;
+  meaning: string;
+  total: string;
+  accounts: LedgerBookAccount[];
+}
+
+export interface LedgerBooks {
+  assets: string;
+  liabilities: string;
+  income: string;
+  expenses: string;
+  balanced: boolean;
+  books: LedgerBook[];
+}
+
+const BOOK_COPY: Record<LedgerBook['id'], { title: string; meaning: string }> = {
+  asset: { title: 'Assets', meaning: 'Cash in Razorpay clearing and amounts customers still owe.' },
+  liability: { title: 'Liabilities', meaning: 'H1 Wallet balances and money due to suppliers.' },
+  income: { title: 'Income', meaning: 'Commission Horeca1 keeps.' },
+  expense: { title: 'Expenses', meaning: 'Rewards and cashback Horeca1 has given.' },
+};
+
+/** The four ledger books, from live account balances. */
+export async function ledgerBooks(): Promise<LedgerBooks> {
+  const accounts = await prisma.ledgerAccount.findMany({
+    include: { balance: true },
+    orderBy: { code: 'asc' },
+  });
+
+  const userIds = new Set<string>();
+  const vendorIds = new Set<string>();
+  for (const account of accounts) {
+    const uid = uuidFromCode(account.code, ['WALLET:', 'AR_CREDIT_H1:', 'AR_CREDIT_SUP:']);
+    if (uid) userIds.add(uid);
+    const vid = uuidFromCode(account.code, ['PAYABLE:', 'HELD:']);
+    if (vid) vendorIds.add(vid);
+  }
+  const [users, vendors] = await Promise.all([
+    userIds.size
+      ? prisma.user.findMany({
+        where: { id: { in: [...userIds] } },
+        select: { id: true, fullName: true, phone: true, hcidDisplay: true, email: true },
+      })
+      : Promise.resolve([]),
+    vendorIds.size
+      ? prisma.vendor.findMany({
+        where: { id: { in: [...vendorIds] } },
+        select: { id: true, displayName: true, businessName: true },
+      })
+      : Promise.resolve([]),
+  ]);
+  const userName = new Map(users.map((user) => [
+    user.id,
+    user.fullName || user.hcidDisplay || user.phone || user.email || user.id.slice(0, 8),
+  ]));
+  const vendorName = new Map(vendors.map((vendor) => [vendor.id, vendor.displayName || vendor.businessName]));
+
+  const partyFor = (code: string, ownerType: string | null, ownerId: string | null): string | null => {
+    if (ownerType === 'customer' && ownerId) return userName.get(ownerId) ?? ownerId.slice(0, 8);
+    if (ownerType === 'supplier' && ownerId) return vendorName.get(ownerId) ?? ownerId.slice(0, 8);
+    const uid = uuidFromCode(code, ['WALLET:', 'AR_CREDIT_H1:', 'AR_CREDIT_SUP:']);
+    if (uid) return userName.get(uid) ?? uid.slice(0, 8);
+    const vid = uuidFromCode(code, ['PAYABLE:', 'HELD:']);
+    if (vid) return vendorName.get(vid) ?? vid.slice(0, 8);
+    if (code === 'REWARD_EXPENSE' || code === 'COMMISSION' || code === 'GATEWAY') return 'Horeca1';
+    return null;
+  };
+
+  const grouped: Record<LedgerBook['id'], LedgerBookAccount[]> = {
+    asset: [],
+    liability: [],
+    income: [],
+    expense: [],
+  };
+  const totals = { asset: 0, liability: 0, income: 0, expense: 0 };
+
+  for (const account of accounts) {
+    const type = account.type as LedgerBook['id'];
+    if (!grouped[type]) continue;
+    const balance = account.balance?.balancePaise ?? 0;
+    totals[type] += balance;
+    if (balance === 0) continue;
+    grouped[type].push({
+      code: account.code,
+      name: account.name,
+      role: roleOfAccount(account.code),
+      party: partyFor(account.code, account.ownerType, account.ownerId),
+      balance: inr(balance),
+    });
+  }
+
+  for (const type of Object.keys(grouped) as LedgerBook['id'][]) {
+    grouped[type].sort((a, b) => Math.abs(Number(b.balance)) - Math.abs(Number(a.balance)));
+  }
+
+  const books = (['asset', 'liability', 'income', 'expense'] as const).map((id) => ({
+    id,
+    title: BOOK_COPY[id].title,
+    meaning: BOOK_COPY[id].meaning,
+    total: inr(totals[id]),
+    accounts: grouped[id],
+  }));
+
+  return {
+    assets: inr(totals.asset),
+    liabilities: inr(totals.liability),
+    income: inr(totals.income),
+    expenses: inr(totals.expense),
+    balanced: totals.asset + totals.expense === totals.liability + totals.income,
+    books,
+  };
+}
+
 export type { StatementRow };

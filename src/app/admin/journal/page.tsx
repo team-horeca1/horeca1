@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import Link from 'next/link';
+import { JournalBooksDashboard } from '@/components/features/ledger/JournalBooksDashboard';
 
 interface JournalLine {
   id: string;
@@ -113,6 +114,8 @@ export default function JournalPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [section, setSection] = useState<'journal' | 'dashboard'>('journal');
+  const [view, setView] = useState<'detail' | 'table' | 'cards'>('detail');
 
   const loadEntries = useCallback((query?: string, event?: string) => {
     setLoading(true);
@@ -202,7 +205,29 @@ export default function JournalPage() {
         </Link>
       </header>
 
-      <form
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Journal sections">
+        {([
+          ['journal', 'Journal'],
+          ['dashboard', 'Dashboard'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={section === id}
+            onClick={() => setSection(id)}
+            className={`min-h-12 rounded-xl px-4 text-[13px] font-semibold ${
+              section === id ? 'bg-[#6B1D2E] text-white' : 'border border-[#E9E3DD] bg-white'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {section === 'dashboard' && <JournalBooksDashboard />}
+
+      {section === 'journal' && <form
         className="flex flex-wrap gap-2"
         onSubmit={(event) => {
           event.preventDefault();
@@ -227,14 +252,99 @@ export default function JournalPage() {
         <button type="submit" className="min-h-12 rounded-xl border border-[#E9E3DD] bg-white px-4 text-[13px] font-semibold">
           Filter
         </button>
-      </form>
+        <div className="flex rounded-xl border border-[#E9E3DD] bg-white p-1" role="group" aria-label="Entry view">
+          {([
+            ['detail', 'Detail'],
+            ['table', 'Table'],
+            ['cards', 'Cards'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={view === id}
+              onClick={() => setView(id)}
+              className={`min-h-10 rounded-lg px-3 text-[13px] font-semibold ${
+                view === id ? 'bg-[#6B1D2E] text-white' : 'text-[#667085]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </form>}
 
+      {section === 'journal' && <>
       {error && <p className="rounded-xl bg-[#F8E8EC] px-3 py-2 text-[14px] font-semibold text-[#6B1D2E]" role="alert">{error}</p>}
       {loading && <p className="text-[14px] text-[#667085]">Loading entries…</p>}
       {!loading && entries.length === 0 && (
         <p className="rounded-2xl border border-[#E9E3DD] bg-white p-6 text-[14px]">No journal entries yet.</p>
       )}
 
+      {view === 'table' && entries.length > 0 && (
+        <div className="overflow-x-auto rounded-2xl border border-[#E9E3DD] bg-white">
+          <table className="w-full min-w-[760px] text-left text-[13px]">
+            <thead className="text-[#667085]">
+              <tr>
+                <th className="px-3 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">What happened</th>
+                <th className="px-3 py-2 font-medium">Buyer</th>
+                <th className="px-3 py-2 font-medium">Supplier</th>
+                <th className="px-3 py-2 font-medium">Paid</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id} className="border-t border-[#E9E3DD]">
+                  <td className="px-3 py-3">{entry.date.slice(0, 10)}</td>
+                  <td className="px-3 py-3">
+                    <p className="font-semibold">{entry.eventLabel}</p>
+                    <p className="text-[12px] text-[#667085]">{entry.referenceId.slice(0, 13)}{entry.edited ? ' · Edited' : ''}</p>
+                  </td>
+                  <td className="px-3 py-3">{entry.summary.buyer ?? '—'}</td>
+                  <td className="px-3 py-3">{entry.summary.supplier ?? '—'}</td>
+                  <td className="px-3 py-3">{entry.summary.paidHow ?? '—'}</td>
+                  <td className="px-3 py-3 text-right font-semibold tabular-nums">₹{entry.summary.totalDebit}</td>
+                  <td className="px-3 py-3 text-right">
+                    <button type="button" onClick={() => { setView('detail'); startEdit(entry); }} className="min-h-10 rounded-lg border border-[#6B1D2E] px-3 text-[12px] font-semibold text-[#6B1D2E]">
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === 'cards' && entries.length > 0 && (
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {entries.map((entry) => (
+            <li key={entry.id} className="flex flex-col rounded-2xl border border-[#E9E3DD] bg-white p-4">
+              <p className="text-[12px] font-medium uppercase tracking-wide text-[#667085]">{entry.date.slice(0, 10)}{entry.edited ? ' · Edited' : ''}</p>
+              <h2 className="mt-1 text-[15px] font-semibold">{entry.eventLabel}</h2>
+              <p className="mt-2 text-[20px] font-semibold tabular-nums">₹{entry.summary.totalDebit}</p>
+              <div className="mt-3 space-y-1 text-[13px] text-[#667085]">
+                <p>Buyer: <span className="font-semibold text-[#1C1C1C]">{entry.summary.buyer ?? '—'}</span></p>
+                <p>Supplier: <span className="font-semibold text-[#1C1C1C]">{entry.summary.supplier ?? '—'}</span></p>
+                <p>Paid: <span className="font-semibold text-[#1C1C1C]">{entry.summary.paidHow ?? '—'}</span></p>
+                {entry.summary.dueTo && <p>Due: <span className="font-semibold text-[#1C1C1C]">{entry.summary.dueTo}</span></p>}
+                {entry.summary.platformExpense && <p className="text-[#6B1D2E]">Horeca1 expense: <span className="font-semibold">{entry.summary.platformExpense}</span></p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setView('detail'); startEdit(entry); }}
+                className="mt-4 min-h-11 rounded-xl border border-[#6B1D2E] text-[13px] font-semibold text-[#6B1D2E]"
+              >
+                Open to edit
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {view === 'detail' && (
       <ul className="space-y-4">
         {entries.map((entry) => {
           const editing = editingId === entry.id;
@@ -429,6 +539,8 @@ export default function JournalPage() {
           );
         })}
       </ul>
+      )}
+      </>}
     </div>
   );
 }
