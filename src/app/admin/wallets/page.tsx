@@ -101,25 +101,38 @@ export default function AdminWalletsPage() {
           <FinanceKpiCard
             title="Rewards given"
             value={inr(summary.rewardsGiven)}
-            subtext="Cashback and grants. Horeca1 expense."
+            subtext="Grants and cashback put into wallets."
             icon={<Gift className="h-4 w-4" />}
             iconTone="burgundy"
           />
           <FinanceKpiCard
             title="Spent"
             value={inr(summary.spent)}
-            subtext="Used on orders. Supplier is still paid in full."
+            subtext="Used on orders. Cancelled spends are put back."
             icon={<ShoppingBag className="h-4 w-4" />}
             iconTone="blue"
           />
           <FinanceKpiCard
             title="Credit notes"
             value={inr(summary.creditNotes)}
-            subtext="Return money put into wallets by suppliers."
+            subtext="Return money suppliers put into wallets."
             icon={<RotateCcw className="h-4 w-4" />}
             iconTone="amber"
           />
         </section>
+      )}
+
+      {summary && (
+        <p className="rounded-xl border border-[#E9E3DD] bg-white px-4 py-3 text-[13px] text-[#1C1C1C]">
+          <span className="font-semibold tabular-nums">{inr(summary.rewardsGiven)}</span>
+          {' rewards + '}
+          <span className="font-semibold tabular-nums">{inr(summary.creditNotes)}</span>
+          {' credit notes − '}
+          <span className="font-semibold tabular-nums">{inr(summary.spent)}</span>
+          {' spent = '}
+          <span className="font-semibold tabular-nums">{inr(summary.spendable)}</span>
+          {' still to spend.'}
+        </p>
       )}
 
       <form
@@ -152,9 +165,9 @@ export default function AdminWalletsPage() {
           <thead className="text-[#667085]">
             <tr>
               <th className="px-3 py-2 font-medium">Customer</th>
-              <th className="px-3 py-2 text-right font-medium">Wallet balance</th>
-              <th className="px-3 py-2 text-right font-medium">Rewards</th>
-              <th className="px-3 py-2 text-right font-medium">Credit notes</th>
+              <th className="px-3 py-2 text-right font-medium">Can spend</th>
+              <th className="px-3 py-2 text-right font-medium">Rewards left</th>
+              <th className="px-3 py-2 text-right font-medium">Notes left</th>
               <th className="px-3 py-2 text-right font-medium">Journal</th>
               <th className="px-3 py-2 font-medium" />
             </tr>

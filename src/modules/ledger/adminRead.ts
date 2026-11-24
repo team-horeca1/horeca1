@@ -30,38 +30,54 @@ function rupees(value: { toString(): string } | null | undefined): string {
   return (Number.isFinite(amount) ? amount : 0).toFixed(2);
 }
 
-/** Platform totals for the H1 Wallet screen. Live wallet book, not the journal shadow. */
+const WALLET_REVERSAL_REFS = ['order_cancel', 'order_redemption_refund', 'cashback_reversal'];
+
+function money(value: { toString(): string } | null | undefined): number {
+  const amount = Number(value?.toString() ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+/**
+ * H1 Wallet totals that add up:
+ * rewards given + credit notes − spent = can spend.
+ * A cancelled spend is a debit plus a later credit, so it is taken out of Spent.
+ * Every grant counts, including ones stored only as a direct grant.
+ */
 export async function adminWalletSummary(): Promise<AdminWalletSummary> {
-  const [balances, rewards, notes, spent] = await Promise.all([
+  const noteWhere = {
+    type: 'credit' as const,
+    OR: [{ source: 'credit_note' }, { referenceType: 'return_credit_note' }],
+  };
+  const [balances, credits, notes, reversals, debits] = await Promise.all([
     prisma.wallet.aggregate({ _sum: { balance: true }, _count: { _all: true } }),
+    prisma.walletTransaction.aggregate({ where: { type: 'credit' }, _sum: { amount: true } }),
+    prisma.walletTransaction.aggregate({ where: noteWhere, _sum: { amount: true } }),
     prisma.walletTransaction.aggregate({
       where: {
         type: 'credit',
-        NOT: { source: 'credit_note' },
+        NOT: noteWhere,
         OR: [
-          { source: 'reward' },
-          { referenceType: 'cashback' },
-          { funderType: 'platform' },
+          { source: 'reversal' },
+          { referenceType: { in: WALLET_REVERSAL_REFS } },
         ],
       },
       _sum: { amount: true },
     }),
-    prisma.walletTransaction.aggregate({
-      where: { type: 'credit', source: 'credit_note' },
-      _sum: { amount: true },
-    }),
-    prisma.walletTransaction.aggregate({
-      where: { type: 'debit' },
-      _sum: { amount: true },
-    }),
+    prisma.walletTransaction.aggregate({ where: { type: 'debit' }, _sum: { amount: true } }),
   ]);
+
+  const creditTotal = money(credits._sum.amount);
+  const noteTotal = money(notes._sum.amount);
+  const reversalTotal = money(reversals._sum.amount);
+  const rewards = creditTotal - noteTotal - reversalTotal;
+  const spent = money(debits._sum.amount) - reversalTotal;
 
   return {
     spendable: rupees(balances._sum.balance),
     wallets: balances._count._all,
-    rewardsGiven: rupees(rewards._sum.amount),
-    spent: rupees(spent._sum.amount),
-    creditNotes: rupees(notes._sum.amount),
+    rewardsGiven: rewards.toFixed(2),
+    spent: spent.toFixed(2),
+    creditNotes: noteTotal.toFixed(2),
   };
 }
 
