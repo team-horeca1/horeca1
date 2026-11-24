@@ -88,7 +88,6 @@ function AdminNavLinks({
                                     <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
                                         <link.icon
                                             size={20}
-                                            strokeWidth={1.75}
                                             className={cn(isActive ? 'text-white' : 'text-[#1C1C1C]')}
                                         />
                                         {collapsed && badge > 0 && (
