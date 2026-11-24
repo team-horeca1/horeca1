@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Gift, RotateCcw, ShoppingBag, Wallet } from 'lucide-react';
-import { FinanceKpiCard, inr } from '@/components/features/finance/financeChrome';
+import { inr } from '@/components/features/finance/financeChrome';
 import { JournalStatement, type StatementRow } from '@/components/features/ledger/JournalStatement';
 
 interface WalletRow {
@@ -29,6 +28,34 @@ interface Detail {
   user: { id: string; name: string; phone: string | null; email: string | null };
   balance: string;
   statement: { reward: string; creditNote: string; total: string; rows: StatementRow[] };
+}
+
+function WalletStory({ summary }: { summary: WalletSummary }) {
+  const putIn = (Number(summary.rewardsGiven) + Number(summary.creditNotes)).toFixed(2);
+  return (
+    <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_auto_1fr_auto_1.15fr] lg:items-stretch">
+      <div className="rounded-2xl border border-[#E9E3DD] bg-white p-5">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-[#667085]">1. Put into wallets</p>
+        <p className="mt-2 text-[clamp(1.6rem,2vw,2rem)] font-bold tabular-nums">{inr(putIn)}</p>
+        <p className="mt-3 text-[13px] text-[#667085]">Horeca1 gave <span className="font-semibold text-[#1C1C1C] tabular-nums">{inr(summary.rewardsGiven)}</span></p>
+        <p className="text-[13px] text-[#667085]">Suppliers returned <span className="font-semibold text-[#1C1C1C] tabular-nums">{inr(summary.creditNotes)}</span></p>
+      </div>
+      <p className="hidden items-center justify-center text-[28px] font-semibold text-[#667085] lg:flex" aria-hidden>−</p>
+      <div className="rounded-2xl border border-[#E9E3DD] bg-white p-5">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-[#667085]">2. Used on orders</p>
+        <p className="mt-2 text-[clamp(1.6rem,2vw,2rem)] font-bold tabular-nums">{inr(summary.spent)}</p>
+        <p className="mt-3 text-[13px] text-[#667085]">Cancelled orders are put back, so they are not in this number.</p>
+      </div>
+      <p className="hidden items-center justify-center text-[28px] font-semibold text-[#667085] lg:flex" aria-hidden>=</p>
+      <div className="rounded-2xl bg-[#6B1D2E] p-5 text-white">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-rose-100">3. Left to spend</p>
+        <p className="mt-2 text-[clamp(1.6rem,2vw,2rem)] font-bold tabular-nums">{inr(summary.spendable)}</p>
+        <p className="mt-3 text-[13px] text-rose-100">
+          {summary.wallets === 1 ? '1 customer' : `${summary.wallets} customers`} can still use this.
+        </p>
+      </div>
+    </section>
+  );
 }
 
 export default function AdminWalletsPage() {
@@ -75,8 +102,8 @@ export default function AdminWalletsPage() {
         <div>
           <h1 className="text-[clamp(1.4rem,2vw+0.8rem,2rem)] font-semibold">H1 Wallet</h1>
           <p className="mt-1 max-w-2xl text-[13px] text-[#667085]">
-            H1 Wallet is the customer&apos;s spendable money. Rewards and cashback are a Horeca1 platform expense.
-            When a customer pays with Wallet, Horeca1 still owes the supplier the full order minus commission.
+            Money put into customer wallets, what they used on orders, and what is left.
+            Horeca1 still pays the supplier in full when a customer pays with this wallet.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -89,51 +116,7 @@ export default function AdminWalletsPage() {
         </div>
       </header>
 
-      {summary && (
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FinanceKpiCard
-            title="Can spend"
-            value={inr(summary.spendable)}
-            subtext={summary.wallets === 1 ? '1 customer wallet' : `${summary.wallets} customer wallets`}
-            icon={<Wallet className="h-4 w-4" />}
-            variant="hero"
-          />
-          <FinanceKpiCard
-            title="Rewards given"
-            value={inr(summary.rewardsGiven)}
-            subtext="Grants and cashback put into wallets."
-            icon={<Gift className="h-4 w-4" />}
-            iconTone="burgundy"
-          />
-          <FinanceKpiCard
-            title="Spent"
-            value={inr(summary.spent)}
-            subtext="Used on orders. Cancelled spends are put back."
-            icon={<ShoppingBag className="h-4 w-4" />}
-            iconTone="blue"
-          />
-          <FinanceKpiCard
-            title="Credit notes"
-            value={inr(summary.creditNotes)}
-            subtext="Return money suppliers put into wallets."
-            icon={<RotateCcw className="h-4 w-4" />}
-            iconTone="amber"
-          />
-        </section>
-      )}
-
-      {summary && (
-        <p className="rounded-xl border border-[#E9E3DD] bg-white px-4 py-3 text-[13px] text-[#1C1C1C]">
-          <span className="font-semibold tabular-nums">{inr(summary.rewardsGiven)}</span>
-          {' rewards + '}
-          <span className="font-semibold tabular-nums">{inr(summary.creditNotes)}</span>
-          {' credit notes − '}
-          <span className="font-semibold tabular-nums">{inr(summary.spent)}</span>
-          {' spent = '}
-          <span className="font-semibold tabular-nums">{inr(summary.spendable)}</span>
-          {' still to spend.'}
-        </p>
-      )}
+      {summary && <WalletStory summary={summary} />}
 
       <form
         className="flex flex-wrap gap-2"
@@ -165,9 +148,9 @@ export default function AdminWalletsPage() {
           <thead className="text-[#667085]">
             <tr>
               <th className="px-3 py-2 font-medium">Customer</th>
-              <th className="px-3 py-2 text-right font-medium">Can spend</th>
-              <th className="px-3 py-2 text-right font-medium">Rewards left</th>
-              <th className="px-3 py-2 text-right font-medium">Notes left</th>
+              <th className="px-3 py-2 text-right font-medium">Left to spend</th>
+              <th className="px-3 py-2 text-right font-medium">From Horeca1</th>
+              <th className="px-3 py-2 text-right font-medium">From returns</th>
               <th className="px-3 py-2 text-right font-medium">Journal</th>
               <th className="px-3 py-2 font-medium" />
             </tr>
@@ -205,9 +188,9 @@ export default function AdminWalletsPage() {
               <h2 className="text-[16px] font-semibold">{detail.user.name}</h2>
               <p className="text-[13px] text-[#667085]">{detail.user.phone || detail.user.email}</p>
               <p className="mt-2 text-[13px]">
-                Can spend <span className="font-semibold tabular-nums">₹{detail.balance}</span>
-                {' · '}Rewards ₹{detail.statement.reward}
-                {' · '}Return credit notes ₹{detail.statement.creditNote}
+                Left to spend <span className="font-semibold tabular-nums">₹{detail.balance}</span>
+                {' · '}From Horeca1 ₹{detail.statement.reward}
+                {' · '}From returns ₹{detail.statement.creditNote}
               </p>
             </div>
             <button type="button" onClick={() => setDetail(null)} className="min-h-10 rounded-lg border border-[#E9E3DD] px-3 text-[12px] font-semibold">
