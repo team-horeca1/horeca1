@@ -1353,7 +1353,29 @@ export class CreditWalletService {
     return { accruals: accr.processed, reminders: rem.sent, expired: exp.expired };
   }
 
-  // ── Manual reactivation ─────────────────────────────────────────────────────
+  /** Remove a credit line that has nothing outstanding or reserved. */
+  async deleteCreditLine(walletId: string) {
+    const wallet = await prisma.creditWallet.findUnique({
+      where: { id: walletId },
+      select: {
+        id: true,
+        userId: true,
+        vendorId: true,
+        status: true,
+        creditLimit: true,
+        outstandingAmount: true,
+        reservedAmount: true,
+      },
+    });
+    if (!wallet) throw Errors.notFound('Credit line');
+    const outstanding = Number(wallet.outstandingAmount);
+    const reserved = Number(wallet.reservedAmount);
+    if (outstanding > 0.009 || reserved > 0.009) {
+      throw Errors.badRequest('Clear the outstanding and reserved amount before deleting this credit line.');
+    }
+    await prisma.creditWallet.delete({ where: { id: walletId } });
+    return wallet;
+  }
 
   /** Admin reactivation — allowed even with dues. Sets blacklistExempt so the
    *  scheduler won't immediately re-blacklist; logs a mandatory audit entry. */

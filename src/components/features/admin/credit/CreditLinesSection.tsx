@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CreditCard, Loader2, Plus, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AdminAssignCreditModal } from './AdminAssignCreditModal';
 import { AdminCreditExplainer } from './AdminCreditExplainer';
@@ -24,6 +25,8 @@ export function CreditLinesSection() {
   const [showAssign, setShowAssign] = useState(false);
   const [editingWallet, setEditingWallet] = useState<CreditWalletRow | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<CreditWalletRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CreditWalletRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadWallets = useCallback(() => {
     setLoading(true);
@@ -134,6 +137,7 @@ export function CreditLinesSection() {
                 setShowAssign(false);
                 setEditingWallet(w);
               }}
+              onDelete={() => setDeleteTarget(w)}
               onReactivate={() => setReactivateTarget(w)}
             />
           ))}
@@ -146,6 +150,50 @@ export function CreditLinesSection() {
           onClose={closeAssign}
           onSuccess={loadWallets}
         />
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-lg">
+            <h2 className="text-[16px] font-semibold text-[#1C1C1C]">Delete this credit line?</h2>
+            <p className="mt-2 text-[13px] text-[#667085]">
+              {deleteTarget.user.fullName} loses this limit. This stays blocked while any amount is outstanding or reserved.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="min-h-12 rounded-xl border border-[#E9E3DD] px-4 text-[13px] font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => {
+                  const target = deleteTarget;
+                  setDeleting(true);
+                  fetch(`/api/v1/admin/credit?id=${encodeURIComponent(target.id)}`, { method: 'DELETE' })
+                    .then((res) => res.json())
+                    .then((json) => {
+                      if (!json.success) throw new Error(json?.error?.message ?? 'Could not delete this credit line');
+                      setWallets((rows) => rows.filter((row) => row.id !== target.id));
+                      setDeleteTarget(null);
+                      toast.success('Credit line deleted');
+                    })
+                    .catch((err: unknown) => {
+                      toast.error(err instanceof Error ? err.message : 'Could not delete this credit line');
+                    })
+                    .finally(() => setDeleting(false));
+                }}
+                className="min-h-12 rounded-xl bg-[#DC2626] px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {reactivateTarget && (

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CreditLinesSection } from '@/components/features/admin/credit/CreditLinesSection';
-import { GlobalConfigSection } from '@/components/features/admin/credit/GlobalConfigSection';
 import { ReportsSection } from '@/components/features/admin/credit/ReportsSection';
 import { StatementSection } from '@/components/features/admin/credit/StatementSection';
 import type { AdminCreditTabKey } from '@/components/features/admin/credit/adminCreditTypes';
@@ -12,7 +11,6 @@ const TABS: { key: AdminCreditTabKey; label: string }[] = [
   { key: 'lines', label: 'Credit Lines' },
   { key: 'reports', label: 'Reports' },
   { key: 'statement', label: 'Statement' },
-  { key: 'config', label: 'Global Config' },
 ];
 
 export default function AdminCreditPage() {
@@ -27,7 +25,7 @@ export default function AdminCreditPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:flex bg-[#F5F5F5] rounded-[12px] p-1 gap-1 w-full lg:w-fit">
+      <div className="flex flex-wrap bg-[#F5F5F5] rounded-[12px] p-1 gap-1 w-full lg:w-fit">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -46,7 +44,6 @@ export default function AdminCreditPage() {
       {tab === 'lines' && <CreditLinesSection />}
       {tab === 'reports' && <ReportsSection />}
       {tab === 'statement' && <StatementSection />}
-      {tab === 'config' && <GlobalConfigSection />}
     </div>
   );
 }

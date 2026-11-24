@@ -4,10 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma, CreditWalletStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
-import { errorResponse } from '@/middleware/errorHandler';
+import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { logAction } from '@/lib/auditLog';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   requirePermission(ctx, 'payments.view');
@@ -52,6 +53,29 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           : null,
       })),
     });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
+  try {
+    requirePermission(ctx, 'payments.create');
+    const id = new URL(req.url).searchParams.get('id')?.trim();
+    if (!id) throw Errors.badRequest('Credit line id is required');
+    const wallet = await creditWalletService.deleteCreditLine(id);
+    await logAction(ctx, req, {
+      action: 'credit_line.delete',
+      entity: 'CreditWallet',
+      entityId: wallet.id,
+      before: {
+        userId: wallet.userId,
+        vendorId: wallet.vendorId,
+        status: wallet.status,
+        creditLimit: String(wallet.creditLimit),
+      },
+    });
+    return NextResponse.json({ success: true, data: { id: wallet.id } });
   } catch (error) {
     return errorResponse(error);
   }

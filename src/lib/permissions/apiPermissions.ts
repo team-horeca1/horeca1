@@ -43,6 +43,7 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['GET'], pattern: /^admin\/ledger(?:\/|$)/, permission: 'payments.view' },
   { methods: ['GET'], pattern: /^admin\/reports(?:\/|$)/, permission: 'analytics.view' },
   { methods: ['GET'], pattern: /^admin\/credit(?:\/|$)/, permission: 'payments.view' },
+  { methods: ['DELETE'], pattern: /^admin\/credit$/, permission: 'payments.create' },
   { methods: ['GET'], pattern: /^admin\/promotions(?:\/|$)/, permission: 'promotions.view' },
   { methods: ['GET'], pattern: /^admin\/team(?:\/|$)/, permission: 'users.view' },
   { methods: ['GET'], pattern: /^admin\/settings(?:\/|$)/, permission: 'settings.view' },

@@ -30,6 +30,7 @@ import {
   Mic2,
   ImageIcon,
   Share2,
+  Landmark,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import type { Module, RoleScope } from '@/lib/permissions/portalFeatures';
@@ -81,12 +82,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Wallets', icon: CreditCard, href: '/admin/wallets', feature: 'ledger', requiredPerm: 'ledger.view' },
       { name: 'Journal', icon: BookOpen, href: '/admin/journal', feature: 'ledger', requiredPerm: 'ledger.view' },
       { name: 'Sales reports', icon: BarChart3, href: '/admin/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
-    ],
-  },
-  {
-    label: 'Credit',
-    links: [
-      { name: 'Credit', icon: CreditCard, href: '/admin/credit', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Credit', icon: Landmark, href: '/admin/credit', feature: 'payments', requiredPerm: 'payments.view' },
     ],
   },
   {

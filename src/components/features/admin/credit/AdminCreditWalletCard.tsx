@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Pencil, RefreshCw } from 'lucide-react';
+import { Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fmtDate, fmtMoney, STATUS_STYLE, type CreditWalletRow } from './adminCreditTypes';
 import { storeDisplayName } from '@/lib/storeDisplayName';
@@ -9,6 +9,7 @@ interface AdminCreditWalletCardProps {
   wallet: CreditWalletRow;
   busy: boolean;
   onEdit: () => void;
+  onDelete: () => void;
   onReactivate: () => void;
 }
 
@@ -28,6 +29,7 @@ export function AdminCreditWalletCard({
   wallet: w,
   busy,
   onEdit,
+  onDelete,
   onReactivate,
 }: AdminCreditWalletCardProps) {
   const pct = utilizationPct(w);
@@ -110,6 +112,15 @@ export function AdminCreditWalletCard({
           >
             <Pencil size={12} />
             Edit
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+            className="inline-flex items-center gap-1 h-[32px] px-3 rounded-[8px] border border-[#EEEEEE] text-[#DC2626] text-[12px] font-bold hover:border-[#DC2626] disabled:opacity-50 transition-colors"
+          >
+            <Trash2 size={12} />
+            Delete
           </button>
           {w.status === 'BLACKLISTED' && (
             <button
