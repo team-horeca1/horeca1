@@ -136,10 +136,12 @@ export interface JournalEntryDetail {
     platformExpense: string | null;
     totalDebit: string;
   };
+  edited: boolean;
   lines: Array<{
     id: string;
     account: string;
     accountName: string;
+    accountType: 'asset' | 'liability' | 'income' | 'expense';
     role: string;
     party: string | null;
     debit: string;
@@ -147,6 +149,8 @@ export interface JournalEntryDetail {
     memo: string | null;
     source: string | null;
     funder: string | null;
+    funderType: string | null;
+    funderId: string | null;
   }>;
 }
 
@@ -157,25 +161,36 @@ export async function listJournalEntries(opts?: {
   limit?: number;
 }): Promise<JournalEntryDetail[]> {
   const limit = opts?.limit ?? 80;
-  const entries = await prisma.journalEntry.findMany({
-    where: {
-      ...(opts?.eventType ? { eventType: opts.eventType } : {}),
-      ...(opts?.search
-        ? {
-          OR: [
-            { eventRefId: { contains: opts.search } },
-            { idempotencyKey: { contains: opts.search } },
-            { remarks: { contains: opts.search, mode: 'insensitive' } },
-          ],
-        }
-        : {}),
-    },
-    include: {
-      lines: { include: { account: true }, orderBy: { debitPaise: 'desc' } },
-    },
-    orderBy: { occurredAt: 'desc' },
-    take: limit,
-  });
+  const [rawEntries, undone] = await Promise.all([
+    prisma.journalEntry.findMany({
+      where: {
+        reversesEntryId: null,
+        ...(opts?.eventType ? { eventType: opts.eventType } : {}),
+        ...(opts?.search
+          ? {
+            OR: [
+              { eventRefId: { contains: opts.search } },
+              { idempotencyKey: { contains: opts.search } },
+              { remarks: { contains: opts.search, mode: 'insensitive' } },
+            ],
+          }
+          : {}),
+      },
+      include: {
+        lines: { include: { account: true }, orderBy: { debitPaise: 'desc' } },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: limit * 3,
+    }),
+    prisma.journalEntry.findMany({
+      where: { reversesEntryId: { not: null } },
+      select: { reversesEntryId: true },
+    }),
+  ]);
+  const hidden = new Set(
+    undone.map((row) => row.reversesEntryId).filter((id): id is string => !!id),
+  );
+  const entries = rawEntries.filter((entry) => !hidden.has(entry.id)).slice(0, limit);
 
   const userIds = new Set<string>();
   const vendorIds = new Set<string>();
@@ -233,6 +248,7 @@ export async function listJournalEntries(opts?: {
       id: line.id,
       account: line.account.code,
       accountName: line.account.name,
+      accountType: line.account.type as 'asset' | 'liability' | 'income' | 'expense',
       role: roleOfAccount(line.account.code),
       party: partyFor(line.account.code, line.account.ownerType, line.account.ownerId),
       debit: inr(line.debitPaise),
@@ -246,6 +262,8 @@ export async function listJournalEntries(opts?: {
             ? `Supplier${line.funderId ? `: ${vendorName.get(line.funderId) ?? line.funderId.slice(0, 8)}` : ''}`
             : line.funderType
         : null,
+      funderType: line.funderType,
+      funderId: line.funderId,
     }));
 
     const walletLine = lines.find((l) => l.account.startsWith('WALLET:'));
@@ -270,6 +288,7 @@ export async function listJournalEntries(opts?: {
       referenceId: entry.eventRefId,
       remarks: entry.remarks,
       postedBy: entry.postedBy,
+      edited: entry.reasonCode === 'entry_edit',
       summary: {
         buyer: walletLine?.party
           ?? lines.find((l) => l.account.startsWith('AR_CREDIT_'))?.party

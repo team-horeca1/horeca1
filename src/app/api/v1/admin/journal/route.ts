@@ -6,6 +6,7 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { postJournal, reversalLines } from '@/modules/ledger/post';
 import { balanceLines, line, type DraftLine } from '@/modules/ledger/money';
+import { correctJournalEntry } from '@/modules/ledger/correct';
 
 const lineSchema = z.object({
   code: z.string().min(2).max(180),
@@ -34,7 +35,34 @@ const bodySchema = z.discriminatedUnion('action', [
     action: z.literal('loss_bearer'),
     lossBearer: z.enum(['pending', 'horeca1', 'supplier', 'per_line']),
   }),
+  z.object({
+    action: z.literal('correct'),
+    entryId: z.string().uuid(),
+    reason: z.string().min(3).max(500),
+    lines: z.array(z.object({
+      code: z.string().min(2).max(180),
+      name: z.string().min(2).max(255),
+      type: z.enum(['asset', 'liability', 'income', 'expense']),
+      debitRupees: z.string().max(20),
+      creditRupees: z.string().max(20),
+      memo: z.string().max(500).nullable().optional(),
+      sourceTag: z.string().max(40).nullable().optional(),
+      funderType: z.string().max(30).nullable().optional(),
+      funderId: z.string().uuid().nullable().optional(),
+    })).min(2).max(12),
+  }),
 ]);
+
+function correctionError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : 'Could not save this edit';
+  if (/wallet overdrawn/i.test(message)) return Errors.badRequest('That edit would take the customer wallet below zero.');
+  if (/unbalanced|must match/i.test(message)) return Errors.badRequest('Debits and credits must match.');
+  if (/already corrected|already reversed/i.test(message)) return Errors.badRequest('This entry was already corrected. Refresh and edit the latest one.');
+  if (/cannot be edited|not found|at least two|either a debit|needs an account|cannot be negative/i.test(message)) {
+    return Errors.badRequest(message);
+  }
+  return Errors.badRequest('Could not save this edit.');
+}
 
 async function otherAdmin(actorId: string, approvedBy: string) {
   if (approvedBy === actorId) throw Errors.forbidden('A different person has to approve this');
@@ -56,6 +84,20 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     requirePermission(ctx, 'ledger.adjust');
+    if (body.action === 'correct') {
+      try {
+        const result = await prisma.$transaction((tx) => correctJournalEntry(tx, {
+          entryId: body.entryId,
+          postedBy: ctx.userId,
+          reason: body.reason,
+          lines: body.lines,
+        }));
+        return NextResponse.json({ success: true, data: result });
+      } catch (error) {
+        throw correctionError(error);
+      }
+    }
+
     await otherAdmin(ctx.userId, body.approvedBy);
 
     const result = await prisma.$transaction(async (tx) => {
