@@ -66,12 +66,17 @@ async function spendBuckets(
     },
   });
   const lots: WalletBucket[] = [];
-  let priorDebit = 0;
   for (const row of rows) {
     const paise = rupeesToPaise(row.amount);
     if (row.type === 'debit') {
       if (row.referenceId === orderId) continue;
-      priorDebit += paise;
+      // A debit can only use money that already existed. Replaying in time order
+      // stops a later credit note from being treated as already spent.
+      const used = allocateSpend(lots, paise);
+      for (const taken of used) {
+        const match = lots.find((lot) => lot.tag === taken.tag && lot.createdAt === taken.createdAt && lot.paise > 0);
+        if (match) match.paise -= taken.paise;
+      }
       continue;
     }
     const mapped = sourceForReference(row.referenceType);
@@ -88,13 +93,7 @@ async function spendBuckets(
       tag: source === 'credit_note' && supplier ? `cn:${supplier}` : 'reward',
     });
   }
-  const consumed = allocateSpend(lots, priorDebit);
-  const left = lots.map((lot) => ({ ...lot }));
-  for (const used of consumed) {
-    const match = left.find((lot) => lot.tag === used.tag && lot.createdAt === used.createdAt && lot.paise > 0);
-    if (match) match.paise -= used.paise;
-  }
-  const available = left.filter((lot) => lot.paise > 0);
+  const available = lots.filter((lot) => lot.paise > 0);
   const chosen = allocateSpend(available, spendPaise);
   if (chosen.reduce((sum, lot) => sum + lot.paise, 0) < spendPaise) {
     chosen.push({

@@ -38,6 +38,7 @@
     "test:e2e:enter-buy": "playwright test e2e/supplier-business-store-enter-buy.spec.ts --workers=1",
     "test:e2e:credit": "playwright test e2e/credit-full-flow.spec.ts e2e/credit-section6.spec.ts --workers=1",
     "verify:credit-wallet": "npx tsx prisma/scripts/verify-credit-wallet.ts",
+    "test:ledger-cases": "npx tsx prisma/scripts/ledger-payment-cases.ts",
     "seed:multi-vendor": "npx tsx prisma/scripts/seed-multi-vendor-offers.ts",
     "sanity": "npm run dev --prefix studio-horeca1"
   },
