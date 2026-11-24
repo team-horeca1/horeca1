@@ -17,6 +17,54 @@ export interface AdminWalletRow {
   journalTotal: string;
 }
 
+export interface AdminWalletSummary {
+  spendable: string;
+  wallets: number;
+  rewardsGiven: string;
+  spent: string;
+  creditNotes: string;
+}
+
+function rupees(value: { toString(): string } | null | undefined): string {
+  const amount = Number(value?.toString() ?? 0);
+  return (Number.isFinite(amount) ? amount : 0).toFixed(2);
+}
+
+/** Platform totals for the H1 Wallet screen. Live wallet book, not the journal shadow. */
+export async function adminWalletSummary(): Promise<AdminWalletSummary> {
+  const [balances, rewards, notes, spent] = await Promise.all([
+    prisma.wallet.aggregate({ _sum: { balance: true }, _count: { _all: true } }),
+    prisma.walletTransaction.aggregate({
+      where: {
+        type: 'credit',
+        NOT: { source: 'credit_note' },
+        OR: [
+          { source: 'reward' },
+          { referenceType: 'cashback' },
+          { funderType: 'platform' },
+        ],
+      },
+      _sum: { amount: true },
+    }),
+    prisma.walletTransaction.aggregate({
+      where: { type: 'credit', source: 'credit_note' },
+      _sum: { amount: true },
+    }),
+    prisma.walletTransaction.aggregate({
+      where: { type: 'debit' },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  return {
+    spendable: rupees(balances._sum.balance),
+    wallets: balances._count._all,
+    rewardsGiven: rupees(rewards._sum.amount),
+    spent: rupees(spent._sum.amount),
+    creditNotes: rupees(notes._sum.amount),
+  };
+}
+
 /** Customer H1 wallets for the admin Wallets screen. */
 export async function listAdminWallets(search?: string): Promise<AdminWalletRow[]> {
   const wallets = await prisma.wallet.findMany({

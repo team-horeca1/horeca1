@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Gift, RotateCcw, ShoppingBag, Wallet } from 'lucide-react';
+import { FinanceKpiCard, inr } from '@/components/features/finance/financeChrome';
 import { JournalStatement, type StatementRow } from '@/components/features/ledger/JournalStatement';
 
 interface WalletRow {
@@ -15,6 +17,14 @@ interface WalletRow {
   journalTotal: string;
 }
 
+interface WalletSummary {
+  spendable: string;
+  wallets: number;
+  rewardsGiven: string;
+  spent: string;
+  creditNotes: string;
+}
+
 interface Detail {
   user: { id: string; name: string; phone: string | null; email: string | null };
   balance: string;
@@ -24,6 +34,7 @@ interface Detail {
 export default function AdminWalletsPage() {
   const [search, setSearch] = useState('');
   const [wallets, setWallets] = useState<WalletRow[]>([]);
+  const [summary, setSummary] = useState<WalletSummary | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +48,7 @@ export default function AdminWalletsPage() {
       .then((json) => {
         if (!json.success) throw new Error(json?.error?.message ?? 'Could not load wallets');
         setWallets(json.data.wallets ?? []);
+        setSummary(json.data.summary ?? null);
         setError(null);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load wallets'))
@@ -76,6 +88,39 @@ export default function AdminWalletsPage() {
           </Link>
         </div>
       </header>
+
+      {summary && (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <FinanceKpiCard
+            title="Can spend"
+            value={inr(summary.spendable)}
+            subtext={summary.wallets === 1 ? '1 customer wallet' : `${summary.wallets} customer wallets`}
+            icon={<Wallet className="h-4 w-4" />}
+            variant="hero"
+          />
+          <FinanceKpiCard
+            title="Rewards given"
+            value={inr(summary.rewardsGiven)}
+            subtext="Cashback and grants. Horeca1 expense."
+            icon={<Gift className="h-4 w-4" />}
+            iconTone="burgundy"
+          />
+          <FinanceKpiCard
+            title="Spent"
+            value={inr(summary.spent)}
+            subtext="Used on orders. Supplier is still paid in full."
+            icon={<ShoppingBag className="h-4 w-4" />}
+            iconTone="blue"
+          />
+          <FinanceKpiCard
+            title="Credit notes"
+            value={inr(summary.creditNotes)}
+            subtext="Return money put into wallets by suppliers."
+            icon={<RotateCcw className="h-4 w-4" />}
+            iconTone="amber"
+          />
+        </section>
+      )}
 
       <form
         className="flex flex-wrap gap-2"

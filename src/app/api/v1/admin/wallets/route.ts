@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
-import { adminWalletDetail, listAdminWallets } from '@/modules/ledger/adminRead';
+import { adminWalletDetail, adminWalletSummary, listAdminWallets } from '@/modules/ledger/adminRead';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
@@ -18,8 +18,8 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       }
     }
     const search = url.searchParams.get('search')?.trim() || undefined;
-    const wallets = await listAdminWallets(search);
-    return NextResponse.json({ success: true, data: { wallets } });
+    const [wallets, summary] = await Promise.all([listAdminWallets(search), adminWalletSummary()]);
+    return NextResponse.json({ success: true, data: { wallets, summary } });
   } catch (error) {
     return errorResponse(error);
   }
